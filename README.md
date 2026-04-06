@@ -1,5 +1,5 @@
-# SPMT Website Monitoring Control Panel
-**Enterprise-grade NOC Dashboard | Dark Mode | Real-time WebSocket**
+# SPMT Website Monitoring 
+**Enterprise-grade Dashboard | Light Mode | Real-time WebSocket**
 
 ---
 
