@@ -16,7 +16,7 @@
 
 ```bash
 # Buat database
-psql -U postgres -c "CREATE DATABASE spmt_monitoring;"
+psql -U postgres -c "CREATE DATABASE monitoring_db;"
 
 # Jalankan migration
 psql -U postgres -d spmt_monitoring -f backend/migrations/001_init.sql
