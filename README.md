@@ -41,7 +41,7 @@ cp .env.example .env
 # DB_PORT=5432
 # DB_USER=postgres
 # DB_PASSWORD=yourpassword
-# DB_NAME=spmt_monitoring
+# DB_NAME=monitoring_db
 # JWT_SECRET=ganti-dengan-secret-yang-kuat
 
 # Download dependencies
