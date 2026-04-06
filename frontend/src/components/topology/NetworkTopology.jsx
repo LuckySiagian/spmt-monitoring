@@ -286,7 +286,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     onSelect?.(null)
   }, [nodes, selectedId, onSelect, onOpenDetail])
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(5, 10, 20, 0.4)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1, position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1, position: 'relative' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>
@@ -299,7 +299,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Topology mode toggle */}
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', border: `1px solid var(--border)`, borderRadius: 6, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', background: 'var(--accent-light)', border: `1px solid var(--border)`, borderRadius: 6, overflow: 'hidden' }}>
             {['star', 'tree'].map(m => (
               <button
                 key={m}
@@ -319,7 +319,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           </div>
 
           {/* Node count */}
-          <span style={{ fontSize: 10, color: 'var(--text-sub)', background: '#0a0e1a', padding: '2px 8px', borderRadius: 10 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-sub)', background: 'var(--accent-light)', padding: '2px 8px', borderRadius: 10 }}>
             {nodes.length} nodes
           </span>
 
@@ -338,21 +338,27 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         </div>
       </div>
 
-      {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        style={{ flex: 1, width: '100%', display: 'block' }}
-        onClick={handleClick}
-        onMouseMove={(e) => {
-          const canvas = canvasRef.current
-          if (!canvas) return
-          const rect = canvas.getBoundingClientRect()
-          const mx = e.clientX - rect.left, my = e.clientY - rect.top
-          const { width, height } = canvas
-          const hovered = nodes.some(n => Math.sqrt((mx - n.x * width) ** 2 + (my - n.y * height) ** 2) < 32)
-          canvas.style.cursor = hovered ? 'pointer' : 'default'
-        }}
-      />
+      {/* Canvas Layer & Radar */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* Radar Animations */}
+        <div style={{ position:'absolute', top: topoMode==='tree'?'88%':'50%', left:'50%', width:'200%', height:'200%', background:'conic-gradient(from 0deg, transparent 70%, rgba(99,102,241,0.15) 100%)', borderRadius:'50%', pointerEvents:'none', animation:'radarSweep 4s linear infinite', zIndex:0 }} />
+        <div style={{ position:'absolute', top: topoMode==='tree'?'88%':'50%', left:'50%', transform:'translate(-50%, -50%)', width:'200%', height:'200%', background:'radial-gradient(circle, transparent 10%, rgba(99,102,241,0.05) 11%, transparent 12%, transparent 20%, rgba(99,102,241,0.05) 21%, transparent 22%, transparent 30%, rgba(99,102,241,0.05) 31%, transparent 32%)', pointerEvents:'none', zIndex:0 }}/>
+
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: 'block', position:'relative', zIndex:1 }}
+          onClick={handleClick}
+          onMouseMove={(e) => {
+            const canvas = canvasRef.current
+            if (!canvas) return
+            const rect = canvas.getBoundingClientRect()
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top
+            const { width, height } = canvas
+            const hovered = nodes.some(n => Math.sqrt((mx - n.x * width) ** 2 + (my - n.y * height) ** 2) < 32)
+            canvas.style.cursor = hovered ? 'pointer' : 'default'
+          }}
+        />
+      </div>
 
       {nodes.length === 0 && (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>

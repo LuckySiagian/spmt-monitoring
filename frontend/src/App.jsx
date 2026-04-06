@@ -65,7 +65,7 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
 
 // ── Settings Modal ──────────────────────────────────────────────
 function SettingsModal({ onClose }) {
-  const { lang, setLanguage, LANGUAGES } = useTheme()
+  const { lang, setLanguage, LANGUAGES, themeId, setTheme, THEME_OPTIONS } = useTheme()
   const [sound, setSound] = useState(()=>localStorage.getItem('spmt_sound')!=='off')
   const [refresh, setRefresh] = useState(()=>localStorage.getItem('spmt_autorefresh')!=='off')
   const save = () => { localStorage.setItem('spmt_sound',sound?'on':'off'); localStorage.setItem('spmt_autorefresh',refresh?'on':'off'); onClose() }
@@ -77,9 +77,9 @@ function SettingsModal({ onClose }) {
           <span style={{ fontSize:15, fontWeight:800, color:'var(--text)' }}>⚙️ Settings</span>
           <button onClick={onClose} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer', fontSize:16 }}>✕</button>
         </div>
-        <div style={{ padding:'18px 20px' }}>
+        <div style={{ padding:'18px 20px', maxHeight:'65vh', overflowY:'auto' }}>
           <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>🌐 LANGUAGE</div>
-          <div style={{ display:'flex', gap:8, marginBottom:20 }}>
+          <div style={{ display:'flex', gap:8, marginBottom:24 }}>
             {Object.values(LANGUAGES).map(l=>(
               <button key={l.code} onClick={()=>setLanguage(l.code)}
                 style={{ flex:1, padding:'10px 6px', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:12,
@@ -88,11 +88,31 @@ function SettingsModal({ onClose }) {
                   color:lang===l.code?'#4f46e5':'#64748b' }}>{l.flag} {l.label}</button>
             ))}
           </div>
+
+          {/* 
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>🎨 THEME COLORS</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:8, marginBottom:24 }}>
+            {THEME_OPTIONS?.map(opt => (
+              <button key={opt.id} onClick={() => setTheme(opt.id)}
+                style={{
+                  display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:8, cursor:'pointer',
+                  background: themeId === opt.id ? `${opt.color}22` : 'var(--bg-main)',
+                  border: themeId === opt.id ? `1px solid ${opt.color}` : '1px solid var(--border)',
+                  color: themeId === opt.id ? opt.color : 'var(--text)', transition:'all 0.15s'
+                }}>
+                <span style={{ width:14, height:14, borderRadius:'50%', background:opt.color, boxShadow:`0 0 5px ${opt.color}` }} />
+                <span style={{ fontSize:12, fontWeight:600 }}>{opt.name}</span>
+              </button>
+            ))}
+          </div>
+          */}
+
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>⚙️ SYSTEM PREFERENCES</div>
           {[{l:'🔔 Notification Sound',s:sound,set:setSound},{l:'🔄 Auto Refresh (30s)',s:refresh,set:setRefresh}].map(item=>(
             <div key={item.l} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid rgba(99,102,241,0.07)' }}>
               <span style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{item.l}</span>
               <button onClick={()=>item.set(v=>!v)} style={{ width:44, height:24, borderRadius:12, border:'none', cursor:'pointer', position:'relative', transition:'all 0.2s', background:item.s?'#4f46e5':'#e2e8f0' }}>
-                <span style={{ position:'absolute', top:2, left:item.s?22:2, width:20, height:20, borderRadius:'50%', background:'var(--text)', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }}/>
+                <span style={{ position:'absolute', top:2, left:item.s?22:2, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }}/>
               </button>
             </div>
           ))}
@@ -165,7 +185,6 @@ function LogoutModal({ onConfirm, onCancel }) {
 
 // ── Profile Modal ───────────────────────────────────────────────
 function ProfileModal({ user, onClose }) {
-  const { themeId, setTheme, THEME_OPTIONS } = useTheme()
   const [avatar, setAvatar] = useState(() => localStorage.getItem(`spmt_avatar_${user?.username}`) || null)
 
   const handleFile = (e) => {
@@ -206,31 +225,25 @@ function ProfileModal({ user, onClose }) {
               }
             </div>
             <div>
-              <div style={{ fontSize:18, fontWeight:800, color:'var(--text)' }}>{user?.username}</div>
+              <div style={{ fontSize:20, fontWeight:800, color:'var(--text)' }}>{user?.username}</div>
               <div style={{ fontSize:12, color:'var(--accent)', fontWeight:600, marginBottom:8 }}>Role: {user?.role.toUpperCase()}</div>
               <div style={{ display:'flex', gap:8 }}>
-                <label style={{ background:'var(--accent)', color:'#fff', padding:'4px 12px', borderRadius:6, fontSize:10, cursor:'pointer', fontWeight:700 }}>
+                <label style={{ background:'var(--accent)', color:'#fff', padding:'5px 14px', borderRadius:6, fontSize:11, cursor:'pointer', fontWeight:700 }}>
                   Upload Photo <input type="file" accept="image/*" style={{ display:'none' }} onChange={handleFile} />
                 </label>
-                {avatar && <button onClick={handleRemove} style={{ background:'transparent', border:'1px solid var(--offline)', color:'var(--offline)', padding:'4px 12px', borderRadius:6, fontSize:10, cursor:'pointer', fontWeight:700 }}>Remove</button>}
+                {avatar && <button onClick={handleRemove} style={{ background:'transparent', border:'1px solid var(--offline)', color:'var(--offline)', padding:'5px 14px', borderRadius:6, fontSize:11, cursor:'pointer', fontWeight:700 }}>Remove</button>}
               </div>
             </div>
           </div>
 
-          <div style={{ fontSize:12, fontWeight:700, color:'var(--text-sub)', letterSpacing:'0.08em', marginBottom:12 }}>🎨 APPLICATION THEME</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px, 1fr))', gap:8 }}>
-            {THEME_OPTIONS.map(opt => (
-              <button key={opt.id} onClick={() => setTheme(opt.id)}
-                style={{
-                  display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:8, cursor:'pointer',
-                  background: themeId === opt.id ? `${opt.color}22` : 'var(--bg-header)',
-                  border: themeId === opt.id ? `1px solid ${opt.color}` : '1px solid var(--border)',
-                  color: themeId === opt.id ? opt.color : 'var(--text)', transition:'all 0.15s'
-                }}>
-                <span style={{ width:12, height:12, borderRadius:'50%', background:opt.color, boxShadow:`0 0 5px ${opt.color}` }} />
-                <span style={{ fontSize:11, fontWeight:600 }}>{opt.name}</span>
-              </button>
-            ))}
+          <div style={{ background:'rgba(99,102,241,0.05)', borderRadius:12, border:'1px solid var(--border)', padding:'16px' }}>
+            <h4 style={{ margin:'0 0 16px 0', fontSize:13, color:'var(--text)' }}>Employee Details</h4>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div><div style={{fontSize:10, color:'var(--text-muted)'}}>Email</div><div style={{fontSize:12, fontWeight:600, color:'var(--text)'}}>{user?.username}@pelindo.co.id</div></div>
+              <div><div style={{fontSize:10, color:'var(--text-muted)'}}>Department</div><div style={{fontSize:12, fontWeight:600, color:'var(--text)'}}>IT / NOC Operasional</div></div>
+              <div><div style={{fontSize:10, color:'var(--text-muted)'}}>Status</div><div style={{fontSize:12, fontWeight:600, color:'var(--online)'}}>Active</div></div>
+              <div><div style={{fontSize:10, color:'var(--text-muted)'}}>Location</div><div style={{fontSize:12, fontWeight:600, color:'var(--text)'}}>Pelabuhan Belawan</div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -258,8 +271,62 @@ function AppInner() {
   const [showProfile, setShowProfile]       = useState(false)
   const [showAllNotifs, setShowAllNotifs]   = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [isTvMode, setTvMode]               = useState(false)
 
   useEffect(()=>{ const h=()=>{setLoggedIn(false);setSummary(null);setWebsites([]);setNotifications([])}; window.addEventListener('auth:logout',h); return ()=>window.removeEventListener('auth:logout',h) },[])
+
+  useEffect(() => {
+    const fn = () => {
+      if(!document.fullscreenElement) {
+        document.body.classList.remove('tv-mode')
+        setTvMode(false)
+      }
+    }
+    document.addEventListener('fullscreenchange', fn)
+    return () => document.removeEventListener('fullscreenchange', fn)
+  }, [])
+
+  const toggleTvMode = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(()=>{})
+      document.body.classList.add('tv-mode')
+      setTvMode(true)
+    } else {
+      document.exitFullscreen().catch(()=>{})
+      document.body.classList.remove('tv-mode')
+      setTvMode(false)
+    }
+  }, [])
+
+  const playAlarm = useCallback(() => {
+    if (localStorage.getItem('spmt_sound') === 'off') return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Ping 1
+      const o1 = ctx.createOscillator(); const g1 = ctx.createGain();
+      o1.type = 'sawtooth';
+      o1.frequency.setValueAtTime(880, ctx.currentTime);
+      o1.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+      g1.gain.setValueAtTime(0.2, ctx.currentTime);
+      g1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+      o1.connect(g1); g1.connect(ctx.destination);
+      o1.start(); o1.stop(ctx.currentTime + 0.3);
+
+      // Ping 2
+      setTimeout(()=> {
+        const o2 = ctx.createOscillator(); const g2 = ctx.createGain();
+        o2.type = 'sawtooth';
+        o2.frequency.setValueAtTime(880, ctx.currentTime);
+        o2.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+        g2.gain.setValueAtTime(0.2, ctx.currentTime);
+        g2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        o2.connect(g2); g2.connect(ctx.destination);
+        o2.start(); o2.stop(ctx.currentTime + 0.3);
+      }, 150);
+
+    } catch(e) {}
+  }, [])
 
   const loadSummary = useCallback(async()=>{ if(!loggedIn)return; try{const r=await dashboardAPI.getSummary();setSummary(r.data)}catch{} },[loggedIn])
   const handleWebsiteUpdate = useCallback(()=>{ loadSummary(); setRefreshTrigger(t=>t+1) },[loadSummary])
@@ -270,8 +337,13 @@ function AppInner() {
 
   const handleNewNotification = useCallback((notif)=>{
     if(notif.type!=='OFFLINE'&&notif.type!=='CRITICAL')return
-    setNotifications(prev=>{ const dupe=prev.find(n=>n.websiteId===notif.websiteId&&n.type===notif.type&&(Date.now()-n.ts)<300000); if(dupe)return prev; return [{...notif,read:false},...prev].slice(0,200) })
-  },[])
+    setNotifications(prev=>{ 
+      const dupe=prev.find(n=>n.websiteId===notif.websiteId&&n.type===notif.type&&(Date.now()-n.ts)<300000); 
+      if(dupe)return prev; 
+      playAlarm(); // TRIGGER SCI-FI ALARM ON NEW ALERT
+      return [{...notif,read:false},...prev].slice(0,200) 
+    })
+  },[playAlarm])
 
   const handleMarkRead    = useCallback((idx)=>setNotifications(p=>p.map((n,i)=>i===idx?{...n,read:true}:n)),[])
   const handleMarkAllRead = useCallback(()=>setNotifications(p=>p.map(n=>({...n,read:true}))),[])
@@ -291,6 +363,7 @@ function AppInner() {
         onMarkRead={handleMarkRead} onMarkAllRead={handleMarkAllRead}
         onNavigate={(nav)=>{ if(nav==='notifications') setShowAllNotifs(true); else navTo(nav) }}
         navItems={navItems}
+        isTvMode={isTvMode} onToggleTvMode={toggleTvMode}
         onProfile={()=>setShowProfile(true)}
         onLogout={()=>setShowLogout(true)}
         onSettings={()=>setShowSettings(true)}

@@ -40,13 +40,19 @@ export const THEME_OPTIONS = [
 ]
 
 export function ThemeProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem('spmt_lang') || 'id')
-  const [themeId, setThemeId] = useState(() => localStorage.getItem('spmt_theme') || 'theme-dark')
+  const [lang, setLang] = useState(() => {
+    return localStorage.getItem('spmt_lang') || 'en'
+  })
+  
+  const [themeId, setThemeId] = useState('theme-light')
 
   useEffect(() => {
-    // Apply theme class to body
-    document.body.className = themeId
-  }, [themeId])
+    // Force light mode
+    setThemeId('theme-light')
+    localStorage.setItem('spmt_theme', 'theme-light')
+    
+    document.documentElement.className = 'theme-light'
+  }, [])
 
   const setLanguage = useCallback((code) => {
     setLang(code)
@@ -56,6 +62,7 @@ export function ThemeProvider({ children }) {
   const setTheme = useCallback((id) => {
     setThemeId(id)
     localStorage.setItem('spmt_theme', id)
+    document.documentElement.className = id
   }, [])
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.id
