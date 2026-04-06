@@ -129,7 +129,7 @@ alignItems:'center',
 justifyContent:'center',
 overflow:'hidden',
 position:'relative',
-background:'#050b18'
+background:'#ffffff'
 },
 
 video:{
@@ -145,7 +145,7 @@ zIndex:0
 overlay:{
 position:'absolute',
 inset:0,
-background:'rgba(5,10,25,0.65)',
+background:'rgba(255,255,255,0.3)',
 zIndex:1
 },
 

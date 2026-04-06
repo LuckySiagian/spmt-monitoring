@@ -58,8 +58,8 @@ const s = {
   main: {
     display:'grid',
     gridTemplateColumns:'72% 28%',
-    gap:12, flex:1, overflow:'hidden',
-    padding:'16px', minHeight:0,
+    gap: 4, flex:1, overflow:'hidden',
+    padding: '4px', minHeight:0,
   },
   topo:   { display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' },
   status: { display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' },
