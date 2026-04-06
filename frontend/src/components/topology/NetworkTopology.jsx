@@ -79,7 +79,7 @@ function calcTreeLayout(websites) {
 }
 
 export default function NetworkTopology({ websites, selectedId, onSelect, onOpenDetail, wsConnected }) {
-  const { theme: t } = useTheme()
+  const { themeId } = useTheme()
   const canvasRef    = useRef(null)
   const animFrameRef = useRef(null)
   const timeRef      = useRef(0)
@@ -225,13 +225,20 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
       // Name label
       const name = node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name
-      const labelY = ny + r + 5
-      ctx.font = `${isSel ? 'bold ' : ''}10px system-ui`
+      const labelY = ny + r + 6
+      ctx.font = `${isSel ? '800 ' : '600 '}12px system-ui`
       ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-      const tw = ctx.measureText(name).width + 8
-      ctx.fillStyle = 'rgba(10,14,26,0.9)'
-      ctx.fillRect(nx - tw / 2, labelY - 1, tw, 14)
-      ctx.fillStyle = isSel ? '#e2e8f0' : 'var(--text-muted)'
+      const tw = ctx.measureText(name).width + 12
+      const isLight = themeId === 'theme-light'
+
+      ctx.fillStyle = isLight ? 'rgba(255,255,255,1)' : 'rgba(10,14,26,0.9)'
+      ctx.fillRect(nx - tw / 2, labelY - 2, tw, 18)
+      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.2)' : 'transparent'
+      if (isLight) ctx.strokeRect(nx - tw / 2, labelY - 2, tw, 18)
+
+      ctx.fillStyle = isLight 
+        ? '#000000' 
+        : (isSel ? '#e2e8f0' : 'var(--text-muted)')
       ctx.fillText(name, nx, labelY)
 
       // Status dot

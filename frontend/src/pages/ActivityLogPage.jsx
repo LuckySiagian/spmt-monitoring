@@ -21,9 +21,9 @@ export default function ActivityLogPage() {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '8px 10px' }}>
-      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(16px)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 10, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', boxShadow: '0 2px 16px rgba(99,102,241,0.10)' }}>
+      <div style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow)' }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(255,255,255,0.92)', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>📋 Activity Log</span>
             <span style={{ fontSize: 11, color: '#64748b' }}>Complete history · {events.length} events</span>
@@ -60,7 +60,7 @@ export default function ActivityLogPage() {
                   </tbody>
                 </table>
               </div>
-              {total > 1 && <div style={{ display: 'flex', gap: 5, justifyContent: 'center', padding: '10px', borderTop: '1px solid rgba(99,102,241,0.1)', background: 'rgba(241,245,249,0.8)' }}>
+              {total > 1 && <div style={{ display: 'flex', gap: 5, justifyContent: 'center', padding: '10px', borderTop: '1px solid var(--border)', background: 'var(--bg-card)' }}>
                 <button style={pb(false)} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
                 {Array.from({ length: Math.min(7, total) }, (_, i) => { const p = Math.max(1, Math.min(total - 6, page - 3)) + i; return <button key={p} style={pb(p === page)} onClick={() => setPage(p)}>{p}</button> })}
                 <button style={pb(false)} onClick={() => setPage(p => Math.min(total, p + 1))} disabled={page === total}>›</button>

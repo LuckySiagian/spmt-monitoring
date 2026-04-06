@@ -14,10 +14,7 @@ html, body, #root {
 
 /* ── Enterprise Dark Mode Background (Base) ── */
 body {
-  background: radial-gradient(circle at 15% 0%, var(--accent-light) 0%, transparent 40%),
-              radial-gradient(circle at 85% 10%, var(--online-light) 0%, transparent 40%),
-              radial-gradient(circle at 50% 100%, var(--bg-card) 0%, transparent 50%),
-              linear-gradient(135deg, var(--bg-main) 0%, var(--bg-header) 100%);
+  background: var(--bg-main);
   min-height: 100vh;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -39,7 +36,30 @@ body::before {
 #root { position: relative; z-index: 1; display: flex; flex-direction: column; }
 
 /* ── Base Theme: Enterprise Dark ── */
-:root, .theme-dark {
+:root, .theme-light {
+  --bg-main:    #ffffff;
+  --bg-card:    rgba(255, 255, 255, 0.8);
+  --bg-header:  rgba(255, 255, 255, 0.95);
+  --border:     rgba(203, 213, 225, 0.8);
+  --border-strong: rgba(148, 163, 184, 0.8);
+  --shadow:     0 4px 20px rgba(0, 0, 0, 0.05);
+  --shadow-glow:0 0 15px rgba(59, 130, 246, 0.15);
+  --text:       #0f172a;
+  --text-sub:   #475569;
+  --text-muted: #94a3b8;
+  --accent:     #2563eb;
+  --accent-light: rgba(59, 130, 246, 0.05);
+  --accent-hover: #1d4ed8;
+  --online:     #16a34a;
+  --online-light: rgba(22, 163, 74, 0.05);
+  --critical:   #d97706;
+  --critical-light: rgba(217, 119, 6, 0.02);
+  --offline:    #dc2626;
+  --warning:    #d97706;
+  --grid-color: rgba(0, 0, 0, 0.03);
+}
+
+.theme-dark {
   --bg-main:    #0B0F19;
   --bg-card:    rgba(16, 24, 39, 0.65);
   --bg-header:  rgba(13, 19, 30, 0.85);
@@ -137,26 +157,6 @@ body::before {
 }
 
 /* ── Theme 7: Clean Light ── */
-.theme-light {
-  --bg-main:    #f8fafc;
-  --bg-card:    rgba(255, 255, 255, 0.8);
-  --bg-header:  rgba(255, 255, 255, 0.95);
-  --border:     rgba(203, 213, 225, 0.8);
-  --border-strong: rgba(148, 163, 184, 0.8);
-  --shadow:     0 4px 20px rgba(0, 0, 0, 0.05);
-  --shadow-glow:0 0 15px rgba(59, 130, 246, 0.15);
-  --text:       #0f172a;
-  --text-sub:   #475569;
-  --text-muted: #94a3b8;
-  --accent:     #2563eb;
-  --online:     #16a34a;
-  --critical:   #d97706;
-  --offline:    #dc2626;
-  --accent-light: rgba(59, 130, 246, 0.05);
-  --online-light: rgba(22, 163, 74, 0.05);
-  --critical-light: rgba(217, 119, 6, 0.02);
-  --grid-color: rgba(0, 0, 0, 0.03);
-}
 
 
 /* ── UI Components & Utilities ── */
@@ -208,10 +208,10 @@ input::placeholder { color: var(--text-muted); }
 
 /* Override table styles inside list pages */
 th {
-  background: rgba(0,0,0,0.4) !important;
+  background: var(--bg-header) !important;
   color: var(--text-muted) !important;
   font-weight: 700 !important;
-  border-bottom: 1px solid var(--border-strong) !important;
+  border-bottom: 2px solid var(--border) !important;
   backdrop-filter: blur(10px);
 }
 td { color: var(--text) !important; }

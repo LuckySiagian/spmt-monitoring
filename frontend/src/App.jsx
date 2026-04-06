@@ -356,7 +356,7 @@ function AppInner() {
   const navItems = ['dashboard','websites','activity-log',...(isSuperAdmin?['users']:[])]
 
   return (
-    <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+    <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column', overflow:'hidden', background:'var(--bg-main)', color:'var(--text)' }}>
       <TopBar
         summary={summary} activeNav={activeNav} onNavChange={navTo}
         websites={websites} notifications={notifications}
