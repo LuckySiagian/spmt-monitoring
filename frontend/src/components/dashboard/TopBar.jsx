@@ -8,7 +8,7 @@ import MetricDetailModal from './MetricDetailModal'
 const fmtSLA = v => v==null?'0.00':Number(v).toFixed(2)
 const DROPDOWN_ID = 'profile-dd'
 
-function ProfileDropdown({ user, onProfile, onLogout, onSettings, onAbout, onClose, rect }) {
+function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbout, onClose, rect }) {
   if (!rect) return null
   const rc = { superadmin:'#7c3aed', admin:'#3b82f6', viewer:'#64748b' }[user?.role] || '#64748b'
   const rl = { superadmin:'SuperAdmin', admin:'Admin', viewer:'Viewer' }[user?.role] || 'User'
@@ -16,10 +16,10 @@ function ProfileDropdown({ user, onProfile, onLogout, onSettings, onAbout, onClo
     <div id={DROPDOWN_ID} style={{ position:'fixed', top:rect.bottom+8, right:window.innerWidth-rect.right, width:210,
       background:'var(--bg-header)', backdropFilter:'blur(20px)', border:'1px solid var(--border)',
       borderRadius:12, boxShadow:'var(--shadow)', zIndex:99995, overflow:'hidden', animation:'fadeIn 0.15s ease' }}>
-      <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)', background:'rgba(0,0,0,0.2)' }}>
+      <div style={{ padding:'12px 14px', borderBottom:'1px solid var(--border)', background:'var(--accent-light)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:36, height:36, borderRadius:'50%', background:`linear-gradient(135deg,${rc}22,${rc}44)`, border:`2px solid ${rc}66`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color:rc }}>
-            {(user?.username||'?')[0].toUpperCase()}
+          <div style={{ width:36, height:36, borderRadius:'50%', background:avatar?'transparent':`linear-gradient(135deg,${rc}22,${rc}44)`, border:`2px solid ${rc}66`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:800, color:rc, overflow:'hidden' }}>
+            {avatar ? <img src={avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/> : (user?.username||'?')[0].toUpperCase()}
           </div>
           <div><div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{user?.username}</div><div style={{ fontSize:10, color:rc, fontWeight:600 }}>{rl}</div></div>
         </div>
@@ -37,7 +37,7 @@ function ProfileDropdown({ user, onProfile, onLogout, onSettings, onAbout, onClo
   )
 }
 
-export default function TopBar({ summary, onNavChange, activeNav, websites=[], notifications=[], onMarkRead, onMarkAllRead, navItems=['dashboard','websites','activity-log'], onNavigate, onLogout, onSettings, onAbout, onProfile }) {
+export default function TopBar({ summary, onNavChange, activeNav, websites=[], notifications=[], onMarkRead, onMarkAllRead, navItems=['dashboard','websites','activity-log'], onNavigate, onLogout, onSettings, onAbout, onProfile, isTvMode, onToggleTvMode }) {
   const { user } = useAuth()
   const { t } = useTheme()
   const [activeMetric, setActiveMetric] = useState(null)
@@ -75,6 +75,8 @@ export default function TopBar({ summary, onNavChange, activeNav, websites=[], n
     {label:'AVG RT',   value:`${Math.round(summary?.avg_response_time??0)}ms`, color:'#8b5cf6'},
     {label:t?.alerts||'ALERTS',   value:alertCount, color:alertCount>0?'var(--offline)':'var(--text-muted)'},
   ]
+
+  const slaPct = Number(summary?.sla_percent || 100);
 
   const rc = {superadmin:'#8b5cf6',admin:'#3b82f6',viewer:'#64748b'}[user?.role]||'#64748b'
   const rl = {superadmin:'SA',admin:'AD',viewer:'VW'}[user?.role]||'??'
@@ -130,7 +132,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites=[], n
         </div>
 
         {/* Nav */}
-        <div style={{ display:'flex', gap:4, background:'rgba(0,0,0,0.2)', border:'1px solid var(--border)', borderRadius:8, padding:'4px', height:36, flexShrink:0 }}>
+        <div className="topbar-nav" style={{ display:'flex', gap:4, background:'var(--accent-light)', border:'1px solid var(--border)', borderRadius:8, padding:'4px', height:36, flexShrink:0 }}>
           {navItems.map(tab=>(
             <button key={tab}
               style={{ 
@@ -144,8 +146,32 @@ export default function TopBar({ summary, onNavChange, activeNav, websites=[], n
           ))}
         </div>
 
+        {/* Mini SLA Donut for TV Mode Highlight */}
+        {isTvMode && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
+            <svg width="34" height="34" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+              <circle cx="18" cy="18" r="14" fill="none" stroke={slaPct>99?'#10b981':slaPct>80?'#f59e0b':'#ef4444'} strokeWidth="4"
+                strokeDasharray="88" strokeDashoffset={88 - (slaPct / 100) * 88} strokeLinecap="round" transform="rotate(-90 18 18)" style={{transition:'stroke-dashoffset 1s ease-in-out'}}/>
+            </svg>
+            <div style={{ display:'flex', flexDirection:'column' }}>
+              <span style={{ fontSize:15, fontWeight:800, color:'var(--text)', lineHeight:1 }}>{slaPct.toFixed(2)}%</span>
+              <span style={{ fontSize:9, color:'var(--accent)', fontWeight:700, letterSpacing:'0.1em' }}>SLA 24H</span>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
-        <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+        <div className="topbar-actions" style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+          <button onClick={onToggleTvMode} className="hover-glow" title="Masuk/Keluar Kiosk TV Mode"
+             style={{ display:'flex', alignItems:'center', justifyContent:'center', gap: 6, padding: '0 12px', height:36, borderRadius:8, background:isTvMode?'rgba(99,102,241,0.2)':'transparent', border:isTvMode?'1px solid var(--accent)':'1px solid transparent', color:isTvMode?'var(--accent)':'var(--text-sub)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+              <polyline points="17 2 12 7 7 2"></polyline>
+            </svg>
+            {!isTvMode && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em' }}>TV NOC</span>}
+          </button>
+
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate}/>
 
           <div style={{ flexShrink:0, padding:'0 12px', borderLeft:'1px solid var(--border)', borderRight:'1px solid var(--border)' }}>
@@ -158,7 +184,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites=[], n
           <div ref={profileRef} style={{ position:'relative', flexShrink:0 }}>
             <button onClick={()=>{ setShowProfile(v=>!v); if(profileRef.current) setProfileRect(profileRef.current.getBoundingClientRect()) }}
               className="hover-glow"
-              style={{ display:'flex', alignItems:'center', gap:8, background:'rgba(0,0,0,0.2)', border:`1px solid var(--border)`, borderRadius:20, padding:'4px 12px 4px 4px', cursor:'pointer' }}>
+              style={{ display:'flex', alignItems:'center', gap:8, background:'var(--accent-light)', border:`1px solid var(--border)`, borderRadius:20, padding:'4px 12px 4px 4px', cursor:'pointer' }}>
               <div style={{ width:28, height:28, borderRadius:'50%', background:avatar?'transparent':`linear-gradient(135deg,${rc}22,${rc}44)`, border:`2px solid ${rc}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:800, color:rc, flexShrink:0, textShadow:`0 0 5px ${rc}`, overflow:'hidden' }}>
                 {avatar ? <img src={avatar} style={{width:'100%',height:'100%',objectFit:'cover'}} alt=""/> : (user?.username||'?')[0].toUpperCase()}
               </div>
@@ -167,7 +193,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites=[], n
               </div>
               <span style={{ color:'var(--text-muted)', fontSize:10 }}>▾</span>
             </button>
-            {showProfile && <ProfileDropdown user={user} rect={profileRect} onProfile={onProfile} onLogout={onLogout} onSettings={onSettings} onAbout={onAbout} onClose={()=>setShowProfile(false)}/>}
+            {showProfile && <ProfileDropdown user={user} avatar={avatar} rect={profileRect} onProfile={onProfile} onLogout={onLogout} onSettings={onSettings} onAbout={onAbout} onClose={()=>setShowProfile(false)}/>}
           </div>
         </div>
       </div>

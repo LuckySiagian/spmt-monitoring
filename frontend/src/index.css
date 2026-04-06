@@ -14,10 +14,10 @@ html, body, #root {
 
 /* ── Enterprise Dark Mode Background (Base) ── */
 body {
-  background: radial-gradient(circle at 15% 50%, var(--accent-light) 0%, transparent 40%),
-              radial-gradient(circle at 85% 30%, var(--online-light) 0%, transparent 40%),
-              radial-gradient(circle at 50% 80%, var(--critical-light) 0%, transparent 40%),
-              var(--bg-main);
+  background: radial-gradient(circle at 15% 0%, var(--accent-light) 0%, transparent 40%),
+              radial-gradient(circle at 85% 10%, var(--online-light) 0%, transparent 40%),
+              radial-gradient(circle at 50% 100%, var(--bg-card) 0%, transparent 50%),
+              linear-gradient(135deg, var(--bg-main) 0%, var(--bg-header) 100%);
   min-height: 100vh;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -208,7 +208,7 @@ input::placeholder { color: var(--text-muted); }
 
 /* Override table styles inside list pages */
 th {
-  background: var(--bg-header) !important;
+  background: rgba(0,0,0,0.4) !important;
   color: var(--text-muted) !important;
   font-weight: 700 !important;
   border-bottom: 1px solid var(--border-strong) !important;
@@ -247,6 +247,36 @@ tr:hover { background: var(--accent-light) !important; }
   box-shadow: 0 0 15px var(--border-strong) !important;
   transform: translateY(-2px);
 }
+
+/* ── TV Mode Customizations ── */
+.tv-mode {
+  font-size: 110% !important;
+}
+.tv-mode .topbar-nav { display: none; }
+.tv-mode .topbar-actions { opacity: 0.1; transition: opacity 0.3s; }
+.tv-mode .topbar-actions:hover { opacity: 1; }
+.tv-mode .glass-card { padding: 12px 18px !important; }
+
+/* ── Hologram & Cyberpunk Effects ── */
+@keyframes radarSweep {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes glitch {
+  0% { transform: scale(1.02) translateX(0); box-shadow: 0 0 10px rgba(239,68,68,0.3); border-color: rgba(239,68,68,0.5); }
+  25% { transform: scale(1.02) translateX(-1px); }
+  50% { transform: scale(1.02) translateX(1px); box-shadow: 0 0 15px rgba(239,68,68,0.6); }
+  75% { transform: scale(1.02) translateX(-1px); }
+  100% { transform: scale(1.02) translateX(0); box-shadow: 0 0 10px rgba(239,68,68,0.3); border-color: rgba(239,68,68,0.5); }
+}
+
+.glitch-offline {
+  animation: glitch 0.5s infinite ease-in-out;
+  position: relative;
+  z-index: 2;
+}
+
 
 /* ════════════════════════════════════════════
    RESPONSIVE

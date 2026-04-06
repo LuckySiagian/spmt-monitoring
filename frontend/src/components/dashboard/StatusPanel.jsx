@@ -42,7 +42,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
   
   return (
     <div
-      className="glass-card hover-glow"
+      className={`glass-card hover-glow ${w.status === 'OFFLINE' ? 'glitch-offline' : ''}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
         cursor: 'pointer', transition: 'all 0.2s',
@@ -112,7 +112,7 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(5, 10, 20, 0.4)', backdropFilter:'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter:'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1 }}>
       
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -126,7 +126,7 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'rgba(0,0,0,0.2)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--accent-light)', flexShrink: 0 }}>
         {TABS.map(tb => (
           <button
             key={tb.id}
