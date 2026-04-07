@@ -285,7 +285,8 @@ func (p *Pool) check(w model.Website) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: false},
+			// Allow connection even if SSL is invalid/expired (fixes the "Offline in monitoring but OK in browser" issue)
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, 
 			DisableKeepAlives:   true,
 			MaxIdleConnsPerHost: 1,
 		},
@@ -315,12 +316,18 @@ func (p *Pool) check(w model.Website) {
 	code := resp.StatusCode
 	logEntry.StatusCode = &code
 
-	// ── STEP 5: SSL Certificate ───────────────────────────────
+	// ── STEP 5: SSL Certificate Analysis (Manual Check because SkipVerify is true) ──
 	if isHTTPS && resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 		cert := resp.TLS.PeerCertificates[0]
 		expiry := cert.NotAfter
 		logEntry.SSLExpiryDate = &expiry
-		logEntry.SSLValid = time.Now().Before(expiry)
+		
+		// Re-verify SSL validity manually for reporting
+		now := time.Now()
+		isExpired := now.After(expiry)
+		isDNSMatch := cert.VerifyHostname(host) == nil
+		
+		logEntry.SSLValid = !isExpired && isDNSMatch
 	} else if !isHTTPS {
 		logEntry.SSLValid = true
 	}
@@ -334,30 +341,37 @@ func (p *Pool) check(w model.Website) {
 
 // determineStatus maps results → ONLINE / CRITICAL / OFFLINE / UNKNOWN
 func determineStatus(code, responseTimeMs int, sslValid, isHTTPS bool) model.LogStatus {
-	// SSL invalid on HTTPS = CRITICAL (expired cert)
+	// ── SECURITY COMPLIANCE CHECK ──
+	// If the service is reachable but SSL is invalid, it's CRITICAL (Security Risk)
 	if isHTTPS && !sslValid {
 		return model.StatusCritical
 	}
+
+	// ── PERFORMANCE & SERVER HEALTH ──
 	// 5xx server errors = CRITICAL
 	if code >= 500 && code <= 599 {
 		return model.StatusCritical
 	}
-	// Extreme slowness = CRITICAL
+	// Extreme latentcy (8s+) = CRITICAL
 	if responseTimeMs > 8000 {
 		return model.StatusCritical
 	}
-	// Successful response codes (2xx, 3xx)
+
+	// ── SUCCESSFUL RESPONSES ──
 	if code >= 200 && code <= 399 {
-		// 3000–8000ms = CRITICAL (very slow)
+		// Degraded Performance (3s - 8s) = CRITICAL
 		if responseTimeMs >= 3000 {
 			return model.StatusCritical
 		}
 		return model.StatusOnline
 	}
-	// 4xx = OFFLINE (service refusing clients)
+
+	// ── CLIENT ERRORS / REJECTIONS ──
+	// 4xx = OFFLINE (The server is up but refusing the request/resource not found)
 	if code >= 400 && code <= 499 {
 		return model.StatusOffline
 	}
+
 	return model.StatusOffline
 }
 
@@ -373,7 +387,7 @@ func diagnoseConnError(errMsg string) string {
 	case strings.Contains(msg, "too many redirects"):
 		return "Too many redirects"
 	case strings.Contains(msg, "certificate"):
-		return "SSL certificate error"
+		return "SSL validation failed"
 	default:
 		return "Service unreachable"
 	}
@@ -382,42 +396,44 @@ func diagnoseConnError(errMsg string) string {
 func diagnoseRootCause(l *model.MonitoringLog) string {
 	switch l.Status {
 	case model.StatusOnline:
-		return "All checks passed"
+		return "Service healthy - All checks passed"
 	case model.StatusUnknown:
 		if l.ErrorMessage != nil {
 			return *l.ErrorMessage
 		}
-		return "Monitoring not completed"
+		return "Monitoring task incomplete"
 	case model.StatusOffline:
 		if !l.DNSResolved {
-			return "DNS lookup failed"
+			return "DNS resolution failed"
 		}
-		if !l.ICMPStatus {
-			return "ICMP unreachable"
+		if !l.ICMPStatus && !l.TCPPortOpen {
+			return "Network routing issue / Host unreachable"
 		}
 		if !l.TCPPortOpen {
-			return "TCP port closed"
+			return "Service port (80/443) closed"
 		}
 		if l.ErrorMessage != nil {
 			return diagnoseConnError(*l.ErrorMessage)
 		}
 		if l.StatusCode != nil && *l.StatusCode >= 400 {
-			return fmt.Sprintf("HTTP %d error", *l.StatusCode)
+			return fmt.Sprintf("HTTP %d Client Error (Service Active)", *l.StatusCode)
 		}
 		return "Service unreachable"
 	case model.StatusCritical:
-		if l.SSLExpiryDate != nil && !l.SSLValid {
-			return "SSL certificate expired"
+		if l.StatusCode != nil && *l.StatusCode >= 200 && *l.StatusCode < 400 {
+			if !l.SSLValid {
+				return "Security Alert: Invalid SSL Certificate (Reachable in Browser)"
+			}
+			if l.ResponseTimeMs != nil && *l.ResponseTimeMs >= 3000 {
+				return "Performance Alert: High latency detected"
+			}
 		}
 		if l.StatusCode != nil && *l.StatusCode >= 500 {
-			return fmt.Sprintf("HTTP %d server error", *l.StatusCode)
+			return fmt.Sprintf("Server Error: HTTP %d response", *l.StatusCode)
 		}
-		if l.ResponseTimeMs != nil && *l.ResponseTimeMs >= 3000 {
-			return "Response time above threshold"
-		}
-		return "Degraded performance"
+		return "Service degraded"
 	}
-	return "Unknown"
+	return "Indeterminate cause"
 }
 
 func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) {

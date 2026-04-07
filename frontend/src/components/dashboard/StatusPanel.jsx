@@ -8,10 +8,10 @@ const getDomain = u => { try { return new URL(u).hostname } catch { return u } }
 
 // ── Status colors ─────────────────────────────────────────────
 const BADGE = {
-  ONLINE:   { bg: 'rgba(16,185,129,0.15)', color: '#10b981', glow: '0 0 10px rgba(16,185,129,0.3)' },
-  CRITICAL: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', glow: '0 0 12px rgba(245,158,11,0.4)' },
-  OFFLINE:  { bg: 'rgba(239,68,68,0.15)',  color: '#ef4444', glow: '0 0 10px rgba(239,68,68,0.4)' },
-  UNKNOWN:  { bg: 'rgba(156,163,175,0.10)', color: '#9ca3af', glow: 'none' },
+  ONLINE:   { bg: 'rgba(22,163,74,0.12)', color: '#16a34a', glow: 'none' },
+  CRITICAL: { bg: 'rgba(217,119,6,0.12)', color: '#d97706', glow: 'none' },
+  OFFLINE:  { bg: 'rgba(220,38,38,0.12)',  color: '#dc2626', glow: 'none' },
+  UNKNOWN:  { bg: 'rgba(71,85,105,0.12)',   color: '#475569', glow: 'none' },
 }
 
 // ── Sub-components ────────────────────────────────────────────
@@ -46,9 +46,8 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
         cursor: 'pointer', transition: 'all 0.2s',
-        border: isSelected ? `1px solid ${c.color}` : '1px solid var(--border)',
-        background: isSelected ? `rgba(255,255,255,0.05)` : 'var(--bg-card)',
-        boxShadow: isSelected ? c.glow : 'none',
+        border: isSelected ? `2px solid ${c.color}` : '1px solid var(--border)',
+        background: isSelected ? `var(--accent-light)` : 'var(--bg-main)',
         marginBottom: 6, borderRadius: 8
       }}
       onClick={() => {

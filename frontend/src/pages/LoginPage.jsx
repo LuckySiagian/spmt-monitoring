@@ -153,13 +153,13 @@ card:{
 position:'relative',
 zIndex:2,
 width:'420px',
-maxWidth:'90%',
+maxWidth:'95%',
 padding:'40px',
-borderRadius:'16px',
-background:'rgba(73, 80, 98, 0.55)',
-backdropFilter:'blur(5px)',
-border:'1px solid rgba(255,255,255,0.08)',
-boxShadow:'0 20px 80px rgba(48, 75, 97, 0.84)',
+borderRadius:'24px',
+background:'rgba(255, 255, 255, 0.65)',
+backdropFilter:'blur(20px)',
+border:'1px solid rgba(255,255,255,0.4)',
+boxShadow:'0 24px 80px rgba(0, 0, 0, 0.15)',
 display:'flex',
 flexDirection:'column',
 alignItems:'center'
@@ -170,12 +170,12 @@ marginBottom:'20px'
 },
 
 logo:{
-height:'100px',
-background:'var(--text)',
-borderRadius: '10px',
-backdropFilter:'blur(100px)',
-border:'1px solid rgba(255,255,255,0.08)',
-boxShadow:'0 20px 80px rgba(119, 145, 169, 0.84)',
+height:'80px',
+background:'#ffffff',
+padding: '10px 20px',
+borderRadius: '12px',
+border:'1px solid var(--border)',
+boxShadow:'0 8px 30px rgba(0,0,0,0.08)',
 objectFit:'contain'
 },
 
@@ -200,23 +200,28 @@ gap:'14px'
 
 input:{
 width:'100%',
-padding:'12px 14px',
-borderRadius:'8px',
-border:'1px solid rgba(255,255,255,0.12)',
-background:'rgba(20,30,50,0.7)',
+padding:'14px 16px',
+borderRadius:'12px',
+border:'1px solid var(--border)',
+background:'#ffffff',
 color:'var(--text)',
-outline:'none'
+fontSize: '14px',
+outline:'none',
+transition: 'all 0.2s'
 },
 
 btn:{
-marginTop:'10px',
-padding:'13px',
-borderRadius:'8px',
+marginTop:'14px',
+padding:'14px',
+borderRadius:'12px',
 border:'none',
-background:'linear-gradient(135deg,#1d4ed8,#3b82f6)',
-color:'var(--text)',
-fontWeight:700,
-cursor:'pointer'
+background:'linear-gradient(135deg,#2563eb,#3b82f6)',
+color:'#ffffff',
+fontSize: '14px',
+fontWeight:800,
+letterSpacing: '0.05em',
+cursor:'pointer',
+boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)'
 },
 
 error:{
@@ -237,11 +242,13 @@ gap:'5px'
 },
 
 brandBox:{
-background:'var(--text)',
-padding:'6px 13px',
-borderRadius:'15px',
+background:'#ffffff',
+padding:'8px 16px',
+border: '1px solid var(--border)',
+borderRadius:'20px',
 display:'flex',
-alignItems:'center'
+alignItems:'center',
+boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
 },
 
 brandLogo:{

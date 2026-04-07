@@ -15,7 +15,12 @@ function hexToRgb(hex) {
 }
 
 function getDomain(url) {
-  try { return new URL(url).hostname } catch { return url }
+  if (!url) return ''
+  try {
+    let clean = url.trim()
+    if (!clean.startsWith('http')) clean = 'http://' + clean
+    return new URL(clean).hostname
+  } catch { return url }
 }
 
 // ── Layout functions ──────────────────────────────────────────
@@ -86,6 +91,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const faviconCache = useRef({})
   const [nodes,   setNodes]   = useState([])
   const [topoMode, setMode]   = useState('star') // 'star' | 'tree'
+  const [hoveredId, setHoveredId] = useState(null)
 
   // Preload favicons
   useEffect(() => {
@@ -94,7 +100,10 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       if (!faviconCache.current[domain]) {
         const img = new Image()
         img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
-        img.onload  = () => { faviconCache.current[domain] = img }
+        img.onload  = () => { 
+          faviconCache.current[domain] = img
+          setNodes(prev => [...prev]) 
+        }
         img.onerror = () => { faviconCache.current[domain] = null }
       }
     })
@@ -128,30 +137,29 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const nx = node.x * width, ny = node.y * height
       const color = STATUS_COLORS[node.status] || STATUS_COLORS.UNKNOWN
       const isSel = node.id === selectedId
+      const isHov = node.id === hoveredId
 
       const alpha = node.status === 'ONLINE' ? 0.28 : 0.18
       ctx.beginPath()
       ctx.moveTo(nx, ny)
       if (topoMode === 'tree') {
-        // Bezier curve: from node upward to server at bottom
         const cpY1 = ny + (serverY - ny) * 0.4
         const cpY2 = serverY - (serverY - ny) * 0.4
         ctx.bezierCurveTo(nx, cpY1, serverX, cpY2, serverX, serverY)
       } else {
         ctx.lineTo(serverX, serverY)
       }
-      ctx.strokeStyle = isSel ? color : `rgba(${hexToRgb(color)},${alpha})`
-      ctx.lineWidth = isSel ? 2.5 : 1.2
+      ctx.strokeStyle = (isSel || isHov) ? color : `rgba(${hexToRgb(color)},${alpha})`
+      ctx.lineWidth = (isSel || isHov) ? 2.5 : 1.2
       ctx.setLineDash([])
       ctx.stroke()
 
-      // Animated data packet along path
+      // Animated data packet
       if (node.status === 'ONLINE' || node.status === 'CRITICAL') {
         const speed = node.status === 'CRITICAL' ? 1.8 : 0.8
         const t2 = (timeRef.current * speed + node.x * 3 + node.y * 2) % 1
         let px, py
         if (topoMode === 'tree') {
-          // Bezier interpolation
           const cpY1 = ny + (serverY - ny) * 0.4
           const cpY2 = serverY - (serverY - ny) * 0.4
           const mt = 1 - t2
@@ -187,13 +195,16 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const color = STATUS_COLORS[node.status] || STATUS_COLORS.UNKNOWN
       const glow  = STATUS_GLOW[node.status]  || STATUS_GLOW.UNKNOWN
       const isSel = node.id === selectedId
+      const isHov = node.id === hoveredId
       const isCrit = node.status === 'CRITICAL'
-      const r = isSel ? 28 : 24
+      
+      // Node size - expands if selected or hovered
+      const r = isHov ? 36 : (isSel ? 32 : 24)
 
       // Critical pulse ring
       if (isCrit) {
         const p = Math.abs(Math.sin(timeRef.current * 3))
-        ctx.beginPath(); ctx.arc(nx, ny, r + 12 * p, 0, Math.PI * 2)
+        ctx.beginPath(); ctx.arc(nx, ny, r + (isHov ? 16 : 12) * p, 0, Math.PI * 2)
         ctx.fillStyle = `rgba(245,158,11,${0.12 * p})`; ctx.fill()
       }
 
@@ -205,53 +216,66 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       // Node body
       ctx.beginPath(); ctx.arc(nx, ny, r, 0, Math.PI * 2)
       ctx.fillStyle = 'rgba(248,250,252,0.95)'; ctx.fill()
-      ctx.strokeStyle = color; ctx.lineWidth = isSel ? 2.5 : isCrit ? 2 : 1.5; ctx.stroke()
+      ctx.shadowBlur = isHov ? 15 : (isSel ? 10 : 0)
+      ctx.shadowColor = color
+      ctx.strokeStyle = color; ctx.lineWidth = (isSel || isHov) ? 3 : isCrit ? 2 : 1.5; ctx.stroke()
+      ctx.shadowBlur = 0 // reset shadow
 
       // Favicon / initial
       const domain  = getDomain(node.url)
       const favicon = faviconCache.current[domain]
-      const imgSize = r * 1.55 | 0  // ~r*1.55 — almost fills the circle
+      const imgSize = r * 1.55 | 0
       if (favicon) {
         try {
           ctx.save()
-          const half = imgSize/2; ctx.beginPath(); ctx.arc(nx, ny - 2, half + 1, 0, Math.PI * 2)
+          const half = imgSize/2; ctx.beginPath(); ctx.arc(nx, ny - 1, half, 0, Math.PI * 2)
           ctx.clip()
-          ctx.drawImage(favicon, nx - half, ny - 2 - half, imgSize, imgSize)
+          ctx.drawImage(favicon, nx - half, ny - 1 - half, imgSize, imgSize)
           ctx.restore()
-        } catch { drawInitial(ctx, node.name, nx, ny) }
+        } catch { drawInitial(ctx, node.name, nx, ny, isHov) }
       } else {
-        drawInitial(ctx, node.name, nx, ny)
+        drawInitial(ctx, node.name, nx, ny, isHov)
       }
 
       // Name label
-      const name = node.name.length > 11 ? node.name.slice(0, 10) + '…' : node.name
-      const labelY = ny + r + 6
-      ctx.font = `${isSel ? '800 ' : '600 '}12px system-ui`
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top'
-      const tw = ctx.measureText(name).width + 12
-      const isLight = themeId === 'theme-light'
+      const name = node.name.length > 15 ? node.name.slice(0, 14) + '…' : node.name
+      const labelY = ny + r + 8
+      const isDark = themeId && themeId.includes('dark')
+      
+      // Font weight changes on hover
+      ctx.font = `${(isSel || isHov) ? '900' : '600'} ${isHov ? '14px' : '13px'} system-ui`
+      const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
 
-      ctx.fillStyle = isLight ? 'rgba(255,255,255,1)' : 'rgba(10,14,26,0.9)'
-      ctx.fillRect(nx - tw / 2, labelY - 2, tw, 18)
-      ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.2)' : 'transparent'
-      if (isLight) ctx.strokeRect(nx - tw / 2, labelY - 2, tw, 18)
+      // Label Box
+      ctx.fillStyle = isDark ? 'rgba(30, 41, 59, 1)' : 'rgba(255, 255, 255, 1)'
+      ctx.strokeStyle = isHov ? color : (isDark ? 'rgba(99, 102, 241, 0.4)' : 'rgba(0, 0, 0, 0.1)')
+      ctx.lineWidth = isHov ? 2 : 1
+      ctx.beginPath()
+      if (ctx.roundRect) {
+        ctx.roundRect(nx - tw / 2, labelY - 2, tw, isHov ? 24 : 20, 6)
+      } else {
+        ctx.rect(nx - tw / 2, labelY - 2, tw, isHov ? 24 : 20)
+      }
+      ctx.fill()
+      ctx.stroke()
 
-      ctx.fillStyle = isLight 
-        ? '#000000' 
-        : (isSel ? '#e2e8f0' : 'var(--text-muted)')
-      ctx.fillText(name, nx, labelY)
+      // Label Text
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'top'
+      ctx.fillStyle = isHov ? color : (isDark ? '#f8fafc' : '#1e1b4b')
+      ctx.fillText(name, nx, labelY + (isHov ? 4 : 2))
 
       // Status dot
-      ctx.beginPath(); ctx.arc(nx + r - 4, ny - r + 4, 4, 0, Math.PI * 2)
+      ctx.beginPath(); ctx.arc(nx + r - 4, ny - r + 4, isHov ? 6 : 4, 0, Math.PI * 2)
       ctx.fillStyle = color; ctx.fill()
     })
 
     animFrameRef.current = requestAnimationFrame(draw)
-  }, [nodes, selectedId, topoMode])
+  }, [nodes, selectedId, hoveredId, topoMode])
 
-  function drawInitial(ctx, name, nx, ny) {
+  function drawInitial(ctx, name, nx, ny, isHov) {
     ctx.fillStyle = '#3b82f6'
-    ctx.font = 'bold 15px system-ui'
+    ctx.font = `bold ${isHov ? '18px' : '15px'} system-ui`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText((name || 'W')[0].toUpperCase(), nx, ny - 2)
@@ -292,6 +316,27 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     }
     onSelect?.(null)
   }, [nodes, selectedId, onSelect, onOpenDetail])
+
+  const handleMouseMove = useCallback((e) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top
+    const { width, height } = canvas
+    
+    let currentHovered = null
+    for (const node of nodes) {
+      const nx = node.x * width, ny = node.y * height
+      if (Math.sqrt((mx - nx) ** 2 + (my - ny) ** 2) < 36) {
+        currentHovered = node.id
+        break
+      }
+    }
+    
+    setHoveredId(currentHovered)
+    canvas.style.cursor = currentHovered ? 'pointer' : 'default'
+  }, [nodes])
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1, position: 'relative' }}>
       {/* Header */}
@@ -355,15 +400,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           ref={canvasRef}
           style={{ width: '100%', height: '100%', display: 'block', position:'relative', zIndex:1 }}
           onClick={handleClick}
-          onMouseMove={(e) => {
-            const canvas = canvasRef.current
-            if (!canvas) return
-            const rect = canvas.getBoundingClientRect()
-            const mx = e.clientX - rect.left, my = e.clientY - rect.top
-            const { width, height } = canvas
-            const hovered = nodes.some(n => Math.sqrt((mx - n.x * width) ** 2 + (my - n.y * height) ** 2) < 32)
-            canvas.style.cursor = hovered ? 'pointer' : 'default'
-          }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoveredId(null)}
         />
       </div>
 

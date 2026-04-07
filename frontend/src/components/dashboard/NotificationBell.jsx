@@ -67,10 +67,10 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
               {domain?<img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} width={16} height={16} alt="" onError={e=>{e.target.style.display='none'}} style={{ borderRadius:3,flexShrink:0,marginTop:1 }}/>:<span style={{ fontSize:14,flexShrink:0,lineHeight:1 }}>{SI[n.type]||'🔔'}</span>}
               <div style={{ flex:1,minWidth:0 }}>
                 <div style={{ fontSize:12,fontWeight:700,color:SC[n.type]||'var(--text)',display:'flex',alignItems:'center',gap:6 }}>
-                  {n.name}{!n.read&&<span style={{ fontSize:8,background:'#dc2626',color:'var(--text)',borderRadius:3,padding:'1px 4px',fontWeight:700 }}>NEW</span>}
+                  {n.name}{!n.read&&<span style={{ fontSize:8,background:'#f0ededff',color:'var(--text)',borderRadius:3,padding:'1px 4px',fontWeight:700 }}>NEW</span>}
                 </div>
                 <div style={{ fontSize:10,color:'var(--text-muted)',marginTop:1 }}>
-                  {n.oldStatus&&<><span style={{ color:SC[n.oldStatus]||'var(--text-muted)' }}>{n.oldStatus}</span><span style={{ color:'#cbd5e1',margin:'0 4px' }}>→</span></>}
+                  {n.oldStatus&&<><span style={{ color:SC[n.oldStatus]||'var(--text-muted)' }}>{n.oldStatus}</span><span style={{ color:'#000000ff',margin:'0 4px' }}>→</span></>}
                   <span style={{ color:SC[n.type]||'var(--text-muted)',fontWeight:600 }}>{n.type}</span>
                 </div>
                 {n.reason&&<div style={{ fontSize:10,color:'var(--text-muted)',marginTop:2 }}>{n.reason}</div>}
@@ -115,7 +115,7 @@ export default function NotificationBell({ notifications=[], onMarkRead, onMarkA
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
             <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
           </svg>
-          {unread>0&&<span style={{ position:'absolute',top:-6,right:-6,background:'#dc2626',color:'var(--text)',fontSize:9,fontWeight:700,borderRadius:10,padding:'1px 5px',minWidth:16,textAlign:'center',border:'2px solid #fff' }}>{unread>99?'99+':unread}</span>}
+          {unread>0&&<span style={{ position:'absolute',top:-6,right:-6,background:'#ff0000cc',color:'#fffcfcff',fontSize:9,fontWeight:700,borderRadius:10,padding:'1px 5px',minWidth:16,textAlign:'center',border:'2px solid #000000ff' }}>{unread>99?'99+':unread}</span>}
         </button>
       </div>
       {open&&<NotifDropdown notifications={notifications} unread={unread} bellRef={bellRef} onMarkAll={handleMarkAll} onItemClick={handleItemClick} onViewAll={handleViewAll}/>}

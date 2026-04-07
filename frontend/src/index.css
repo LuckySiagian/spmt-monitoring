@@ -10,6 +10,7 @@ html, body, #root {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text);
   overflow-x: hidden;
+  font-size: 16px; /* Base font size increased from ~12-14px to 16px */
 }
 
 /* ── Enterprise Dark Mode Background (Base) ── */
@@ -37,124 +38,62 @@ body::before {
 
 /* ── Base Theme: Enterprise Dark ── */
 :root, .theme-light {
-  --bg-main:    #ffffff;
-  --bg-card:    rgba(255, 255, 255, 0.8);
-  --bg-header:  rgba(255, 255, 255, 0.95);
-  --border:     rgba(203, 213, 225, 0.8);
-  --border-strong: rgba(148, 163, 184, 0.8);
-  --shadow:     0 4px 20px rgba(0, 0, 0, 0.05);
-  --shadow-glow:0 0 15px rgba(59, 130, 246, 0.15);
-  --text:       #0f172a;
-  --text-sub:   #475569;
-  --text-muted: #94a3b8;
+  --bg-main:    #fdfdfd;
+  --bg-card:    #ffffff;
+  --bg-header:  #ffffff;
+  --border:     #e5eaf2;
+  --border-strong: #d1d9e6;
+  --shadow:     0 8px 30px rgba(0, 0, 0, 0.05);
+  --shadow-glow:0 0 20px rgba(59, 130, 246, 0.1);
+  --text:       #1a1d23;
+  --text-sub:   #3e4a5b;
+  --text-muted: #64748b;
   --accent:     #2563eb;
-  --accent-light: rgba(59, 130, 246, 0.05);
+  --accent-light: rgba(37, 99, 235, 0.05);
   --accent-hover: #1d4ed8;
-  --online:     #16a34a;
-  --online-light: rgba(22, 163, 74, 0.05);
-  --critical:   #d97706;
-  --critical-light: rgba(217, 119, 6, 0.02);
-  --offline:    #dc2626;
-  --warning:    #d97706;
-  --grid-color: rgba(0, 0, 0, 0.03);
+  --online:     #10b981;
+  --online-light: rgba(16, 185, 129, 0.05);
+  --critical:   #f59e0b;
+  --critical-light: rgba(245, 158, 11, 0.04);
+  --offline:    #ef4444;
+  --warning:    #f59e0b;
+  --grid-color: rgba(0, 0, 0, 0.02);
+  --header-height: 74px;
 }
 
+/* ── LIGHT THEMES ── */
+.theme-light-sky      { --bg-main:#f0f9ff; --bg-header:#e0f2fe; --accent:#0284c7; --text:#0c4a6e; --border:#bae6fd; --header-height:74px; }
+.theme-light-emerald  { --bg-main:#ecfdf5; --bg-header:#d1fae5; --accent:#059669; --text:#064e3b; --border:#a7f3d0; --header-height:74px; }
+.theme-light-lavender { --bg-main:#f5f3ff; --bg-header:#ede9fe; --accent:#7c3aed; --text:#4c1d95; --border:#ddd6fe; --header-height:74px; }
+.theme-light-rose     { --bg-main:#fff1f2; --bg-header:#ffe4e6; --accent:#e11d48; --text:#881337; --border:#fecdd3; --header-height:74px; }
+.theme-light-amber    { --bg-main:#fffbeb; --bg-header:#fef3c7; --accent:#d97706; --text:#78350f; --border:#fde68a; --header-height:74px; }
+.theme-light-slate    { --bg-main:#f8fafc; --bg-header:#f1f5f9; --accent:#475569; --text:#0f172a; --border:#e2e8f0; --header-height:74px; }
+.theme-light-teal     { --bg-main:#f0fdfa; --bg-header:#ccfbf1; --accent:#0d9488; --text:#134e4a; --border:#99f6e4; --header-height:74px; }
+.theme-light-indigo   { --bg-main:#eef2ff; --bg-header:#e0e7ff; --accent:#4f46e5; --text:#1e1b4b; --border:#c7d2fe; --header-height:74px; }
+.theme-light-orange   { --bg-main:#fff7ed; --bg-header:#ffedd5; --accent:#ea580c; --text:#7c2d12; --border:#fed7aa; --header-height:74px; }
+.theme-light-lime     { --bg-main:#f7fee7; --bg-header:#ecfccb; --accent:#65a30d; --text:#365314; --border:#d9f99d; --header-height:74px; }
+
+/* ── DARK THEMES ── */
 .theme-dark {
-  --bg-main:    #0B0F19;
-  --bg-card:    rgba(16, 24, 39, 0.65);
-  --bg-header:  rgba(13, 19, 30, 0.85);
-  --border:     rgba(99, 102, 241, 0.25);
-  --border-strong: rgba(99, 102, 241, 0.5);
-  --shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.5);
-  --shadow-glow:0 0 20px rgba(99, 102, 241, 0.2);
-  --text:       #F8FAFC;
-  --text-sub:   #cbd5e1;
-  --text-muted: #94A3B8;
-  --accent:     #6366F1;
-  --accent-light: rgba(99, 102, 241, 0.08);
-  --accent-hover: #4F46E5;
-  --online:     #10B981;
-  --online-light: rgba(16, 185, 129, 0.08);
-  --critical:   #F59E0B;
-  --critical-light: rgba(245, 158, 11, 0.05);
-  --offline:    #EF4444;
-  --warning:    #F59E0B;
-  --grid-color: rgba(255, 255, 255, 0.02);
+  --bg-main:#0B0F19; --bg-card:rgba(16,24,39,0.8); --bg-header:rgba(13,19,30,0.9); --border:rgba(99,102,241,0.2); --border-strong:rgba(99,102,241,0.5); --shadow:0 8px 32px rgba(0,0,0,0.5); --shadow-glow:0 0 20px rgba(99,102,241,0.2); --text:#ffffff; --text-sub:#f8fafc; --text-muted:#94a3b8; --accent:#6366f1; --accent-light:rgba(99,102,241,0.1); --online:#10b981; --offline:#ef4444; --grid-color:rgba(255,255,255,0.02); --header-height: 74px;
 }
+.theme-dark-obsidian { --bg-main:#020617; --bg-header:#1e293b; --bg-card:#0f172a; --accent:#38bdf8; --text:#ffffff; --text-sub:#e2e8f0; --border:#334155; --header-height:74px; }
+.theme-dark-forest   { --bg-main:#052e16; --bg-header:#065f46; --bg-card:#064e3b; --accent:#34d399; --text:#ffffff; --text-sub:#dcfce7; --border:#065f46; --header-height:74px; }
+.theme-dark-midnight { --bg-main:#0f172a; --bg-header:#334155; --bg-card:#1e293b; --accent:#818cf8; --text:#ffffff; --text-sub:#f1f5f9; --border:#475569; --header-height:74px; }
+.theme-dark-crimson  { --bg-main:#450a0a; --bg-header:#991b1b; --bg-card:#7f1d1d; --accent:#f87171; --text:#ffffff; --text-sub:#fee2e2; --border:#991b1b; --header-height:74px; }
+.theme-dark-violet   { --bg-main:#2e1065; --bg-header:#5b21b6; --bg-card:#4c1d95; --accent:#a78bfa; --text:#ffffff; --text-sub:#f5f3ff; --border:#5b21b6; --header-height:74px; }
+.theme-dark-carbon   { --bg-main:#171717; --bg-header:#404040; --bg-card:#262626; --accent:#a3a3a3; --text:#ffffff; --text-sub:#f5f5f5; --border:#525252; --header-height:74px; }
+.theme-dark-ocean    { --bg-main:#082f49; --bg-header:#0369a1; --bg-card:#075985; --accent:#7dd3fc; --text:#ffffff; --text-sub:#e0f2fe; --border:#0369a1; --header-height:74px; }
+.theme-dark-plum     { --bg-main:#4c0519; --bg-header:#9d174d; --bg-card:#831843; --accent:#f472b6; --text:#ffffff; --text-sub:#fce7f3; --border:#9d174d; --header-height:74px; }
+.theme-dark-bronze   { --bg-main:#451a03; --bg-header:#92400e; --bg-card:#78350f; --accent:#fbbf24; --text:#ffffff; --text-sub:#fef3c7; --border:#92400e; --header-height:74px; }
+.theme-dark-neon-glow{ --bg-main:#000000; --bg-header:#111111; --bg-card:#111111; --accent:#00ff41; --text:#00ff41; --text-sub:#00ff41; --border:#00ff41; --header-height:74px; }
 
-/* ── Theme 2: Cyberpunk Red ── */
-.theme-cyber {
-  --bg-main:    #160808;
-  --bg-card:    rgba(30, 10, 10, 0.7);
-  --bg-header:  rgba(20, 5, 5, 0.85);
-  --border:     rgba(239, 68, 68, 0.3);
-  --border-strong: rgba(239, 68, 68, 0.6);
-  --shadow:     0 8px 32px 0 rgba(0, 0, 0, 0.6);
-  --shadow-glow:0 0 20px rgba(239, 68, 68, 0.3);
-  --accent:     #ef4444;
-  --accent-light: rgba(239, 68, 68, 0.1);
-  --online-light: rgba(239, 68, 68, 0.05);
-  --grid-color: rgba(239, 68, 68, 0.04);
-}
-
-/* ── Theme 3: Hacker Green ── */
-.theme-matrix {
-  --bg-main:    #061108;
-  --bg-card:    rgba(10, 25, 12, 0.7);
-  --bg-header:  rgba(5, 15, 8, 0.85);
-  --border:     rgba(16, 185, 129, 0.3);
-  --border-strong: rgba(16, 185, 129, 0.6);
-  --shadow-glow:0 0 20px rgba(16, 185, 129, 0.25);
-  --accent:     #10b981;
-  --accent-light: rgba(16, 185, 129, 0.1);
-  --online-light: rgba(16, 185, 129, 0.08);
-  --grid-color: rgba(16, 185, 129, 0.05);
-}
-
-/* ── Theme 4: Ocean Blue ── */
-.theme-ocean {
-  --bg-main:    #071622;
-  --bg-card:    rgba(12, 30, 45, 0.7);
-  --bg-header:  rgba(8, 20, 30, 0.85);
-  --border:     rgba(14, 165, 233, 0.25);
-  --border-strong: rgba(14, 165, 233, 0.5);
-  --shadow-glow:0 0 20px rgba(14, 165, 233, 0.2);
-  --accent:     #0ea5e9;
-  --accent-light: rgba(14, 165, 233, 0.1);
-  --grid-color: rgba(14, 165, 233, 0.03);
-}
-
-/* ── Theme 5: Neon Purple ── */
-.theme-neon {
-  --bg-main:    #120B19;
-  --bg-card:    rgba(25, 15, 35, 0.7);
-  --bg-header:  rgba(18, 10, 25, 0.85);
-  --border:     rgba(217, 70, 239, 0.25);
-  --border-strong: rgba(217, 70, 239, 0.5);
-  --shadow-glow:0 0 20px rgba(217, 70, 239, 0.2);
-  --accent:     #d946ef;
-  --accent-light: rgba(217, 70, 239, 0.1);
-  --grid-color: rgba(217, 70, 239, 0.04);
-}
-
-/* ── Theme 6: Solarized Dark ── */
-.theme-solar {
-  --bg-main:    #002B36;
-  --bg-card:    rgba(7, 54, 66, 0.7);
-  --bg-header:  rgba(0, 43, 54, 0.85);
-  --border:     rgba(133, 153, 0, 0.3);
-  --border-strong: rgba(133, 153, 0, 0.6);
-  --text:       #eee8d5;
-  --text-sub:   #93a1a1;
-  --text-muted: #586e75;
-  --shadow-glow:0 0 20px rgba(133, 153, 0, 0.2);
-  --accent:     #b58900;
-  --online:     #859900;
-  --critical:   #cb4b16;
-  --offline:    #dc322f;
-  --accent-light: rgba(181, 137, 0, 0.1);
-  --grid-color: rgba(147, 161, 161, 0.04);
-}
+/* Legacy Themes updated with header height */
+.theme-cyber { --header-height: 74px; }
+.theme-matrix { --header-height: 74px; }
+.theme-ocean { --header-height: 74px; }
+.theme-neon { --header-height: 74px; }
+.theme-solar { --header-height: 74px; }
 
 /* ── Theme 7: Clean Light ── */
 
@@ -249,12 +188,10 @@ tr:hover { background: var(--accent-light) !important; }
 }
 
 /* ── TV Mode Customizations ── */
-.tv-mode {
-  font-size: 110% !important;
-}
-.tv-mode .topbar-nav { display: none; }
-.tv-mode .topbar-actions { opacity: 0.1; transition: opacity 0.3s; }
-.tv-mode .topbar-actions:hover { opacity: 1; }
+.tv-mode .topbar-nav { opacity: 0.6; transform: scale(0.9); transform-origin: right center; }
+.tv-mode .topbar-actions { opacity: 1 !important; transform: scale(0.9); }
+.tv-mode .topbar-metrics { gap: 4px !important; }
+.tv-mode .metric-card { padding: 4px 8px !important; min-width: 60px !important; }
 .tv-mode .glass-card { padding: 12px 18px !important; }
 
 /* ── Hologram & Cyberpunk Effects ── */
@@ -282,17 +219,27 @@ tr:hover { background: var(--accent-light) !important; }
    RESPONSIVE
    ════════════════════════════════════════════ */
 
-@media (max-width: 640px) {
-  html { font-size: 13px; }
-  .topbar-metrics { display: none !important; }
-  .topbar-nav span { display: none; } 
+/* ── Responsive Dashboard Grid ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 72% 28%;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  min-height: 0;
 }
-@media (max-width: 1024px) { html { font-size: 13px; } }
-@media (min-width: 1280px) { html { font-size: 14px; } }
 
-@media (max-width: 768px) {
-  div[style*="gridTemplateColumns: '75% 25%'"], div[style*="gridTemplateColumns: '60% 40%'"], div[style*="gridTemplateColumns: '72% 28%'"] {
-    grid-template-columns: 1fr !important;
-    overflow-y: auto !important;
+@media (max-width: 1100px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
   }
+}
+
+@media (max-width: 640px) {
+  html { font-size: 14px; }
+  .topbar-metrics { display: none !important; }
+  .topbar-nav { gap: 4px !important; overflow-x: auto; }
+  .topbar-nav button { padding: 0 10px !important; font-size: 11px !important; }
 }
