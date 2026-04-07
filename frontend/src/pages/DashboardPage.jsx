@@ -40,8 +40,8 @@ export default function DashboardPage({ onSummaryUpdate, onNewNotification, onWe
 
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden' }}>
-      {/* Responsive grid — on mobile stacks vertically */}
-      <div style={s.main}>
+      {/* Responsive grid — automatically stacks on mobile via CSS class */}
+      <div className="dashboard-grid">
         <div style={s.topo}>
           <NetworkTopology websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} wsConnected={wsConnected}/>
         </div>
@@ -55,12 +55,6 @@ export default function DashboardPage({ onSummaryUpdate, onNewNotification, onWe
 }
 
 const s = {
-  main: {
-    display:'grid',
-    gridTemplateColumns:'72% 28%',
-    gap: 4, flex:1, overflow:'hidden',
-    padding: '4px', minHeight:0,
-  },
   topo:   { display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' },
   status: { display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' },
 }

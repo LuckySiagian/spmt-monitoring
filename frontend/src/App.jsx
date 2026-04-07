@@ -67,8 +67,10 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
 function SettingsModal({ onClose }) {
   const { lang, setLanguage, LANGUAGES, themeId, setTheme, THEME_OPTIONS } = useTheme()
   const [sound, setSound] = useState(()=>localStorage.getItem('spmt_sound')!=='off')
-  const [refresh, setRefresh] = useState(()=>localStorage.getItem('spmt_autorefresh')!=='off')
-  const save = () => { localStorage.setItem('spmt_sound',sound?'on':'off'); localStorage.setItem('spmt_autorefresh',refresh?'on':'off'); onClose() }
+  const save = () => { 
+    localStorage.setItem('spmt_sound', sound ? 'on' : 'off')
+    window.location.reload() 
+  }
   return createPortal(
     <div style={{ position:'fixed', inset:0, background:'rgba(30,41,59,0.45)', zIndex:99999, display:'flex', alignItems:'center', justifyContent:'center' }}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -78,44 +80,33 @@ function SettingsModal({ onClose }) {
           <button onClick={onClose} style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer', fontSize:16 }}>✕</button>
         </div>
         <div style={{ padding:'18px 20px', maxHeight:'65vh', overflowY:'auto' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>🌐 LANGUAGE</div>
-          <div style={{ display:'flex', gap:8, marginBottom:24 }}>
-            {Object.values(LANGUAGES).map(l=>(
-              <button key={l.code} onClick={()=>setLanguage(l.code)}
-                style={{ flex:1, padding:'10px 6px', borderRadius:8, cursor:'pointer', fontWeight:700, fontSize:12,
-                  background:lang===l.code?'rgba(79,70,229,0.12)':'rgba(99,102,241,0.05)',
-                  border:lang===l.code?'2px solid #4f46e5':'1px solid rgba(99,102,241,0.15)',
-                  color:lang===l.code?'#4f46e5':'#64748b' }}>{l.flag} {l.label}</button>
-            ))}
-          </div>
-
-          {/* 
-          <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>🎨 THEME COLORS</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:8, marginBottom:24 }}>
-            {THEME_OPTIONS?.map(opt => (
-              <button key={opt.id} onClick={() => setTheme(opt.id)}
-                style={{
-                  display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:8, cursor:'pointer',
-                  background: themeId === opt.id ? `${opt.color}22` : 'var(--bg-main)',
-                  border: themeId === opt.id ? `1px solid ${opt.color}` : '1px solid var(--border)',
-                  color: themeId === opt.id ? opt.color : 'var(--text)', transition:'all 0.15s'
-                }}>
-                <span style={{ width:14, height:14, borderRadius:'50%', background:opt.color, boxShadow:`0 0 5px ${opt.color}` }} />
-                <span style={{ fontSize:12, fontWeight:600 }}>{opt.name}</span>
-              </button>
-            ))}
-          </div>
-          */}
-
-          <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>⚙️ SYSTEM PREFERENCES</div>
-          {[{l:'🔔 Notification Sound',s:sound,set:setSound},{l:'🔄 Auto Refresh (30s)',s:refresh,set:setRefresh}].map(item=>(
+          <div style={{ fontSize:11, fontWeight:700, color:'#64748b', letterSpacing:'0.08em', marginBottom:10 }}>⚙️ MONITORING PREFERENCES</div>
+          {[
+            {l:'🔔 Notification Sound',s:sound,set:setSound},
+            {l:'📡 Intensive Network Scan',s:localStorage.getItem('spmt_scan')==='on',set:(v)=>localStorage.setItem('spmt_scan', v?'on':'off')},
+            {l:'🎯 Auto-Acknowledge Resolved Alerts',s:localStorage.getItem('spmt_autoack')==='on',set:(v)=>localStorage.setItem('spmt_autoack', v?'on':'off')},
+            {l:'📊 Detailed Metrics Tooltips',s:localStorage.getItem('spmt_tooltips')!=='off',set:(v)=>localStorage.setItem('spmt_tooltips', v?'on':'off')},
+            {l:'🔄 Real-time Topology Sync',s:localStorage.getItem('spmt_topo_sync')!=='off',set:(v)=>localStorage.setItem('spmt_topo_sync', v?'on':'off')},
+          ].map(item=>(
             <div key={item.l} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid rgba(99,102,241,0.07)' }}>
               <span style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{item.l}</span>
-              <button onClick={()=>item.set(v=>!v)} style={{ width:44, height:24, borderRadius:12, border:'none', cursor:'pointer', position:'relative', transition:'all 0.2s', background:item.s?'#4f46e5':'#e2e8f0' }}>
+              <button 
+                onClick={()=>{
+                  if(typeof item.set === 'function' && item.set.length === 1) {
+                    item.set(!item.s); 
+                    window.location.reload(); // Simple way to apply localstorage changes
+                  } else {
+                    item.set(v=>!v);
+                  }
+                }} 
+                style={{ width:44, height:24, borderRadius:12, border:'none', cursor:'pointer', position:'relative', transition:'all 0.2s', background:item.s?'#4f46e5':'#e2e8f0' }}>
                 <span style={{ position:'absolute', top:2, left:item.s?22:2, width:20, height:20, borderRadius:'50%', background:'#fff', transition:'left 0.2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }}/>
               </button>
             </div>
           ))}
+          <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:12, fontStyle:'italic' }}>
+            ⚡ System language is locked to **English** for standard NOC operations. Data refreshes every 2s.
+          </div>
         </div>
         <div style={{ padding:'12px 20px', borderTop:'1px solid rgba(99,102,241,0.1)', display:'flex', justifyContent:'flex-end', gap:10 }}>
           <button onClick={onClose} style={{ background:'var(--border)', border:'1px solid rgba(99,102,241,0.15)', color:'#64748b', borderRadius:7, padding:'7px 18px', fontSize:12, cursor:'pointer' }}>Cancel</button>
@@ -331,7 +322,7 @@ function AppInner() {
   const loadSummary = useCallback(async()=>{ if(!loggedIn)return; try{const r=await dashboardAPI.getSummary();setSummary(r.data)}catch{} },[loggedIn])
   const handleWebsiteUpdate = useCallback(()=>{ loadSummary(); setRefreshTrigger(t=>t+1) },[loadSummary])
 
-  useEffect(()=>{ if(loggedIn){loadSummary();const iv=setInterval(loadSummary,30000);return()=>clearInterval(iv)} },[loggedIn,loadSummary])
+  useEffect(()=>{ if(loggedIn){loadSummary();const iv=setInterval(loadSummary, 2000);return()=>clearInterval(iv)} },[loggedIn,loadSummary])
 
   const navTo = useCallback((nav)=>{ if(nav==='users'&&!isSuperAdmin)return; setActiveNav(nav); localStorage.setItem('spmt_active_nav',nav) },[isSuperAdmin])
 

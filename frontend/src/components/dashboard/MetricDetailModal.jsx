@@ -76,7 +76,7 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
               </thead>
               <tbody>
                 {filtered.map((w, i) => (
-                  <tr key={w.id} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(30,45,74,0.2)' }}>
+                  <tr key={w.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                     <td style={{ ...styles.td, color: i < 3 ? '#f59e0b' : '#4a5568', fontWeight: 700 }}>{i + 1}</td>
                     <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                     <td style={{ ...styles.td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url}</td>
@@ -100,7 +100,7 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
                 </thead>
                 <tbody>
                   {filtered.map((w, i) => (
-                    <tr key={w.id} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(30,45,74,0.2)' }}>
+                    <tr key={w.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                       <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                       <td style={styles.td}><StatusBadge status={w.status} /></td>
                       <td style={styles.td}>{w.status === 'OFFLINE' ? 'Service Unreachable' : 'Degraded Performance'}</td>
@@ -122,7 +122,7 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
                 {filtered.length === 0 ? (
                   <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#4a5568', fontSize: 12 }}>No services found</td></tr>
                 ) : filtered.map((w, i) => (
-                  <tr key={w.id} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(30,45,74,0.2)' }}>
+                  <tr key={w.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                     <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                     <td style={{ ...styles.td, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url}</td>
                     <td style={styles.td}><StatusBadge status={w.status} /></td>
@@ -151,19 +151,20 @@ const styles = {
     backdropFilter: 'blur(2px)',
   },
   modal: {
-    width: '780px', maxHeight: '75vh',
+    width: 'min(780px, 95%)', maxHeight: '90vh',
     background: 'var(--bg-main)',
-    border: '1px solid rgba(99,102,241,0.15)',
-    borderRadius: '10px',
+    border: '1px solid var(--border)',
+    borderRadius: '16px',
     display: 'flex', flexDirection: 'column',
-    boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
+    boxShadow: '0 24px 64px rgba(0,0,0,0.2)',
     overflow: 'hidden',
+    animation: 'fadeIn 0.2s ease-out',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '14px 18px',
-    borderBottom: '1px solid #1e2d4a',
-    background: 'rgba(255,255,255,0.97)',
+    borderBottom: '1px solid var(--border)',
+    background: 'var(--bg-header)',
     flexShrink: 0,
   },
   title: { fontSize: 14, fontWeight: 700, color: 'var(--text)' },
@@ -175,12 +176,13 @@ const styles = {
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 11 },
   th: {
     textAlign: 'left', padding: '8px 10px',
-    fontSize: 9, color: '#4a6fa5', letterSpacing: '0.1em',
-    borderBottom: '1px solid #1e2d4a', fontWeight: 600,
+    fontSize: 9, color: 'var(--text-sub)', letterSpacing: '0.1em',
+    borderBottom: '1px solid var(--border)', fontWeight: 800,
+    background: 'var(--bg-header)',
   },
   td: {
-    padding: '7px 10px', color: 'var(--text-muted)',
-    borderBottom: '1px solid rgba(30,45,74,0.4)',
+    padding: '7px 10px', color: 'var(--text-sub)',
+    borderBottom: '1px solid var(--border)',
     fontVariantNumeric: 'tabular-nums',
   },
   noAlerts: {
@@ -192,11 +194,11 @@ const styles = {
     borderRadius: 10, padding: '24px', textAlign: 'center',
   },
   slaValue: { fontSize: 48, fontWeight: 800, color: '#3b82f6', fontVariantNumeric: 'tabular-nums' },
-  slaLabel: { fontSize: 11, color: '#4a6fa5', marginTop: 4, letterSpacing: '0.1em' },
+  slaLabel: { fontSize: 11, color: 'var(--text-muted)', marginTop: 4, letterSpacing: '0.1em' },
   slaRow: {
     display: 'flex', alignItems: 'center', gap: 10,
     padding: '6px 0',
-    borderBottom: '1px solid rgba(30,45,74,0.3)',
+    borderBottom: '1px solid var(--border)',
   },
   slaName: { fontSize: 11, color: 'var(--text-muted)', width: 140, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   slaBar: { flex: 1, height: 6, background: 'var(--bg-header)', borderRadius: 3, overflow: 'hidden' },

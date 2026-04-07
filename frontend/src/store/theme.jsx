@@ -3,9 +3,11 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 const ThemeContext = createContext(null)
 
 export const LANGUAGES = {
-  id: { code: 'id', label: 'Bahasa Indonesia', flag: '🇮🇩' },
-  en: { code: 'en', label: 'English', flag: '🇺🇸' },
-  zh: { code: 'zh', label: '中文', flag: '🇨🇳' }
+  id: { code: 'id', label: 'Indo', flag: '🇮🇩' },
+  en: { code: 'en', label: 'Eng',  flag: '🇺🇸' },
+  zh: { code: 'zh', label: '中文',  flag: '🇨🇳' },
+  ja: { code: 'ja', label: '日本語', flag: '🇯🇵' },
+  ru: { code: 'ru', label: 'Рус',  flag: '🇷🇺' }
 }
 
 export const TRANSLATIONS = {
@@ -26,50 +28,63 @@ export const TRANSLATIONS = {
     online: '在线', offline: '离线', critical: '严重', unknown: '未知', total: '总计', alerts: '警报',
     profile: '个人资料', settings: '设置', about: '关于', logout: '登出', save: '保存', cancel: '取消', delete: '删除',
     edit: '编辑', createUser: '创建用户', addWebsite: '添加网站', clearAll: '清除全部', markAllRead: '全部已读'
+  },
+  ja: {
+    dashboard: 'ダッシュボード', websites: 'ウェブサイト', activity: 'アクティビティ', users: 'ユーザー', notifications: '通知',
+    online: 'オンライン', offline: 'オフライン', critical: 'クリティカル', unknown: '不明', total: '合計', alerts: 'アラート',
+    profile: 'プロファイル', settings: '設定', about: '詳細', logout: 'ログアウト', save: '保存', cancel: 'キャンセル', delete: '削除',
+    edit: '編集', createUser: 'ユーザー作成', addWebsite: 'サイト追加', clearAll: 'すべて消去', markAllRead: 'すべて既読'
+  },
+  ru: {
+    dashboard: 'Панель', websites: 'Сайты', activity: 'Активность', users: 'Пользователи', notifications: 'Уведомления',
+    online: 'ОНЛАЙН', offline: 'ОФФЛАЙН', critical: 'КРИТИЧЕСКИЙ', unknown: 'НЕИЗВЕСТНО', total: 'ВСЕГО', alerts: 'ТРЕВОГИ',
+    profile: 'Профиль', settings: 'Настройки', about: 'О программе', logout: 'Выйти', save: 'Сохранить', cancel: 'Отмена', delete: 'Удалить',
+    edit: 'Правка', createUser: 'СОЗДАТЬ ЮЗЕРА', addWebsite: 'ДОБАВИТЬ САЙТ', clearAll: 'Очистить все', markAllRead: 'Прочитать все'
   }
 }
 
 export const THEME_OPTIONS = [
-  { id: 'theme-dark',   name: 'Enterprise Dark', color: '#6366f1' },
-  { id: 'theme-cyber',  name: 'Cyberpunk Red',   color: '#ef4444' },
-  { id: 'theme-matrix', name: 'Hacker Green',    color: '#10b981' },
-  { id: 'theme-ocean',  name: 'Ocean Blue',      color: '#0ea5e9' },
-  { id: 'theme-neon',   name: 'Neon Purple',     color: '#d946ef' },
-  { id: 'theme-solar',  name: 'Solarized Dark',  color: '#eab308' },
-  { id: 'theme-light',  name: 'Clean Light',     color: '#3b82f6' }
+  { id: 'theme-light', name: 'Clean Light', color: '#3b82f6', dark: false },
+  { id: 'theme-light-sky', name: 'Sky Blue', color: '#0284c7', dark: false },
+  { id: 'theme-light-emerald', name: 'Emerald', color: '#059669', dark: false },
+  { id: 'theme-light-lavender', name: 'Lavender', color: '#7c3aed', dark: false },
+  { id: 'theme-light-rose', name: 'Rose', color: '#e11d48', dark: false },
+  { id: 'theme-light-amber', name: 'Amber', color: '#d97706', dark: false },
+  { id: 'theme-light-slate', name: 'Slate', color: '#475569', dark: false },
+  { id: 'theme-light-teal', name: 'Teal', color: '#0d9488', dark: false },
+  { id: 'theme-light-indigo', name: 'Indigo', color: '#4f46e5', dark: false },
+  { id: 'theme-light-orange', name: 'Orange', color: '#ea580c', dark: false },
+  
+  { id: 'theme-dark', name: 'Enterprise Dark', color: '#6366f1', dark: true },
+  { id: 'theme-dark-obsidian', name: 'Obsidian', color: '#38bdf8', dark: true },
+  { id: 'theme-dark-forest', name: 'Forest', color: '#34d399', dark: true },
+  { id: 'theme-dark-midnight', name: 'Midnight', color: '#818cf8', dark: true },
+  { id: 'theme-dark-crimson', name: 'Crimson', color: '#f87171', dark: true },
+  { id: 'theme-dark-violet', name: 'Violet', color: '#a78bfa', dark: true },
+  { id: 'theme-dark-carbon', name: 'Carbon', color: '#a3a3a3', dark: true },
+  { id: 'theme-dark-ocean', name: 'Ocean Depth', color: '#7dd3fc', dark: true },
+  { id: 'theme-dark-plum', name: 'Deep Plum', color: '#f472b6', dark: true },
+  { id: 'theme-dark-neon-glow', name: 'Neon Glow', color: '#00ff41', dark: true }
 ]
 
 export function ThemeProvider({ children }) {
-  const [lang, setLang] = useState(() => {
-    return localStorage.getItem('spmt_lang') || 'en'
-  })
-  
-  const [themeId, setThemeId] = useState('theme-light')
+  const [lang] = useState('en')
+  const [themeId, setThemeId] = useState(() => localStorage.getItem('spmt_theme') || 'theme-light')
 
   useEffect(() => {
-    // Force light mode
-    setThemeId('theme-light')
-    localStorage.setItem('spmt_theme', 'theme-light')
-    
-    document.documentElement.className = 'theme-light'
-  }, [])
-
-  const setLanguage = useCallback((code) => {
-    setLang(code)
-    localStorage.setItem('spmt_lang', code)
-  }, [])
+    document.documentElement.className = themeId
+  }, [themeId])
 
   const setTheme = useCallback((id) => {
     setThemeId(id)
     localStorage.setItem('spmt_theme', id)
-    document.documentElement.className = id
   }, [])
 
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.id
+  const t = TRANSLATIONS.en
 
   return (
     <ThemeContext.Provider value={{
-      lang, setLanguage, t, LANGUAGES,
+      lang, t, LANGUAGES,
       themeId, setTheme, THEME_OPTIONS
     }}>
       {children}
