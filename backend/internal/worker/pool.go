@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"strings"
@@ -102,9 +103,6 @@ func (p *Pool) reloadWebsites() {
 
 func (p *Pool) startTicker(w model.Website) {
 	interval := w.IntervalSeconds
-	if interval < 10 {
-		interval = 30
-	}
 	p.jobs <- MonitorJob{Website: w}
 	t := time.NewTicker(time.Duration(interval) * time.Second)
 	p.tickers[w.ID] = t
@@ -282,8 +280,10 @@ func (p *Pool) check(w model.Website) {
 	logEntry.TCPPortOpen = tcpCheck(host, port)
 
 	// ── STEP 4: HTTP ──────────────────────────────────────────
+	jar, _ := cookiejar.New(nil)
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 15 * time.Second,
+		Jar:     jar, // Enable cookie support to handle auth/redirect loops (e.g., ASP.NET Cookie Support detection)
 		Transport: &http.Transport{
 			// Allow connection even if SSL is invalid/expired (fixes the "Offline in monitoring but OK in browser" issue)
 			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, 
@@ -291,15 +291,25 @@ func (p *Pool) check(w model.Website) {
 			MaxIdleConnsPerHost: 1,
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
+			if len(via) >= 15 {
 				return fmt.Errorf("too many redirects (%d)", len(via))
+			}
+			// Important: Maintain headers during redirects (useful for headers we set manually)
+			if len(via) > 0 {
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 			}
 			return nil
 		},
 	}
 
 	httpStart := time.Now()
-	resp, httpErr := client.Get(w.URL)
+	// Create a new request to add browser-like headers
+	req, _ := http.NewRequest("GET", w.URL, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
+
+	resp, httpErr := client.Do(req)
 	elapsed := int(time.Since(httpStart).Milliseconds())
 	logEntry.ResponseTimeMs = &elapsed
 
@@ -322,10 +332,13 @@ func (p *Pool) check(w model.Website) {
 		expiry := cert.NotAfter
 		logEntry.SSLExpiryDate = &expiry
 		
+		// Use the hostname of the FINAL URL after redirects for validation
+		finalHost := extractHost(resp.Request.URL.String())
+		
 		// Re-verify SSL validity manually for reporting
 		now := time.Now()
 		isExpired := now.After(expiry)
-		isDNSMatch := cert.VerifyHostname(host) == nil
+		isDNSMatch := cert.VerifyHostname(finalHost) == nil
 		
 		logEntry.SSLValid = !isExpired && isDNSMatch
 	} else if !isHTTPS {
