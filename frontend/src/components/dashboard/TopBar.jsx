@@ -145,20 +145,46 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
         position: 'relative', zIndex: 100
       }}>
 
-        {/* LOGO SECTION (Fixed) */}
-        <div style={{ flexShrink: 0, paddingRight: 12, borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'center' }}>
-          <div style={{ background: '#ffffff', padding: '4px 8px', borderRadius: 8, display: 'flex', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <img src="/images/logos/logo spmt fc.png" alt="SPMT"
-              style={{ height: 26, objectFit: 'contain', animation: 'logoPulse 4s ease-in-out infinite' }} />
+        {/* ── BRANDING SECTION (COMPACT & CLAMPED) ── */}
+        <div style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
+          {/* Logo Part - CLAMPED LEFT */}
+          <div style={{ 
+            height: '100%', padding: '0 8px 0 0', /* Extreme left */
+            display: 'flex', alignItems: 'center', justifyContent: 'center' 
+          }}>
+            <div style={{ 
+              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0', 
+              boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <img src="/images/logos/logo spmt fc.png" alt="SPMT"
+                style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
+            </div>
+          </div>
+          
+          {/* Text Part (Compact) */}
+          <div style={{ 
+            padding: '0 8px', display: 'flex', flexDirection: 'column', 
+            justifyContent: 'center', height: '100%' 
+          }}>
+            <span style={{ 
+              fontSize: 18, fontWeight: 1000, color: 'var(--text)', /* Smaller as requested */
+              letterSpacing: '-0.02em', background: 'linear-gradient(to right, var(--accent), #3b82f6)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 0.9
+            }}>SPMT</span>
+            <span style={{ 
+              fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', 
+              letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1
+            }}>MONITORING</span>
           </div>
         </div>
 
-        {/* ── METRICS SECTION (Flexible & Tight) ── */}
-        <div style={{
+        {/* ── METRICS SECTION (Flexible To Avoid Overlap) ── */}
+        <div className="topbar-metrics" style={{
           flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '0 10px', visibility: activeNav === 'dashboard' ? 'visible' : 'hidden'
+          padding: '0 10px', visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
+          overflow: 'hidden'
         }}>
-          <div style={{ display: 'flex', gap: 4, width: '100%', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 4, width: 'auto', justifyContent: 'center', alignItems: 'center' }}>
             {metrics.map(m => {
               const active = activeMetric === m.label
               const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
@@ -167,8 +193,8 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                 <div key={m.label} title={`Detail ${m.label}`}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '4px 2px', borderRadius: 8, cursor: 'pointer', userSelect: 'none',
-                    flex: 1, minWidth: 55, maxWidth: 90,
+                    padding: '4px 8px', borderRadius: 8, cursor: 'pointer', userSelect: 'none',
+                    flex: '0 1 auto', minWidth: 65, maxWidth: 100,
                     background: active ? `linear-gradient(180deg, transparent, ${m.color}20)` : 'var(--accent-light)',
                     border: `1px solid ${active ? m.color : 'var(--border)'}`,
                     borderBottom: `2.5px solid ${active ? m.color : m.color + '40'}`,
@@ -194,10 +220,10 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           </div>
         </div>
 
-        {/* ── NAVIGATION SECTION (Fixed Tight) ── */}
+        {/* ── NAVIGATION SECTION (Enlarged Boxes) ── */}
         <div className="topbar-nav" style={{
-          display: 'flex', gap: 2, background: 'var(--accent-light)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: 3, height: 34, flexShrink: 0
+          display: 'flex', gap: 4, background: 'var(--accent-light)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: 2, height: 36, flexShrink: 0
         }}>
           {navItems.map(tab => {
             const labelStr = navLabel(tab).split(' ')[1] || navLabel(tab) // Remove emoji for space
@@ -207,9 +233,9 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                   background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
                   border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
                   color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
-                  fontSize: 10, fontWeight: 900, padding: '0 8px', borderRadius: 6,
-                  cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.15s'
+                  fontSize: 10, fontWeight: 800, padding: '0 12px', borderRadius: 6,
+                  cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 2px 5px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.05em'
                 }}
                 onClick={() => onNavChange(tab)}>{labelStr}</button>
             )
@@ -218,21 +244,21 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
         {/* Mini SLA Donut for TV Mode Highlight */}
         {isTvMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
-            <svg width="34" height="34" viewBox="0 0 36 36">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid var(--border)', paddingLeft: 12 }}>
+            <svg width="28" height="28" viewBox="0 0 36 36">
               <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
               <circle cx="18" cy="18" r="14" fill="none" stroke={slaPct > 99 ? '#10b981' : slaPct > 80 ? '#f59e0b' : '#ef4444'} strokeWidth="4"
                 strokeDasharray="88" strokeDashoffset={88 - (slaPct / 100) * 88} strokeLinecap="round" transform="rotate(-90 18 18)" style={{ transition: 'stroke-dashoffset 1s ease-in-out' }} />
             </svg>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{slaPct.toFixed(2)}%</span>
-              <span style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.1em' }}>SLA 24H</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{slaPct.toFixed(2)}%</span>
+              <span style={{ fontSize: 8, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.1em' }}>SLA 24H</span>
             </div>
           </div>
         )}
 
         {/* Actions */}
-        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button onClick={onToggleTvMode} className="hover-glow" title="Full/Mini Screen"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 12px', height: 36, borderRadius: 8, background: isTvMode ? 'rgba(99,102,241,0.2)' : 'transparent', border: isTvMode ? '1px solid var(--accent)' : '1px solid transparent', color: isTvMode ? 'var(--accent)' : 'var(--text-sub)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

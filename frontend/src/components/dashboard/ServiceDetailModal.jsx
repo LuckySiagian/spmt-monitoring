@@ -44,9 +44,9 @@ function AvailabilityTimeline({ websiteId }) {
     const diff = toMs - fromMs
     if (diff < 0) return '—'
     const s = Math.floor(diff / 1000)
-    if (s < 60)  return `${s}s`
+    if (s < 60) return `${s}s`
     const m = Math.floor(s / 60)
-    if (m < 60)  return `${m}m ${s % 60}s`
+    if (m < 60) return `${m}m ${s % 60}s`
     const h = Math.floor(m / 60)
     return `${h}h ${m % 60}m`
   }
@@ -114,7 +114,7 @@ function AvailabilityTimeline({ websiteId }) {
             const color = STATUS_COLORS[ev.new_status] || '#4a5568'
             const nextEv = sorted[i + 1]
             const from = new Date(ev.created_at).getTime()
-            const to   = nextEv ? new Date(nextEv.created_at).getTime() : Date.now()
+            const to = nextEv ? new Date(nextEv.created_at).getTime() : Date.now()
             const width = Math.max(3, Math.min(100 / sorted.length, 100))
             return (
               <div
@@ -225,7 +225,7 @@ function AIAnalyst({ website }) {
   if (analyzing) return (
     <div style={{ background: 'linear-gradient(90deg, rgba(59,130,246,0.05), rgba(99,102,241,0.05))', borderRadius: 12, padding: '24px', border: '1px dashed rgba(99,102,241,0.3)', textAlign: 'center', marginTop: 16 }}>
       <div className="ai-thinking" style={{ fontSize: 12, color: '#3b82f6', fontWeight: 800, letterSpacing: '0.05em' }}>
-        <span style={{ marginRight: 10, display: 'inline-block', animation: 'spin 2s linear infinite' }}>🧠</span> 
+        <span style={{ marginRight: 10, display: 'inline-block', animation: 'spin 2s linear infinite' }}>🧠</span>
         AI AGENT ANALYZING... / MENGANALISA...
       </div>
     </div>
@@ -244,7 +244,7 @@ function AIAnalyst({ website }) {
         <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '0.03em' }}>AI AGENT NOC DIAGNOSIS</span>
         <div style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '2px 10px', borderRadius: 20, color: '#fff', fontSize: 10, fontWeight: 800 }}>BILINGUAL ANALYST</div>
       </div>
-      
+
       <div style={{ padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
           <div style={{ width: 44, height: 44, borderRadius: 12, background: theme.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
@@ -255,7 +255,7 @@ function AIAnalyst({ website }) {
             <div style={{ fontSize: 11, fontWeight: 800, color: theme.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{analysis.severity}</div>
           </div>
         </div>
-        
+
         {/* BILINQUAL SUMMARY */}
         <div style={{ background: 'rgba(0,0,0,0.02)', padding: '14px 16px', borderRadius: 10, borderLeft: `5px solid ${theme.color}`, marginBottom: 20 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6, opacity: 0.7 }}>SUMMARY / RINGKASAN</div>
@@ -345,9 +345,9 @@ export default function ServiceDetailModal({ website, onClose }) {
   const fmtTime = (d) => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
   const rtSeries = logs.filter(l => l.response_time_ms != null).map(l => l.response_time_ms)
-  const avgRT  = rtSeries.length ? Math.round(rtSeries.reduce((a, b) => a + b, 0) / rtSeries.length) : null
-  const maxRT  = rtSeries.length ? Math.max(...rtSeries) : null
-  const minRT  = rtSeries.length ? Math.min(...rtSeries) : null
+  const avgRT = rtSeries.length ? Math.round(rtSeries.reduce((a, b) => a + b, 0) / rtSeries.length) : null
+  const maxRT = rtSeries.length ? Math.max(...rtSeries) : null
+  const minRT = rtSeries.length ? Math.min(...rtSeries) : null
   const upLogs = logs.filter(l => l.status === 'ONLINE')
   const uptime = logs.length > 0 ? ((upLogs.length / logs.length) * 100).toFixed(2) : '—'
   const alerts = logs.filter(l => l.status === 'OFFLINE' || l.status === 'CRITICAL')
@@ -405,17 +405,17 @@ export default function ServiceDetailModal({ website, onClose }) {
           {/* ── OVERVIEW ── */}
           {tab === 'overview' && (
             <div>
-              <InfoRow label="Service Name"        value={website.name} />
-              <InfoRow label="URL"                 value={website.url} />
-              <InfoRow label="IP Address"          value={website.ip_address || '—'} />
-              <InfoRow label="Status"              value={<StatusBadge status={website.status} />} />
-              <InfoRow label="HTTP Code"           value={website.status_code} />
-              <InfoRow label="DNS Status"          value={website.dns_resolved === false ? '✗ Failed' : '✓ Resolved'} valueColor={website.dns_resolved === false ? '#ef4444' : '#10b981'} />
-              <InfoRow label="SSL Status"          value={website.ssl_valid == null ? '—' : website.ssl_valid ? '✓ Valid' : '✗ Invalid'} valueColor={website.ssl_valid ? '#10b981' : '#ef4444'} />
-              <InfoRow label="Response Time"       value={fmt(website.response_time_ms)} valueColor={website.response_time_ms > 3000 ? '#f59e0b' : '#10b981'} />
+              <InfoRow label="Service Name" value={website.name} />
+              <InfoRow label="URL" value={website.url} />
+              <InfoRow label="IP Address" value={website.ip_address || '—'} />
+              <InfoRow label="Status" value={<StatusBadge status={website.status} />} />
+              <InfoRow label="HTTP Code" value={website.status_code} />
+              <InfoRow label="DNS Status" value={website.dns_resolved === false ? '✗ Failed' : '✓ Resolved'} valueColor={website.dns_resolved === false ? '#ef4444' : '#10b981'} />
+              <InfoRow label="SSL Status" value={website.ssl_valid == null ? '—' : website.ssl_valid ? '✓ Valid' : '✗ Invalid'} valueColor={website.ssl_valid ? '#10b981' : '#ef4444'} />
+              <InfoRow label="Response Time" value={fmt(website.response_time_ms)} valueColor={website.response_time_ms > 3000 ? '#f59e0b' : '#10b981'} />
               <InfoRow label="Monitoring Interval" value={website.interval_seconds ? `${website.interval_seconds}s` : '—'} />
-              <InfoRow label="Last Check"          value={fmtTime(website.last_checked)} />
-              <InfoRow label="24h Sample Uptime"   value={`${uptime}%`} valueColor={parseFloat(uptime) > 99 ? '#10b981' : parseFloat(uptime) > 90 ? '#f59e0b' : '#ef4444'} />
+              <InfoRow label="Last Check" value={fmtTime(website.last_checked)} />
+              <InfoRow label="24h Sample Uptime" value={`${uptime}%`} valueColor={parseFloat(uptime) > 99 ? '#10b981' : parseFloat(uptime) > 90 ? '#f59e0b' : '#ef4444'} />
 
               <RootCauseSection website={website} />
               <AIAnalyst website={website} />
@@ -429,8 +429,8 @@ export default function ServiceDetailModal({ website, onClose }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
                 {[
                   { label: 'Avg Response', value: fmt(avgRT), color: '#3b82f6' },
-                  { label: 'Slowest',      value: fmt(maxRT), color: '#ef4444' },
-                  { label: 'Fastest',      value: fmt(minRT), color: '#10b981' },
+                  { label: 'Slowest', value: fmt(maxRT), color: '#ef4444' },
+                  { label: 'Fastest', value: fmt(minRT), color: '#10b981' },
                 ].map(item => (
                   <div key={item.label} style={{ background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 8, padding: '10px 14px' }}>
                     <div style={{ fontSize: 9, color: '#4a6fa5', letterSpacing: '0.08em' }}>{item.label.toUpperCase()}</div>
@@ -466,9 +466,9 @@ export default function ServiceDetailModal({ website, onClose }) {
               <div style={{ marginTop: 14 }}>
                 {[
                   { label: 'Total Checks (sample)', value: logs.length },
-                  { label: 'Successful Checks',     value: upLogs.length },
-                  { label: 'Sample Uptime',         value: `${uptime}%` },
-                  { label: 'Alert Events',          value: alerts.length },
+                  { label: 'Successful Checks', value: upLogs.length },
+                  { label: 'Sample Uptime', value: `${uptime}%` },
+                  { label: 'Alert Events', value: alerts.length },
                 ].map(item => (
                   <InfoRow key={item.label} label={item.label} value={item.value} />
                 ))}

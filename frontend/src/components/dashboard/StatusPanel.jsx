@@ -44,51 +44,55 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
     <div
       className={`glass-card hover-glow ${w.status === 'OFFLINE' ? 'glitch-offline' : ''}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
+        display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px',
         cursor: 'pointer', transition: 'all 0.2s',
-        border: isSelected ? `2px solid ${c.color}` : '1px solid var(--border)',
+        border: isSelected ? `2.5px solid ${c.color}` : '1px solid var(--border)',
         background: isSelected ? `var(--accent-light)` : 'var(--bg-main)',
-        marginBottom: 6, borderRadius: 8
+        marginBottom: 10, borderRadius: 10,
+        boxShadow: isSelected ? `0 0 20px ${c.color}33` : 'var(--shadow)'
       }}
       onClick={() => {
         onSelect?.(w.id === isSelected ? null : w.id)
         onOpenDetail?.(w)
       }}
     >
-      <Favicon url={w.url} name={w.name} />
+      <div style={{ transform: 'scale(1.2)', marginRight: 4 }}>
+        <Favicon url={w.url} name={w.name} />
+      </div>
       
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
             {/* Status Dot */}
             <span style={{ 
-              width: 6, height: 6, borderRadius: '50%', background: c.color, 
-              boxShadow: c.glow, flexShrink: 0,
-              animation: w.status === 'CRITICAL' ? 'pulse 1s infinite' : 'none' 
+              width: 10, height: 10, borderRadius: '50%', background: c.color, 
+              boxShadow: `0 0 10px ${c.color}`, flexShrink: 0,
+              animation: w.status === 'CRITICAL' || w.status === 'OFFLINE' ? 'pulse 1s infinite' : 'none' 
             }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={w.name}>
+            <span style={{ fontSize: 15, fontWeight: 900, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={w.name}>
               {w.name}
             </span>
           </div>
           
-          {/* Quick Metrics */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 10, color: isOnline ? 'var(--text-sub)' : c.color, fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: isOnline ? 'var(--online)' : c.color, fontFamily: 'monospace', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 4 }}>
               {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
-            </span>
-            <span style={{ fontSize: 10, color: w.response_time_ms > 2000 ? 'var(--critical)' : 'var(--text-sub)', fontFamily: 'monospace', width: 45, textAlign: 'right' }}>
-              {fmtMs(w.response_time_ms)}
             </span>
           </div>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '60%' }}>
-             {w.root_cause && w.status !== 'ONLINE' ? `⚠ ${w.root_cause}` : w.url}
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
+             {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
           </span>
-          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', color: c.color, background: c.bg, padding: '1px 6px', borderRadius: 4 }}>
-            {w.status}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--critical)' : 'var(--text-sub)', fontFamily: 'monospace' }}>
+              {fmtMs(w.response_time_ms)}
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.1em', color: '#fff', background: c.color, padding: '2px 8px', borderRadius: 5 }}>
+              {w.status}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -97,14 +101,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
 
 // ── Main StatusPanel ──────────────────────────────────────────
 
-const TABS = [
-  { id: 'services', label: '⚡ LIVE FEED' },
-  { id: 'graph',    label: '📈 GRAPH HISTORY' },
-]
-
 export default function StatusPanel({ websites, selectedId, onSelect, onOpenDetail, realtimeSnapshot }) {
-  const [tab, setTab] = useState('services')
-
   const sorted = [...websites].sort((a, b) => {
     const order = { OFFLINE: 0, CRITICAL: 1, ONLINE: 2, UNKNOWN: 3 }
     return (order[a.status] ?? 4) - (order[b.status] ?? 4)
@@ -114,42 +111,27 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
     <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter:'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1 }}>
       
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>
-          <span style={{ width: 8, height: 8, background: 'var(--online)', borderRadius: '50%', marginRight: 8, animation: 'pulse 2s infinite', boxShadow: '0 0 10px var(--online)' }}></span>
-          SYSTEM STATUS
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>
+          <span style={{ width: 10, height: 10, background: 'var(--online)', borderRadius: '50%', marginRight: 10, animation: 'pulse 2s infinite', boxShadow: '0 0 10px var(--online)' }}></span>
+          MONITORING STATUS
         </span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-sub)', background: 'var(--bg-main)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: 10 }}>
-          {websites.length} DOMAINS
+        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', background: 'var(--accent-light)', border: '1px solid var(--border)', padding: '4px 12px', borderRadius: 12 }}>
+          {websites.length} WEBSITES
         </span>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--accent-light)', flexShrink: 0 }}>
-        {TABS.map(tb => (
-          <button
-            key={tb.id}
-            style={{
-              flex: 1, background: tab === tb.id ? 'rgba(99,102,241,0.1)' : 'transparent', border: 'none',
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-              padding: '10px 4px', cursor: 'pointer',
-              color: tab === tb.id ? 'var(--accent)' : 'var(--text-muted)',
-              borderBottom: tab === tb.id ? '2px solid var(--accent)' : '2px solid transparent',
-              transition: 'all 0.15s',
-            }}
-            onClick={() => setTab(tb.id)}
-          >
-            {tb.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        {tab === 'services' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '10px', display: 'flex', flexDirection: 'column' }}>
+      {/* Content Stack: Live Feed Top, Graph Bottom */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        
+        {/* LIVE FEED SECTION (Top 60%) */}
+        <div style={{ height: '60%', display: 'flex', flexDirection: 'column', borderBottom: '2px solid var(--border)' }}>
+          <div style={{ padding: '8px 16px', background: 'var(--bg-main)', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>
+            🌐 ACTIVE MONITORING FEED
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column' }}>
             {sorted.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '40px 0' }}>// NO SERVICES CONFIGURED</div>
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: '40px 0' }}>// NO SERVICES CONFIGURED</div>
             )}
             {sorted.map(w => (
               <ServiceRow
@@ -161,13 +143,17 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
               />
             ))}
           </div>
-        )}
+        </div>
 
-        {tab === 'graph' && (
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* GRAPH SECTION (Bottom 40%) */}
+        <div style={{ height: '40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
+           <div style={{ padding: '8px 16px', background: 'var(--bg-main)', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>
+            📈 GLOBAL RESPONSE TIMES
+          </div>
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden', padding: '10px' }}>
             <MonitoringGraph realtimeSnapshot={realtimeSnapshot} />
           </div>
-        )}
+        </div>
 
       </div>
     </div>

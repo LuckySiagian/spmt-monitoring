@@ -190,11 +190,11 @@ func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequ
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
 	}
-	if req.IntervalSeconds < 3 {
-		req.IntervalSeconds = 3
+	if req.IntervalSeconds < 1 {
+		req.IntervalSeconds = 1
 	}
-	if req.IntervalSeconds > 60 {
-		req.IntervalSeconds = 60
+	if req.IntervalSeconds > 3 {
+		req.IntervalSeconds = 3
 	}
 	return s.repo.CreateWebsite(ctx, req)
 }
@@ -203,11 +203,11 @@ func (s *Service) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.Upd
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
 	}
-	if req.IntervalSeconds < 3 {
-		req.IntervalSeconds = 3
+	if req.IntervalSeconds < 1 {
+		req.IntervalSeconds = 1
 	}
-	if req.IntervalSeconds > 60 {
-		req.IntervalSeconds = 60
+	if req.IntervalSeconds > 3 {
+		req.IntervalSeconds = 3
 	}
 	return s.repo.UpdateWebsite(ctx, id, req)
 }

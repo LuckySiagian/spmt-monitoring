@@ -21,6 +21,15 @@ const Input = ({ label, ...props }) => (
   </div>
 )
 
+const Select = ({ label, options, ...props }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+    <label style={mStyles.label}>{label}</label>
+    <select style={mStyles.input} {...props}>
+      {options.map(opt => <option key={opt.val} value={opt.val}>{opt.lbl}</option>)}
+    </select>
+  </div>
+)
+
 const Textarea = ({ label, ...props }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
     <label style={mStyles.label}>{label}</label>
@@ -49,7 +58,7 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
   const [showAdd, setShowAdd] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 60 })
+  const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 3 })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -67,7 +76,7 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
   useEffect(() => { load() }, [])
 
   const openAdd = () => {
-    setForm({ name: '', url: '', description: '', interval_seconds: 30 })
+    setForm({ name: '', url: '', description: '', interval_seconds: 3 })
     setError('')
     setShowAdd(true)
   }
@@ -125,18 +134,24 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
         )}
       </div>
 
-      <div style={wStyles.tableContainer}>
+      <div className="website-table-container" style={wStyles.tableContainer}>
         {loading ? (
           <div style={wStyles.empty}>Loading...</div>
         ) : websites.length === 0 ? (
           <div style={wStyles.empty}>No websites configured. {isAdmin && 'Click "Add Website" to begin.'}</div>
         ) : (
-          <table style={wStyles.table}>
+          <table className="website-table" style={wStyles.table}>
             <thead>
               <tr>
-                {['NAME', 'URL', 'INTERVAL', 'STATUS', 'HTTP', 'RESPONSE', 'SSL', 'LAST CHECKED', ...(isAdmin ? ['ACTIONS'] : [])].map(h => (
-                  <th key={h} style={wStyles.th}>{h}</th>
-                ))}
+                <th style={wStyles.th}>NAME</th>
+                <th style={wStyles.th} className="hide-mobile">URL</th>
+                <th style={wStyles.th} className="hide-mobile">INTERVAL</th>
+                <th style={wStyles.th}>STATUS</th>
+                <th style={wStyles.th} className="hide-mobile">HTTP</th>
+                <th style={wStyles.th}>RESPONSE</th>
+                <th style={wStyles.th} className="hide-mobile">SSL</th>
+                <th style={wStyles.th} className="hide-mobile">LAST CHECKED</th>
+                {isAdmin && <th style={wStyles.th}>ACTIONS</th>}
               </tr>
             </thead>
             <tbody>
@@ -144,19 +159,19 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
                 <tr key={w.id} style={wStyles.tr}>
                   <td style={wStyles.td}>
                     <div style={{ fontWeight: 600, color: 'var(--text)' }}>{w.name}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{w.description}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }} className="hide-mobile">{w.description}</div>
                   </td>
-                  <td style={wStyles.td}><a href={w.url} target="_blank" rel="noreferrer" style={wStyles.link}>{w.url}</a></td>
-                  <td style={wStyles.td}>{w.interval_seconds}s</td>
+                  <td style={wStyles.td} className="hide-mobile"><a href={w.url} target="_blank" rel="noreferrer" style={wStyles.link}>{w.url}</a></td>
+                  <td style={wStyles.td} className="hide-mobile">{w.interval_seconds}s</td>
                   <td style={wStyles.td}><StatusBadge status={w.status} /></td>
-                  <td style={wStyles.td}>{w.status_code ?? '—'}</td>
+                  <td style={wStyles.td} className="hide-mobile">{w.status_code ?? '—'}</td>
                   <td style={{ ...wStyles.td, color: w.response_time_ms > 3000 ? '#f59e0b' : '#10b981' }}>
                     {w.response_time_ms != null ? `${w.response_time_ms}ms` : '—'}
                   </td>
-                  <td style={{ ...wStyles.td, color: w.ssl_valid ? '#10b981' : w.ssl_valid === false ? '#ef4444' : '#4a5568' }}>
-                    {w.ssl_valid == null ? '—' : w.ssl_valid ? '✓ Valid' : '✗ Invalid'}
+                  <td style={{ ...wStyles.td, color: w.ssl_valid ? '#10b981' : w.ssl_valid === false ? '#ef4444' : '#4a5568' }} className="hide-mobile">
+                    {w.ssl_valid == null ? '—' : w.ssl_valid ? '✓' : '✗'}
                   </td>
-                  <td style={{ ...wStyles.td, fontSize: 11, color: '#4a5568' }}>
+                  <td style={{ ...wStyles.td, fontSize: 11, color: '#4a5568' }} className="hide-mobile">
                     {w.last_checked ? new Date(w.last_checked).toLocaleTimeString('id-ID', { hour12: false }) : '—'}
                   </td>
                   {isAdmin && (
@@ -181,7 +196,16 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
             <Input label="NAME *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="My Website" required />
             <Input label="URL *" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://example.com" required />
             <Textarea label="DESCRIPTION" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
-            <Input label="Monitoring Interval (seconds) [3–60]" type="number" min="3" max="60" value={form.interval_seconds} onChange={e => setForm(f => ({ ...f, interval_seconds: parseInt(e.target.value) || 30 }))} />
+            <Select 
+              label="MONITORING INTERVAL" 
+              value={form.interval_seconds} 
+              onChange={e => setForm(f => ({ ...f, interval_seconds: parseInt(e.target.value) }))}
+              options={[
+                { val: 1, lbl: '1 Second (Ultra Fast)' },
+                { val: 2, lbl: '2 Seconds (Fast)' },
+                { val: 3, lbl: '3 Seconds (Standard NOC)' },
+              ]}
+            />
             {error && <div style={mStyles.error}>{error}</div>}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" style={mStyles.cancelBtn} onClick={() => { setShowAdd(false); setEditTarget(null) }}>Cancel</button>

@@ -92,6 +92,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const [nodes,   setNodes]   = useState([])
   const [topoMode, setMode]   = useState('star') // 'star' | 'tree'
   const [hoveredId, setHoveredId] = useState(null)
+  const isMobile = window.innerWidth < 640
 
   // Preload favicons
   useEffect(() => {
@@ -324,21 +325,92 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     const mx = e.clientX - rect.left, my = e.clientY - rect.top
     const { width, height } = canvas
     
-    let currentHovered = null
+    let currentHoveredId = null
     for (const node of nodes) {
       const nx = node.x * width, ny = node.y * height
       if (Math.sqrt((mx - nx) ** 2 + (my - ny) ** 2) < 36) {
-        currentHovered = node.id
+        currentHoveredId = node.id
         break
       }
     }
     
-    setHoveredId(currentHovered)
-    canvas.style.cursor = currentHovered ? 'pointer' : 'default'
+    setHoveredId(currentHoveredId)
+    canvas.style.cursor = currentHoveredId ? 'pointer' : 'default'
   }, [nodes])
 
+  const hoveredNodeData = hoveredId ? websites.find(w => w.id === hoveredId) : null
+  const hoveredNodeObj  = hoveredId ? nodes.find(n => n.id === hoveredId) : null
+
+  let cardPos = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: 1, position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: isMobile ? 'none' : 1, height: isMobile ? '380px' : 'auto', position: 'relative', marginBottom: isMobile ? 12 : 0 }}>
+      {/* ── CENTRAL HOLOGRAM PANEL ── */}
+      {hoveredNodeData && hoveredNodeObj && (
+        <div style={{
+          position: 'absolute', top: cardPos.top, left: cardPos.left, transform: cardPos.transform,
+          width: 300, background: 'rgba(15, 23, 42, 0.94)', backdropFilter: 'blur(20px)',
+          border: `2px solid ${STATUS_COLORS[hoveredNodeData.status] || 'var(--accent)'}`,
+          borderRadius: 20, padding: '24px', 
+          boxShadow: `0 0 60px rgba(0,0,0,0.8), 0 0 20px ${(STATUS_COLORS[hoveredNodeData.status] || '#6366f1')}33`,
+          zIndex: 100, pointerEvents: 'none', 
+          animation: 'hologramIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+          display: 'flex', flexDirection: 'column', gap: 12
+        }}>
+          <style>{`
+            @keyframes hologramIn {
+              from { opacity: 0; filter: blur(30px) brightness(2); transform: translate(-50%, -55%) scale(1.1); }
+              to { opacity: 1; filter: blur(0px) brightness(1); transform: translate(-50%, -50%) scale(1); }
+            }
+          `}</style>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUS_COLORS[hoveredNodeData.status], boxShadow: `0 0 10px ${STATUS_COLORS[hoveredNodeData.status]}` }} />
+              <span style={{ fontSize: 13, fontWeight: 1000, color: '#fff', textTransform: 'uppercase' }}>{hoveredNodeData.name}</span>
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 800, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 4 }}>{hoveredNodeData.status}</span>
+          </div>
+
+          {/* Endpoint Info */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>ENDPOINT & IP ADDRESS</div>
+            <div style={{ fontSize: 10, color: '#cbd5e1', wordBreak: 'break-all', fontFamily: 'monospace' }}>{hoveredNodeData.url}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>IP: {hoveredNodeData.ip_address || '---'}</div>
+          </div>
+
+          {/* Metrics Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: 8 }}>
+            <div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LATENCY</div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.response_time_ms ? `${hoveredNodeData.response_time_ms}ms` : '---'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>HTTP CODE</div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.status_code || '---'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>SSL STATUS</div>
+              <div style={{ fontSize: 10, fontWeight: 900, color: hoveredNodeData.ssl_valid ? '#10b981' : (hoveredNodeData.ssl_valid === false ? '#ef4444' : '#64748b') }}>
+                {hoveredNodeData.ssl_valid === true ? '✓ VALID' : (hoveredNodeData.ssl_valid === false ? '✗ INVALID' : 'PND')}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LAST CHECK</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>
+                {hoveredNodeData.last_checked ? new Date(hoveredNodeData.last_checked).toLocaleTimeString([], { hour12: false }) : '---'}
+              </div>
+            </div>
+          </div>
+
+          {hoveredNodeData.root_cause && hoveredNodeData.status !== 'ONLINE' && (
+             <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, background: 'rgba(239,68,68,0.1)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)' }}>
+               ⚠️ CAUSE: {hoveredNodeData.root_cause.toUpperCase()}
+             </div>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
         <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>
