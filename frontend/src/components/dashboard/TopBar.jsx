@@ -146,33 +146,33 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
       }}>
 
         {/* ── BRANDING SECTION (COMPACT & CLAMPED) ── */}
-        <div style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
+        <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
           {/* Logo Part - CLAMPED LEFT */}
-          <div style={{ 
+          <div style={{
             height: '100%', padding: '0 8px 0 0', /* Extreme left */
-            display: 'flex', alignItems: 'center', justifyContent: 'center' 
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <div style={{ 
-              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0', 
+            <div style={{
+              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0',
               boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
               <img src="/images/logos/logo spmt fc.png" alt="SPMT"
-                style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
+                style={{ height: 60, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
             </div>
           </div>
-          
+
           {/* Text Part (Compact) */}
-          <div style={{ 
-            padding: '0 8px', display: 'flex', flexDirection: 'column', 
-            justifyContent: 'center', height: '100%' 
+          <div style={{
+            padding: '0 8px', display: 'flex', flexDirection: 'column',
+            justifyContent: 'center', height: '100%'
           }}>
-            <span style={{ 
+            <span style={{
               fontSize: 18, fontWeight: 1000, color: 'var(--text)', /* Smaller as requested */
               letterSpacing: '-0.02em', background: 'linear-gradient(to right, var(--accent), #3b82f6)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 0.9
             }}>SPMT</span>
-            <span style={{ 
-              fontSize: 9, fontWeight: 800, color: 'var(--text-muted)', 
+            <span style={{
+              fontSize: 9, fontWeight: 800, color: 'var(--text-muted)',
               letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1
             }}>MONITORING</span>
           </div>
