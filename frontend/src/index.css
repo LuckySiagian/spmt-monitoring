@@ -554,95 +554,40 @@ tr:hover {
    RESPONSIVE (STRICT DEVICE CONTROL)
    ════════════════════════════════════════════ */
 
-/* ── 1. TABLET & MOBILE (Dashboard Stacks Vertically) ── */
-@media (max-width: 1100px) {
+/* ── Responsive Dashboard Grid ── */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 72% 28%;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  min-height: 0;
+}
+@media (max-width: 992px) {
   .dashboard-grid {
     display: flex;
     flex-direction: column;
-    grid-template-columns: 1fr;
     overflow-y: auto !important;
     height: auto !important;
-    padding: 10px;
-    gap: 12px;
-  }
-  
-  .dashboard-grid > div {
-    flex: none !important;
-    width: 100% !important;
-    min-height: 420px;
-    height: auto !important;
+    padding: 8px;
+    gap: 8px;
   }
 }
 
-/* ── 2. MOBILE ONLY (Header Stacks, Compact UI) ── */
 @media (max-width: 768px) {
   html { font-size: 14px; }
-  
   .topbar {
     flex-direction: column !important;
     height: auto !important;
-    padding: 0 !important;
-    gap: 0 !important;
+    padding: 8px 0 !important;
+    gap: 8px;
   }
-
-  .topbar-branding {
-    width: 100% !important;
-    justify-content: space-between !important;
-    padding: 6px 14px !important;
-    height: 56px !important;
-    border-bottom: 1px solid var(--border);
+  .topbar-branding { width: 100%; justify-content: center; height: auto; padding: 4px; }
+  .topbar-metrics { 
+    width: 100%; overflow-x: auto; padding: 4px 10px; height: 50px; 
+    display: flex !important; justify-content: flex-start !important; 
   }
-
-  .topbar-logo-text { display: none; }
-  
-  .topbar-metrics {
-    display: flex !important;
-    width: 100% !important;
-    justify-content: flex-start !important;
-    overflow-x: auto !important;
-    padding: 6px 14px !important;
-    height: 48px !important;
-    gap: 8px !important;
-    border-bottom: 1px solid var(--border);
-    -webkit-overflow-scrolling: touch;
-  }
-  .topbar-metrics::-webkit-scrollbar { display: none; }
-  
-  .metric-card {
-    min-width: 85px !important;
-    height: 36px !important;
-    flex: 0 0 auto !important;
-  }
-
-  .topbar-nav {
-    width: 100% !important;
-    overflow-x: auto !important;
-    padding: 8px 14px !important;
-    height: 44px !important;
-    justify-content: flex-start !important;
-    gap: 4px !important;
-  }
-  .topbar-nav button {
-    padding: 0 16px !important;
-    font-size: 11px !important;
-    height: 30px !important;
-    white-space: nowrap !important;
-  }
-
-  /* Modal & Table Fixes */
-  .hide-mobile { display: none !important; }
-  .website-table th:nth-child(2), .website-table td:nth-child(2),
-  .website-table th:nth-child(5), .website-table td:nth-child(5),
-  .website-table th:nth-child(7), .website-table td:nth-child(7) {
-    display: none !important;
-  }
+  .topbar-nav { width: 100%; overflow-x: auto; height: 40px; padding: 0 10px; }
 }
-
-/* ── 3. DESKTOP ONLY (Restoring Full Table & Row Layout) ── */
-@media (min-width: 1101px) {
-  .dashboard-grid {
-    grid-template-columns: 72% 28%;
-  }
-  .topbar-logo-text { display: block; }
-  .topbar { flex-direction: row !important; height: 74px !important; }
-}
+
