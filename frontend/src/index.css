@@ -551,98 +551,98 @@ tr:hover {
 
 
 /* ════════════════════════════════════════════
-   RESPONSIVE
+   RESPONSIVE (STRICT DEVICE CONTROL)
    ════════════════════════════════════════════ */
 
-/* ── Responsive Dashboard Grid ── */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 72% 28%;
-  gap: 8px;
-  flex: 1;
-  overflow: hidden;
-  padding: 8px;
-  min-height: 0;
-}
-
+/* ── 1. TABLET & MOBILE (Dashboard Stacks Vertically) ── */
 @media (max-width: 1100px) {
   .dashboard-grid {
+    display: flex;
+    flex-direction: column;
     grid-template-columns: 1fr;
-    overflow-y: auto;
+    overflow-y: auto !important;
+    height: auto !important;
+    padding: 10px;
+    gap: 12px;
+  }
+  
+  .dashboard-grid > div {
+    flex: none !important;
+    width: 100% !important;
+    min-height: 420px;
+    height: auto !important;
   }
 }
 
-@media (max-width: 640px) {
-  html {
-    font-size: 14px;
+/* ── 2. MOBILE ONLY (Header Stacks, Compact UI) ── */
+@media (max-width: 768px) {
+  html { font-size: 14px; }
+  
+  .topbar {
+    flex-direction: column !important;
+    height: auto !important;
+    padding: 0 !important;
+    gap: 0 !important;
   }
 
+  .topbar-branding {
+    width: 100% !important;
+    justify-content: space-between !important;
+    padding: 6px 14px !important;
+    height: 56px !important;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar-logo-text { display: none; }
+  
   .topbar-metrics {
-    display: none !important;
+    display: flex !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    padding: 6px 14px !important;
+    height: 48px !important;
+    gap: 8px !important;
+    border-bottom: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+  }
+  .topbar-metrics::-webkit-scrollbar { display: none; }
+  
+  .metric-card {
+    min-width: 85px !important;
+    height: 36px !important;
+    flex: 0 0 auto !important;
   }
 
   .topbar-nav {
+    width: 100% !important;
+    overflow-x: auto !important;
+    padding: 8px 14px !important;
+    height: 44px !important;
+    justify-content: flex-start !important;
     gap: 4px !important;
-    overflow-x: auto;
-    width: 100%;
-    justify-content: flex-start;
-    padding-bottom: 4px;
-    -webkit-overflow-scrolling: touch;
   }
-
-  /* Hide scrollbar for nav but keep functionality */
-  .topbar-nav::-webkit-scrollbar {
-    display: none;
-  }
-
   .topbar-nav button {
-    padding: 0 12px !important;
-    font-size: 10px !important;
-    white-space: nowrap;
-    height: 32px;
+    padding: 0 16px !important;
+    font-size: 11px !important;
+    height: 30px !important;
+    white-space: nowrap !important;
   }
 
-  .topbar-logo-text {
-    display: none;
-  }
-
-  /* Service Detail Modal Mobile Fix */
-  .modal-body {
-    padding: 12px !important;
-  }
-
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 2px;
-  }
-
-  .info-row span:last-child {
-    text-align: left !important;
-    max-width: 100% !important;
-  }
-
-  /* Website Management Table Mobile Fix */
-  /* Hide non-essential columns on mobile */
-  .hide-mobile {
+  /* Modal & Table Fixes */
+  .hide-mobile { display: none !important; }
+  .website-table th:nth-child(2), .website-table td:nth-child(2),
+  .website-table th:nth-child(5), .website-table td:nth-child(5),
+  .website-table th:nth-child(7), .website-table td:nth-child(7) {
     display: none !important;
-  }
-  
-  .website-table th:nth-child(2), 
-  .website-table td:nth-child(2),
-  .website-table th:nth-child(3), 
-  .website-table td:nth-child(3),
-  .website-table th:nth-child(5), 
-  .website-table td:nth-child(5),
-  .website-table th:nth-child(7), 
-  .website-table td:nth-child(7),
-  .website-table th:nth-child(8), 
-  .website-table td:nth-child(8) {
-    display: none !important;
-  }
-
-  /* Utility for mobile stacking */
-  .mobile-stack {
-    flex-direction: column !important;
   }
 }
+
+/* ── 3. DESKTOP ONLY (Restoring Full Table & Row Layout) ── */
+@media (min-width: 1101px) {
+  .dashboard-grid {
+    grid-template-columns: 72% 28%;
+  }
+  .topbar-logo-text { display: block; }
+  .topbar { flex-direction: row !important; height: 74px !important; }
+}

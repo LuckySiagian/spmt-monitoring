@@ -11,7 +11,7 @@ const STATUS_GLOW = {
 
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : '148,163,184'
+  return r ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}` : '148,163,184'
 }
 
 function getDomain(url) {
@@ -67,7 +67,7 @@ function calcTreeLayout(websites) {
     for (let ci = 0; ci < rowSize; ci++) {
       const w = websites[idx++]
       // x: evenly distributed with padding
-      const xPad  = 0.08
+      const xPad = 0.08
       const xSpan = 1 - xPad * 2
       const x = rowSize === 1 ? 0.5 : xPad + (ci / (rowSize - 1)) * xSpan
 
@@ -85,14 +85,20 @@ function calcTreeLayout(websites) {
 
 export default function NetworkTopology({ websites, selectedId, onSelect, onOpenDetail, wsConnected }) {
   const { themeId } = useTheme()
-  const canvasRef    = useRef(null)
+  const canvasRef = useRef(null)
   const animFrameRef = useRef(null)
-  const timeRef      = useRef(0)
+  const timeRef = useRef(0)
   const faviconCache = useRef({})
-  const [nodes,   setNodes]   = useState([])
-  const [topoMode, setMode]   = useState('star') // 'star' | 'tree'
+  const [nodes, setNodes] = useState([])
+  const [topoMode, setMode] = useState('star') // 'star' | 'tree'
   const [hoveredId, setHoveredId] = useState(null)
-  const isMobile = window.innerWidth < 640
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1100)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1100)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Preload favicons
   useEffect(() => {
@@ -101,9 +107,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       if (!faviconCache.current[domain]) {
         const img = new Image()
         img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
-        img.onload  = () => { 
+        img.onload = () => {
           faviconCache.current[domain] = img
-          setNodes(prev => [...prev]) 
+          setNodes(prev => [...prev])
         }
         img.onerror = () => { faviconCache.current[domain] = null }
       }
@@ -164,8 +170,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           const cpY1 = ny + (serverY - ny) * 0.4
           const cpY2 = serverY - (serverY - ny) * 0.4
           const mt = 1 - t2
-          px = mt*mt*mt*nx + 3*mt*mt*t2*nx + 3*mt*t2*t2*serverX + t2*t2*t2*serverX
-          py = mt*mt*mt*ny + 3*mt*mt*t2*cpY1 + 3*mt*t2*t2*cpY2 + t2*t2*t2*serverY
+          px = mt * mt * mt * nx + 3 * mt * mt * t2 * nx + 3 * mt * t2 * t2 * serverX + t2 * t2 * t2 * serverX
+          py = mt * mt * mt * ny + 3 * mt * mt * t2 * cpY1 + 3 * mt * t2 * t2 * cpY2 + t2 * t2 * t2 * serverY
         } else {
           px = nx + (serverX - nx) * t2
           py = ny + (serverY - ny) * t2
@@ -194,11 +200,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     nodes.forEach(node => {
       const nx = node.x * width, ny = node.y * height
       const color = STATUS_COLORS[node.status] || STATUS_COLORS.UNKNOWN
-      const glow  = STATUS_GLOW[node.status]  || STATUS_GLOW.UNKNOWN
+      const glow = STATUS_GLOW[node.status] || STATUS_GLOW.UNKNOWN
       const isSel = node.id === selectedId
       const isHov = node.id === hoveredId
       const isCrit = node.status === 'CRITICAL'
-      
+
       // Node size - expands if selected or hovered
       const r = isHov ? 36 : (isSel ? 32 : 24)
 
@@ -223,13 +229,13 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       ctx.shadowBlur = 0 // reset shadow
 
       // Favicon / initial
-      const domain  = getDomain(node.url)
+      const domain = getDomain(node.url)
       const favicon = faviconCache.current[domain]
       const imgSize = r * 1.55 | 0
       if (favicon) {
         try {
           ctx.save()
-          const half = imgSize/2; ctx.beginPath(); ctx.arc(nx, ny - 1, half, 0, Math.PI * 2)
+          const half = imgSize / 2; ctx.beginPath(); ctx.arc(nx, ny - 1, half, 0, Math.PI * 2)
           ctx.clip()
           ctx.drawImage(favicon, nx - half, ny - 1 - half, imgSize, imgSize)
           ctx.restore()
@@ -242,7 +248,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const name = node.name.length > 15 ? node.name.slice(0, 14) + '…' : node.name
       const labelY = ny + r + 8
       const isDark = themeId && themeId.includes('dark')
-      
+
       // Font weight changes on hover
       ctx.font = `${(isSel || isHov) ? '900' : '600'} ${isHov ? '14px' : '13px'} system-ui`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
@@ -292,11 +298,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     const canvas = canvasRef.current
     if (!canvas) return
     const ro = new ResizeObserver(() => {
-      canvas.width  = canvas.offsetWidth
+      canvas.width = canvas.offsetWidth
       canvas.height = canvas.offsetHeight
     })
     ro.observe(canvas)
-    canvas.width  = canvas.offsetWidth
+    canvas.width = canvas.offsetWidth
     canvas.height = canvas.offsetHeight
     return () => ro.disconnect()
   }, [])
@@ -324,7 +330,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     const rect = canvas.getBoundingClientRect()
     const mx = e.clientX - rect.left, my = e.clientY - rect.top
     const { width, height } = canvas
-    
+
     let currentHoveredId = null
     for (const node of nodes) {
       const nx = node.x * width, ny = node.y * height
@@ -333,13 +339,13 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         break
       }
     }
-    
+
     setHoveredId(currentHoveredId)
     canvas.style.cursor = currentHoveredId ? 'pointer' : 'default'
   }, [nodes])
 
   const hoveredNodeData = hoveredId ? websites.find(w => w.id === hoveredId) : null
-  const hoveredNodeObj  = hoveredId ? nodes.find(n => n.id === hoveredId) : null
+  const hoveredNodeObj = hoveredId ? nodes.find(n => n.id === hoveredId) : null
 
   let cardPos = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
 
@@ -351,9 +357,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           position: 'absolute', top: cardPos.top, left: cardPos.left, transform: cardPos.transform,
           width: 300, background: 'rgba(15, 23, 42, 0.94)', backdropFilter: 'blur(20px)',
           border: `2px solid ${STATUS_COLORS[hoveredNodeData.status] || 'var(--accent)'}`,
-          borderRadius: 20, padding: '24px', 
+          borderRadius: 20, padding: '24px',
           boxShadow: `0 0 60px rgba(0,0,0,0.8), 0 0 20px ${(STATUS_COLORS[hoveredNodeData.status] || '#6366f1')}33`,
-          zIndex: 100, pointerEvents: 'none', 
+          zIndex: 100, pointerEvents: 'none',
           animation: 'hologramIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
           display: 'flex', flexDirection: 'column', gap: 12
         }}>
@@ -404,9 +410,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           </div>
 
           {hoveredNodeData.root_cause && hoveredNodeData.status !== 'ONLINE' && (
-             <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, background: 'rgba(239,68,68,0.1)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)' }}>
-               ⚠️ CAUSE: {hoveredNodeData.root_cause.toUpperCase()}
-             </div>
+            <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, background: 'rgba(239,68,68,0.1)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)' }}>
+              ⚠️ CAUSE: {hoveredNodeData.root_cause.toUpperCase()}
+            </div>
           )}
         </div>
       )}
@@ -451,7 +457,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           <span style={{
             display: 'flex', alignItems: 'center', gap: 4,
             fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
-            color:      wsConnected ? '#10b981' : '#f59e0b',
+            color: wsConnected ? '#10b981' : '#f59e0b',
             background: wsConnected ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
             border: '1px solid ' + (wsConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'),
             borderRadius: 10, padding: '2px 8px',
@@ -465,12 +471,12 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       {/* Canvas Layer & Radar */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {/* Radar Animations */}
-        <div style={{ position:'absolute', top: topoMode==='tree'?'88%':'50%', left:'50%', width:'200%', height:'200%', background:'conic-gradient(from 0deg, transparent 70%, rgba(99,102,241,0.15) 100%)', borderRadius:'50%', pointerEvents:'none', animation:'radarSweep 4s linear infinite', zIndex:0 }} />
-        <div style={{ position:'absolute', top: topoMode==='tree'?'88%':'50%', left:'50%', transform:'translate(-50%, -50%)', width:'200%', height:'200%', background:'radial-gradient(circle, transparent 10%, rgba(99,102,241,0.05) 11%, transparent 12%, transparent 20%, rgba(99,102,241,0.05) 21%, transparent 22%, transparent 30%, rgba(99,102,241,0.05) 31%, transparent 32%)', pointerEvents:'none', zIndex:0 }}/>
+        <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', width: '200%', height: '200%', background: 'conic-gradient(from 0deg, transparent 70%, rgba(99,102,241,0.15) 100%)', borderRadius: '50%', pointerEvents: 'none', animation: 'radarSweep 4s linear infinite', zIndex: 0 }} />
+        <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '200%', height: '200%', background: 'radial-gradient(circle, transparent 10%, rgba(99,102,241,0.05) 11%, transparent 12%, transparent 20%, rgba(99,102,241,0.05) 21%, transparent 22%, transparent 30%, rgba(99,102,241,0.05) 31%, transparent 32%)', pointerEvents: 'none', zIndex: 0 }} />
 
         <canvas
           ref={canvasRef}
-          style={{ width: '100%', height: '100%', display: 'block', position:'relative', zIndex:1 }}
+          style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
           onClick={handleClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoveredId(null)}
