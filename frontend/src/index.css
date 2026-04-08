@@ -335,69 +335,96 @@ body::before {
   display: grid !important;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(2, 1fr);
-  gap: 4px; /* Tighter gap */
+  gap: 4px;
   padding: 4px;
-  flex: none;
-  min-width: 320px;
-  margin: 0 10px;
+  flex: 0 1 auto; /* Be flexible but shrink if needed */
+  max-width: 500px;
+  min-width: 0;
+}
+
+.topbar-nav-container {
+  flex: 0 1 auto; /* Shrink to save space */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  min-width: 0;
 }
 
 .metric-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row; /* Horizontal for HUD feel */
   align-items: center;
-  justify-content: center;
-  padding: 2px 8px;
-  border-radius: 8px;
-  min-width: 75px;
-  height: 34px !important; /* Compact Height */
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  transition: all 0.2s ease;
+  justify-content: flex-start;
+  padding: 0 12px;
+  border-radius: 6px;
+  min-width: 110px;
+  height: 36px !important;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--border); /* Vertical Accent */
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .metric-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-left-width: 6px;
 }
 
 .metric-card span:first-child {
-  font-size: 14px !important; /* Balanced number size */
+  font-size: 16px !important;
   font-weight: 1000;
   font-family: 'JetBrains Mono', monospace;
-  line-height: 1;
+  margin-right: 8px;
+  text-shadow: 0 0 10px currentColor;
 }
 
 .metric-card span:last-child {
-  font-size: 7px !important;
+  font-size: 8px !important;
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-top: 1px;
+  opacity: 0.7;
 }
 
-/* Status Glow Effects - PREMIUM */
+/* HUD Animations */
+@keyframes hudPulse {
+  0% { opacity: 0.6; box-shadow: inset 0 0 5px currentColor; }
+  50% { opacity: 1; box-shadow: inset 0 0 20px currentColor; }
+  100% { opacity: 0.6; box-shadow: inset 0 0 5px currentColor; }
+}
+
 .metric-card.online { 
-  border-color: #10b98166; 
-  box-shadow: inset 0 0 15px #10b98115, 0 0 10px #10b98110; 
-  background: linear-gradient(180deg, rgba(16, 185, 129, 0.05), transparent);
+  border-left-color: #10b981 !important; 
+  color: #10b981; 
 }
 .metric-card.critical { 
-  border-color: #f59e0b66; 
-  box-shadow: inset 0 0 15px #f59e0b15, 0 0 10px #f59e0b10;
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.05), transparent);
+  border-left-color: #f59e0b !important; 
+  color: #f59e0b; 
+  animation: hudPulse 2s infinite ease-in-out;
 }
 .metric-card.offline { 
-  border-color: #ef444466; 
-  box-shadow: inset 0 0 15px #ef444415, 0 0 10px #ef444410;
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.05), transparent);
+  border-left-color: #ef4444 !important; 
+  color: #ef4444; 
+  animation: hudPulse 1.5s infinite ease-in-out;
 }
 
 .topbar-branding {
   height: 100%;
   display: flex;
   align-items: center;
-  padding-left: 10px;
+  padding-left: 0px;
+  flex-shrink: 0 !important;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0 !important;
+  margin-left: auto;
 }
 
 /* ── UI Components & Utilities ── */

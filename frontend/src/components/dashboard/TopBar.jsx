@@ -202,42 +202,31 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           })}
         </div>
 
-        {/* ── NAVIGATION SECTION (Enlarged Boxes) ── */}
-        <div className="topbar-nav" style={{
-          display: 'flex', gap: 4, background: 'var(--accent-light)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: 2, height: 36, flexShrink: 0
-        }}>
-          {navItems.map(tab => {
-            const labelStr = navLabel(tab).split(' ')[1] || navLabel(tab) // Remove emoji for space
-            return (
-              <button key={tab}
-                style={{
-                  background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
-                  border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
-                  color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
-                  fontSize: 10, fontWeight: 800, padding: '0 12px', borderRadius: 6,
-                  cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 2px 5px rgba(0,0,0,0.05)' : 'none',
-                  transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.05em'
-                }}
-                onClick={() => onNavChange(tab)}>{labelStr}</button>
-            )
-          })}
+        {/* ── NAVIGATION SECTION (Region Locked: 35%) ── */}
+        <div className="topbar-nav-container">
+          <div className="topbar-nav" style={{
+            display: 'flex', gap: 6, background: 'var(--accent-light)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: 3, height: 40, flexShrink: 0
+          }}>
+            {navItems.map(tab => {
+              const label = navLabel(tab)
+              return (
+                <button key={tab}
+                  style={{
+                    background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
+                    border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
+                    color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
+                    fontSize: 10, fontWeight: 800, padding: '0 10px', borderRadius: 6,
+                    cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 4px 10px rgba(0,0,0,0.1)' : 'none',
+                    transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                  onClick={() => onNavChange(tab)}>{label}</button>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Mini SLA Donut for TV Mode Highlight */}
-        {isTvMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid var(--border)', paddingLeft: 12 }}>
-            <svg width="28" height="28" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
-              <circle cx="18" cy="18" r="14" fill="none" stroke={slaPct > 99 ? '#10b981' : slaPct > 80 ? '#f59e0b' : '#ef4444'} strokeWidth="4"
-                strokeDasharray="88" strokeDashoffset={88 - (slaPct / 100) * 88} strokeLinecap="round" transform="rotate(-90 18 18)" style={{ transition: 'stroke-dashoffset 1s ease-in-out' }} />
-            </svg>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{slaPct.toFixed(2)}%</span>
-              <span style={{ fontSize: 8, color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.1em' }}>SLA 24H</span>
-            </div>
-          </div>
-        )}
+
 
         {/* Actions */}
         <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
