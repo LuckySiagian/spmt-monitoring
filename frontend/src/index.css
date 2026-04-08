@@ -311,13 +311,96 @@ body::before {
 .theme-neon {
   --header-height: 74px;
 }
-
 .theme-solar {
   --header-height: 74px;
 }
 
-/* ── Theme 7: Clean Light ── */
+.topbar {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 0 24px;
+  height: 105px !important; /* Balanced height */
+  background: var(--bg-header);
+  backdrop-filter: blur(32px);
+  border-bottom: 2px solid var(--border);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  position: relative;
+}
 
+.topbar-metrics {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr); 
+  grid-template-rows: repeat(2, 1fr);   
+  gap: 6px;
+  padding: 8px;
+  flex: 0 1 auto;
+  max-width: 440px; 
+  margin: 0 auto;
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 10px;
+  min-width: 90px;
+  height: 42px !important; /* Slightly smaller than before */
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--border);
+  transition: all 0.2s ease;
+}
+
+.metric-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  z-index: 10;
+}
+
+.metric-card span:first-child {
+  font-size: 15px !important; /* Balanced fonts */
+  font-weight: 1000;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+}
+
+.metric-card span:last-child {
+  font-size: 8px !important;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+/* Status Glow Effects - PREMIUM */
+.metric-card.online { 
+  border-color: #10b98166; 
+  box-shadow: inset 0 0 15px #10b98115, 0 0 10px #10b98110; 
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.05), transparent);
+}
+.metric-card.critical { 
+  border-color: #f59e0b66; 
+  box-shadow: inset 0 0 15px #f59e0b15, 0 0 10px #f59e0b10;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.05), transparent);
+}
+.metric-card.offline { 
+  border-color: #ef444466; 
+  box-shadow: inset 0 0 15px #ef444415, 0 0 10px #ef444410;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.05), transparent);
+}
+
+.topbar-branding {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+}
 
 /* ── UI Components & Utilities ── */
 
@@ -564,15 +647,32 @@ tr:hover {
   padding: 8px;
   min-height: 0;
 }
-@media (max-width: 992px) {
+@media (max-width: 1100px) {
+  .topbar {
+     height: auto !important;
+     padding: 12px !important;
+  }
+}
+
+@media (max-width: 960px) {
   .dashboard-grid {
     display: flex;
     flex-direction: column;
     overflow-y: auto !important;
     height: auto !important;
-    padding: 8px;
     gap: 8px;
   }
+  .topbar-nav {
+    display: flex; gap: 6px; background: var(--accent-light); border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 3px; height: 44px !important; flex-shrink: 0;
+  }
+  .topbar-nav button {
+    font-size: 11px !important; font-weight: 800; padding: 0 16px !important; border-radius: 8px;
+    height: 100%; transition: all 0.2s; letter-spacing: 0.05em;
+  }
+  
+  .topbar-actions { gap: 12px !important; }
+  .topbar-actions .clock-text { font-size: 18px !important; font-weight: 900; }
 }
 
 @media (max-width: 768px) {

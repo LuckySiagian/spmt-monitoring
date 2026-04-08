@@ -136,13 +136,9 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
   return (
     <>
-      <div style={{
+      <div className="topbar" style={{
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-        height: '74px', padding: '0 24px',
-        background: 'var(--bg-header)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)',
-        borderBottom: '1px solid var(--border)',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
-        position: 'relative', zIndex: 100
+        padding: '0 24px', position: 'relative', zIndex: 100
       }}>
 
         {/* ── BRANDING SECTION (COMPACT & CLAMPED) ── */}
@@ -178,46 +174,32 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           </div>
         </div>
 
-        {/* ── METRICS SECTION (Flexible To Avoid Overlap) ── */}
+        {/* ── METRICS SECTION (Symmetric 4x2 Grid) ── */}
         <div className="topbar-metrics" style={{
-          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '0 10px', visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
-          overflow: 'hidden'
+          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden'
         }}>
-          <div style={{ display: 'flex', gap: 4, width: 'auto', justifyContent: 'center', alignItems: 'center' }}>
-            {metrics.map(m => {
-              const active = activeMetric === m.label
-              const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
+          {metrics.map(m => {
+            const active = activeMetric === m.label
+            const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
+            const statusClass = m.label === 'ONLINE' ? 'online' : (m.label === 'CRITICAL' ? 'critical' : (m.label === 'OFFLINE' ? 'offline' : ''))
 
-              return (
-                <div key={m.label} title={`Detail ${m.label}`}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '4px 8px', borderRadius: 8, cursor: 'pointer', userSelect: 'none',
-                    flex: '0 1 auto', minWidth: 65, maxWidth: 100,
-                    background: active ? `linear-gradient(180deg, transparent, ${m.color}20)` : 'var(--accent-light)',
-                    border: `1px solid ${active ? m.color : 'var(--border)'}`,
-                    borderBottom: `2.5px solid ${active ? m.color : m.color + '40'}`,
-                    transition: 'all 0.2s ease', position: 'relative'
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
-                    e.currentTarget.style.zIndex = 10;
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.zIndex = 1;
-                  }}
-                  onClick={() => setActiveMetric(active ? null : m.label)}>
+            return (
+              <div key={m.label} title={`Detail ${m.label}`}
+                className={`metric-card ${statusClass}`}
+                style={{
+                  cursor: 'pointer', userSelect: 'none',
+                  background: active ? `${m.color}22` : undefined,
+                  borderColor: active ? m.color : undefined
+                }}
+                onClick={() => setActiveMetric(active ? null : m.label)}>
 
-                  {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: 'var(--offline)', animation: 'pulse 1s infinite' }} />}
+                {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: 'var(--offline)', animation: 'pulse 1s infinite' }} />}
 
-                  <div style={{ color: m.color, fontSize: 14, fontWeight: 1000, fontFamily: 'monospace', lineHeight: 1, whiteSpace: 'nowrap' }}>{m.value}</div>
-                  <div style={{ fontSize: 8, color: m.color, letterSpacing: '0.01em', marginTop: 2, fontWeight: 900, opacity: 1, whiteSpace: 'nowrap' }}>{m.label}</div>
-                </div>
-              )
-            })}
-          </div>
+                <span style={{ color: m.color }}>{m.value}</span>
+                <span style={{ color: m.color }}>{m.label}</span>
+              </div>
+            )
+          })}
         </div>
 
         {/* ── NAVIGATION SECTION (Enlarged Boxes) ── */}
@@ -271,7 +253,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
           <div style={{ flexShrink: 0, padding: '0 16px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
+            <div className="clock-text" style={{ color: 'var(--text)', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
           </div>
