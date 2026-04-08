@@ -319,26 +319,27 @@ body::before {
   display: flex !important;
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
-  padding: 0 24px;
-  height: 105px !important; /* Balanced height */
+  gap: 12px;
+  padding: 0 16px;
+  height: 95px !important; /* Balanced Height */
   background: var(--bg-header);
-  backdrop-filter: blur(32px);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   border-bottom: 2px solid var(--border);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   z-index: 1000;
   position: relative;
 }
 
 .topbar-metrics {
   display: grid !important;
-  grid-template-columns: repeat(4, 1fr); 
-  grid-template-rows: repeat(2, 1fr);   
-  gap: 6px;
-  padding: 8px;
-  flex: 0 1 auto;
-  max-width: 440px; 
-  margin: 0 auto;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 4px; /* Tighter gap */
+  padding: 4px;
+  flex: none;
+  min-width: 320px;
+  margin: 0 10px;
 }
 
 .metric-card {
@@ -346,36 +347,33 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4px 12px;
-  border-radius: 10px;
-  min-width: 90px;
-  height: 42px !important; /* Slightly smaller than before */
+  padding: 2px 8px;
+  border-radius: 8px;
+  min-width: 75px;
+  height: 34px !important; /* Compact Height */
   background: rgba(255, 255, 255, 0.04);
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border);
   transition: all 0.2s ease;
 }
 
 .metric-card:hover {
   background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.05);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-  z-index: 10;
+  transform: translateY(-1px);
 }
 
 .metric-card span:first-child {
-  font-size: 15px !important; /* Balanced fonts */
+  font-size: 14px !important; /* Balanced number size */
   font-weight: 1000;
   font-family: 'JetBrains Mono', monospace;
   line-height: 1;
 }
 
 .metric-card span:last-child {
-  font-size: 8px !important;
+  font-size: 7px !important;
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-top: 2px;
-  opacity: 0.9;
+  margin-top: 1px;
 }
 
 /* Status Glow Effects - PREMIUM */
@@ -662,17 +660,6 @@ tr:hover {
     height: auto !important;
     gap: 8px;
   }
-  .topbar-nav {
-    display: flex; gap: 6px; background: var(--accent-light); border: 1.5px solid var(--border);
-    border-radius: 10px; padding: 3px; height: 44px !important; flex-shrink: 0;
-  }
-  .topbar-nav button {
-    font-size: 11px !important; font-weight: 800; padding: 0 16px !important; border-radius: 8px;
-    height: 100%; transition: all 0.2s; letter-spacing: 0.05em;
-  }
-  
-  .topbar-actions { gap: 12px !important; }
-  .topbar-actions .clock-text { font-size: 18px !important; font-weight: 900; }
 }
 
 @media (max-width: 768px) {

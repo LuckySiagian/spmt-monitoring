@@ -253,7 +253,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
           <div style={{ flexShrink: 0, padding: '0 16px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
-            <div className="clock-text" style={{ color: 'var(--text)', fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
+            <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
           </div>
