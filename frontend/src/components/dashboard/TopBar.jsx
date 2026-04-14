@@ -5,7 +5,6 @@ import { useTheme } from '../../store/theme'
 import NotificationBell from './NotificationBell'
 import MetricDetailModal from './MetricDetailModal'
 
-const fmtSLA = v => v == null ? '0.00' : Number(v).toFixed(2)
 const DROPDOWN_ID = 'profile-dd'
 
 function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbout, onClose, rect }) {
@@ -109,22 +108,14 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  const alertCount = summary?.active_alerts ?? 0
   const metrics = [
     { label: t?.online || 'ONLINE', value: summary?.online_count ?? 0, color: 'var(--online)' },
-    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: 'var(--critical)' },
     { label: t?.offline || 'OFFLINE', value: summary?.offline_count ?? 0, color: 'var(--offline)' },
+    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: 'var(--critical)' },
     { label: t?.unknown || 'UNKNOWN', value: summary?.unknown_count ?? 0, color: 'var(--text-muted)' },
-    { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: 'var(--accent)' },
-    { label: t?.total || 'TOTAL', value: summary?.total_websites ?? 0, color: 'var(--text-sub)' },
-    { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#7c3aed' },
-    { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? 'var(--offline)' : 'var(--text-muted)' },
   ]
 
-  const slaPct = Number(summary?.sla_percent || 100);
-
   const rc = { superadmin: '#8b5cf6', admin: '#3b82f6', viewer: '#64748b' }[user?.role] || '#64748b'
-  const rl = { superadmin: 'SA', admin: 'AD', viewer: 'VW' }[user?.role] || '??'
   const navLabel = tab => {
     if (tab === 'dashboard') return `📊 ${t?.dashboard || 'Dashboard'}`
     if (tab === 'websites') return `🌐 ${t?.websites || 'Websites'}`
@@ -141,46 +132,24 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
         padding: '0 24px', position: 'relative', zIndex: 100
       }}>
 
-        {/* ── BRANDING SECTION (COMPACT & CLAMPED) ── */}
         <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-          {/* Logo Part - CLAMPED LEFT */}
-          <div style={{
-            height: '100%', padding: '0 8px 0 0', /* Extreme left */
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div style={{
-              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0',
-              boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <img src="/images/logos/logo spmt fc.png" alt="SPMT"
-                style={{ height: 60, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
-            </div>
-          </div>
-
-          {/* Text Part (Compact) */}
-          <div style={{
-            padding: '0 8px', display: 'flex', flexDirection: 'column',
-            justifyContent: 'center', height: '100%'
-          }}>
-            <span style={{
-              fontSize: 18, fontWeight: 1000, color: 'var(--text)', /* Smaller as requested */
-              letterSpacing: '-0.02em', background: 'linear-gradient(to right, var(--accent), #3b82f6)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 0.9
-            }}>SPMT</span>
-            <span style={{
-              fontSize: 9, fontWeight: 800, color: 'var(--text-muted)',
-              letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1
-            }}>MONITORING</span>
-          </div>
+          <img
+            src="/images/logos/logo.png"
+            alt="Logo"
+            style={{ height: 52, width: 'auto', objectFit: 'contain' }}
+          />
         </div>
 
         {/* ── METRICS SECTION (Symmetric 4x2 Grid) ── */}
-        <div className="topbar-metrics" style={{
-          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden'
+        <div className="topbar-metrics single-row" style={{
+          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'nowrap'
         }}>
           {metrics.map(m => {
             const active = activeMetric === m.label
-            const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
             const statusClass = m.label === 'ONLINE' ? 'online' : (m.label === 'CRITICAL' ? 'critical' : (m.label === 'OFFLINE' ? 'offline' : ''))
 
             return (
@@ -193,7 +162,6 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                 }}
                 onClick={() => setActiveMetric(active ? null : m.label)}>
 
-                {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: 'var(--offline)', animation: 'pulse 1s infinite' }} />}
 
                 <span style={{ color: m.color }}>{m.value}</span>
                 <span style={{ color: m.color }}>{m.label}</span>
