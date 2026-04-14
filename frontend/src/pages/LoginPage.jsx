@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../store/auth'
+import { toast } from 'react-toastify'
 
 const videos = [
   "/images/background/bg1.MP4",
@@ -28,8 +29,11 @@ export default function LoginPage({ onLogin }) {
     try {
       await login(form.username, form.password)
       onLogin()
+      setTimeout(() => toast.success('“Login successful” ', { icon: '✅' }), 500)
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Check credentials.')
+      const errorMsg = err.response?.data?.error || 'Login failed. Check credentials.'
+      setError(errorMsg)
+      toast.error(`❌ Login gagal: ${errorMsg}`, { icon: '😞' })
     } finally {
       setLoading(false)
     }
@@ -221,7 +225,7 @@ fontSize: '14px',
 fontWeight:800,
 letterSpacing: '0.05em',
 cursor:'pointer',
-boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)'
+boxShadow:'0 4px 15px rgba(37, 99, 235, 0.3)'
 },
 
 error:{

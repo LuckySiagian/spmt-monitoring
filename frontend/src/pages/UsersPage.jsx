@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { userAPI, userAdminAPI } from '../services/api'
 import { useAuth } from '../store/auth'
+import { toast } from 'react-toastify'
 
 const RoleBadge = ({ role }) => {
   const map = {
@@ -27,39 +28,43 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false)
   const [actionMsg, setActionMsg] = useState('')
 
-  const load = async () => {
+  const load = async (signal) => {
     try {
-      const res = await userAPI.getAll()
+      const res = await userAPI.getAll(signal ? { signal } : undefined)
       setUsers(res.data || [])
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    } catch (e) {
+      if (e?.name === 'CanceledError' || e?.code === 'ERR_CANCELED') return
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [])
 
   const adminCount = users.filter(u => u.role === 'admin').length
 
   const handlePromote = async (userId) => {
     try {
       await userAPI.promote(userId)
-      setActionMsg('User promoted to Admin')
+      toast.success('🚀 User promoted to Admin!', { icon: '⭐' })
       await load()
-      setTimeout(() => setActionMsg(''), 3000)
     } catch (e) {
-      setActionMsg(e.response?.data?.error || 'Failed to promote')
-      setTimeout(() => setActionMsg(''), 3000)
+      toast.error(`❌ Failed to promote: ${e.response?.data?.error || 'Unknown error'}`, { icon: '😞' })
     }
   }
 
   const handleDemote = async (userId) => {
     try {
       await userAPI.demote(userId)
-      setActionMsg('User demoted to Viewer')
+      toast.success('⬇️ User demoted to Viewer!', { icon: '📉' })
       await load()
-      setTimeout(() => setActionMsg(''), 3000)
     } catch (e) {
-      setActionMsg(e.response?.data?.error || 'Failed to demote')
-      setTimeout(() => setActionMsg(''), 3000)
+      toast.error(`❌ Failed to demote: ${e.response?.data?.error || 'Unknown error'}`, { icon: '😞' })
     }
   }
 
@@ -71,10 +76,11 @@ export default function UsersPage() {
       setShowRegister(false)
       setRegForm({ username: '', password: '', role: 'viewer' })
       await load()
-      setActionMsg('User created successfully')
-      setTimeout(() => setActionMsg(''), 3000)
+      toast.success('👤 User created successfully!', { icon: '🎉' })
     } catch (err) {
-      setRegError(err.response?.data?.error || 'Failed to create user')
+      const errorMsg = err.response?.data?.error || 'Failed to create user'
+      setRegError(errorMsg)
+      toast.error(`❌ Failed to create user: ${errorMsg}`, { icon: '😞' })
     } finally {
       setSaving(false)
     }
@@ -85,11 +91,9 @@ export default function UsersPage() {
       await userAdminAPI.delete(userId)
       setDeleteTarget(null)
       await load()
-      setActionMsg('User deleted')
-      setTimeout(() => setActionMsg(''), 3000)
+      toast.success('🗑️ User deleted successfully!', { icon: '💥' })
     } catch (e) {
-      setActionMsg(e.response?.data?.error || 'Failed to delete')
-      setTimeout(() => setActionMsg(''), 3000)
+      toast.error(`❌ Failed to delete: ${e.response?.data?.error || 'Unknown error'}`, { icon: '😞' })
     }
   }
 
@@ -252,26 +256,26 @@ export default function UsersPage() {
 }
 
 const styles = {
-  page: { display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 8, overflow: 'hidden', background: 'var(--bg-main)' },
-  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '10px' },
-  title: { fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' },
-  sub: { fontSize: 11, color: 'var(--text-muted)', marginTop: 2 },
-  addBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: 'var(--text)', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', cursor: 'pointer' },
-  actionMsg: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 6, padding: '8px 14px', fontSize: 12, flexShrink: 0 },
-  limitBar: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
-  limitLabel: { fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em' },
-  limitTrack: { display: 'flex', gap: 4 },
-  limitSlot: { width: 40, height: 8, borderRadius: 2, transition: 'background 0.3s' },
-  tableContainer: { flex: 1, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow)' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { padding: '10px 14px', textAlign: 'left', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', borderBottom: '2px solid var(--border)', background: 'var(--bg-header)', position: 'sticky', top: 0 },
-  tr: { borderBottom: '1px solid rgba(99,102,241,0.07)' },
-  td: { padding: '12px 14px', fontSize: 13, color: 'var(--text-sub)' },
-  avatar: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontWeight: 700, fontSize: 13, flexShrink: 0 },
-  promoteBtn: { background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer' },
-  demoteBtn: { background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer' },
-  deleteBtn: { background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' },
-  empty: { textAlign: 'center', color: 'var(--text-muted)', padding: '48px', fontSize: 13 },
+  page: { display: 'flex', flexDirection: 'column', height: '100%', padding: '12px', gap: 10, overflow: 'hidden', background: 'linear-gradient(180deg, var(--bg-main) 0%, rgba(255,255,255,0.96) 100%)' },
+  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, gap: 10, paddingBottom: '12px' },
+  title: { fontSize: 22, fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.03em' },
+  sub: { fontSize: 12, color: 'var(--text-muted)', marginTop: 4 },
+  addBtn: { background: 'linear-gradient(135deg,#4f46e5,#2563eb)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', cursor: 'pointer', boxShadow: '0 18px 40px rgba(59,130,246,0.2)' },
+  actionMsg: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 8, padding: '10px 14px', fontSize: 12, flexShrink: 0 },
+  limitBar: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, padding: '10px 0' },
+  limitLabel: { fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.12em' },
+  limitTrack: { display: 'flex', gap: 6 },
+  limitSlot: { width: 45, height: 10, borderRadius: 999, transition: 'background 0.3s' },
+  tableContainer: { flex: 1, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid rgba(99,102,241,0.14)', borderRadius: 16, boxShadow: 'var(--shadow)', padding: '12px', animation: 'fadeInUp 0.45s ease both' },
+  table: { width: '100%', borderCollapse: 'collapse', minWidth: 760 },
+  th: { padding: '14px 16px', textAlign: 'left', fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.12em', borderBottom: '1px solid rgba(99,102,241,0.12)', background: 'var(--bg-header)', position: 'sticky', top: 0, zIndex: 1 },
+  tr: { borderBottom: '1px solid rgba(99,102,241,0.08)', transition: 'background 0.25s ease, transform 0.25s ease' },
+  td: { padding: '14px 16px', fontSize: 13, color: 'var(--text-sub)' },
+  avatar: { width: 36, height: 36, borderRadius: '50%', background: 'rgba(59,130,246,0.16)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontWeight: 700, fontSize: 13, flexShrink: 0 },
+  promoteBtn: { background: 'rgba(59,130,246,0.16)', border: '1px solid rgba(59,130,246,0.35)', color: '#3b82f6', borderRadius: 8, padding: '6px 12px', fontSize: 11, cursor: 'pointer' },
+  demoteBtn: { background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.35)', color: '#f59e0b', borderRadius: 8, padding: '6px 12px', fontSize: 11, cursor: 'pointer' },
+  deleteBtn: { background: 'rgba(239,68,68,0.16)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444', borderRadius: 8, padding: '6px 10px', fontSize: 11, cursor: 'pointer' },
+  empty: { textAlign: 'center', color: 'var(--text-muted)', padding: '56px', fontSize: 14, letterSpacing: '0.01em' },
 }
 
 const mStyles = {

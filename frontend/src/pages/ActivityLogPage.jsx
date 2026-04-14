@@ -13,7 +13,18 @@ export default function ActivityLogPage() {
   const [page, setPage] = useState(1)
   const PER = 50
 
-  useEffect(() => { setLoading(true); eventsAPI.getAll(500).then(r => setEvents(r.data || [])).catch(() => setEvents([])).finally(() => setLoading(false)) }, [])
+  useEffect(() => {
+    setLoading(true)
+    const controller = new AbortController()
+    eventsAPI.getAll(500, { signal: controller.signal })
+      .then(r => setEvents(r.data || []))
+      .catch((err) => {
+        if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return
+        setEvents([])
+      })
+      .finally(() => setLoading(false))
+    return () => controller.abort()
+  }, [])
   const fmt = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
   const filtered = events.filter(ev => filter === 'ALL' || ev.new_status === filter)
   const total = Math.max(1, Math.ceil(filtered.length / PER))

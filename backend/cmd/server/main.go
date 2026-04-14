@@ -65,26 +65,63 @@ func main() {
 	r.Use(chimiddleware.Logger)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.RequestID)
+	
+	// ✅ SECURITY: Restricted CORS - only accept requests from frontend
+	allowedOrigins := []string{cfg.FrontendURL}
 	r.Use(cors.Handler(cors.Options{
-		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowOriginFunc: func(r *http.Request, origin string) bool {
+			for _, allowed := range allowedOrigins {
+				if origin == allowed {
+					return true
+				}
+			}
+			return false
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	
+	// ✅ SECURITY: Add security headers middleware
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-Content-Type-Options", "nosniff")
+			w.Header().Set("X-Frame-Options", "DENY")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; connect-src 'self' ws: wss:")
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			w.Header().Set("X-XSS-Protection", "1; mode=block")
+			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+			next.ServeHTTP(w, r)
+		})
+	})
+	
+	// ✅ SECURITY: Add request size limit (10MB max)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	// ✅ SECURITY: Rate limiter for auth endpoints (5 attempts per 15 minutes per IP)
+	authLimiter := middleware.NewRateLimiter(5, 15*time.Minute)
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Auth routes (public)
-	r.Post("/auth/login", h.Login)
-	r.Post("/auth/register", h.Register)
+	// Auth routes (public) - Rate limited by client IP
+	r.Post("/auth/login", authLimiter.Middleware()(http.HandlerFunc(h.Login)))
+	r.Post("/auth/register", authLimiter.Middleware()(http.HandlerFunc(h.Register)))
 
-	// WebSocket (public - auth via query param or handled client-side)
-	r.Get("/ws", h.ServeWS)
+	// ✅ SECURITY: WebSocket endpoint protected with authentication
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Auth(cfg.JWTSecret))
+		r.Get("/ws", h.ServeWS)
+	})
 
 	// Protected routes
 	r.Group(func(r chi.Router) {

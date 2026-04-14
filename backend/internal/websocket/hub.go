@@ -14,11 +14,9 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // allow all origins for NOC dashboard
-	},
-}
-
-type Client struct {
+			// ✅ SECURITY: Origin validation moved to route protection with Auth middleware
+			// WebSocket endpoint is now protected by JWT authentication in main.go
+			return true // Safe because endpoint is behind Auth middleware
 	conn *websocket.Conn
 	send chan []byte
 }

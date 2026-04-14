@@ -8,6 +8,8 @@ import WebsitesPage from './pages/WebsitesPage'
 import UsersPage from './pages/UsersPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
+import { ToastContainer, toast } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { dashboardAPI } from './services/api'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
@@ -324,9 +326,16 @@ function AppInner() {
   const loadSummary = useCallback(async () => { if (!loggedIn) return; try { const r = await dashboardAPI.getSummary(); setSummary(r.data) } catch { } }, [loggedIn])
   const handleWebsiteUpdate = useCallback(() => { loadSummary(); setRefreshTrigger(t => t + 1) }, [loadSummary])
 
-  useEffect(() => { if (loggedIn) { loadSummary(); const iv = setInterval(loadSummary, 2000); return () => clearInterval(iv) } }, [loggedIn, loadSummary])
+  useEffect(() => { if (loggedIn) { loadSummary(); const iv = setInterval(loadSummary, 4000); return () => clearInterval(iv) } }, [loggedIn, loadSummary])
 
   const navTo = useCallback((nav) => { if (nav === 'users' && !isSuperAdmin) return; setActiveNav(nav); localStorage.setItem('spmt_active_nav', nav) }, [isSuperAdmin])
+
+  useEffect(() => {
+    if (activeNav === 'users' && !isSuperAdmin) {
+      setActiveNav('dashboard')
+      localStorage.setItem('spmt_active_nav', 'dashboard')
+    }
+  }, [activeNav, isSuperAdmin])
 
   const handleNewNotification = useCallback((notif) => {
     if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL') return
@@ -342,7 +351,7 @@ function AppInner() {
   const handleMarkAllRead = useCallback(() => setNotifications(p => p.map(n => ({ ...n, read: true }))), [])
   const handleDelete = useCallback((idx) => setNotifications(p => p.filter((_, i) => i !== idx)), [])
   const handleClearAll = useCallback(() => setNotifications([]), [])
-  const handleLogout = () => { setShowLogout(false); logout(); setLoggedIn(false); localStorage.removeItem('spmt_active_nav') }
+  const handleLogout = () => { setShowLogout(false); logout(); setLoggedIn(false); localStorage.removeItem('spmt_active_nav'); toast.success('🚪 Logout berhasil! Sampai jumpa lagi.', { icon: '👋' }) }
 
   if (!loggedIn) return <LoginPage onLogin={() => setLoggedIn(true)} />
 
@@ -374,8 +383,64 @@ function AppInner() {
       {showLogout && <LogoutModal onConfirm={handleLogout} onCancel={() => setShowLogout(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+        toastStyle={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: '#fff',
+          borderRadius: '12px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          fontWeight: '600',
+          fontSize: '14px'
+        }}
+        progressStyle={{
+          background: 'rgba(255,255,255,0.8)',
+          height: '3px'
+        }}
+      />
     </div>
   )
 }
 
-export default function App() { return <ThemeProvider><AuthProvider><AppInner /></AuthProvider></ThemeProvider> }
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="colored"
+          toastStyle={{
+            background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)',
+            color: '#fff',
+            borderRadius: '14px',
+            boxShadow: '0 14px 36px rgba(0,0,0,0.2)',
+            fontWeight: 700,
+            fontSize: '13px'
+          }}
+          progressStyle={{
+            background: 'rgba(255,255,255,0.9)',
+            height: '4px'
+          }}
+        />
+        <AppInner />
+      </AuthProvider>
+    </ThemeProvider>
+  )
+}

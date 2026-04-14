@@ -19,19 +19,19 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
 
   return createPortal(
     <div id={DROPDOWN_ID} style={{
-      position: 'fixed', top: rect.bottom + 8, right: window.innerWidth - rect.right, width: 280,
+      position: 'fixed', top: rect.bottom + 8, right: window.innerWidth - rect.right, width: 260,
       background: 'var(--bg-card)', backdropFilter: 'blur(24px)', border: '1px solid var(--border)',
       borderRadius: 16, boxShadow: '0 20px 50px rgba(0,0,0,0.3)', zIndex: 99995, overflow: 'hidden', animation: 'fadeIn 0.15s ease'
     }}>
 
       <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', background: 'var(--accent-light)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}88`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: rc, overflow: 'hidden' }}>
+          <div style={{ width: 50, height: 50, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}88`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: rc, overflow: 'hidden' }}>
             {avatar ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (user?.username || '?')[0].toUpperCase()}
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{user?.username}</div>
-            <div style={{ fontSize: 11, color: rc, fontWeight: 700, letterSpacing: '0.05em' }}>{rl.toUpperCase()}</div>
+            <div style={{ fontSize: 11, color: rc, fontWeight: 600, letterSpacing: '0.05em' }}>{rl.toUpperCase()}</div>
           </div>
         </div>
       </div>
@@ -44,7 +44,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {lightThemes.map(t => (
               <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
-                style={{ width: 24, height: 24, borderRadius: '50%', background: t.color, border: themeId === t.id ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+                style={{ width: 20, height: 20, borderRadius: '50%', background: t.color, border: themeId === t.id ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
             ))}
           </div>
         </div>
@@ -54,7 +54,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {darkThemes.map(t => (
               <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
-                style={{ width: 24, height: 24, borderRadius: '50%', background: t.color, border: themeId === t.id ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+                style={{ width: 20, height: 20, borderRadius: '50%', background: t.color, border: themeId === t.id ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
             ))}
           </div>
         </div>
@@ -111,161 +111,112 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
   const alertCount = summary?.active_alerts ?? 0
   const metrics = [
-    { label: t?.online || 'ONLINE', value: summary?.online_count ?? 0, color: 'var(--online)' },
-    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: 'var(--critical)' },
-    { label: t?.offline || 'OFFLINE', value: summary?.offline_count ?? 0, color: 'var(--offline)' },
-    { label: t?.unknown || 'UNKNOWN', value: summary?.unknown_count ?? 0, color: 'var(--text-muted)' },
-    { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: 'var(--accent)' },
-    { label: t?.total || 'TOTAL', value: summary?.total_websites ?? 0, color: 'var(--text-sub)' },
-    { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#7c3aed' },
-    { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? 'var(--offline)' : 'var(--text-muted)' },
+    { label: t?.online || 'ONLINE', value: summary?.online_count ?? 0, color: '#10b981', bgColor: 'rgba(16, 185, 129, 0.15)', borderColor: '#10b981' },
+    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#f59e0b' },
+    { label: t?.offline || 'OFFLINE', value: summary?.offline_count ?? 0, color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#ef4444' },
+    { label: t?.unknown || 'UNKNOWN', value: summary?.unknown_count ?? 0, color: '#64748b', bgColor: 'rgba(100, 116, 139, 0.15)', borderColor: '#64748b' },
+    { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#2563eb', bgColor: 'rgba(37, 99, 235, 0.15)', borderColor: '#2563eb' },
+    { label: t?.total || 'TOTAL', value: summary?.total_websites ?? 0, color: '#7c3aed', bgColor: 'rgba(124, 58, 237, 0.15)', borderColor: '#7c3aed' },
+    { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#ec4899', bgColor: 'rgba(236, 72, 153, 0.15)', borderColor: '#ec4899' },
+    { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? '#dc2626' : '#64748b', bgColor: alertCount > 0 ? 'rgba(220, 38, 38, 0.15)' : 'rgba(100, 116, 139, 0.15)', borderColor: alertCount > 0 ? '#dc2626' : '#64748b' },
   ]
 
-  const slaPct = Number(summary?.sla_percent || 100);
-
   const rc = { superadmin: '#8b5cf6', admin: '#3b82f6', viewer: '#64748b' }[user?.role] || '#64748b'
-  const rl = { superadmin: 'SA', admin: 'AD', viewer: 'VW' }[user?.role] || '??'
   const navLabel = tab => {
-    if (tab === 'dashboard') return `📊 ${t?.dashboard || 'Dashboard'}`
-    if (tab === 'websites') return `🌐 ${t?.websites || 'Websites'}`
-    if (tab === 'activity-log') return `📋 ${t?.activity || 'Activity'}`
-    if (tab === 'notifications') return `🔔 ${t?.notifications || 'Notifications'}`
-    if (tab === 'users') return `👥 ${t?.users || 'Users'}`
+    if (tab === 'dashboard') return `📊 Dashboard`
+    if (tab === 'websites') return `🌐 Websites`
+    if (tab === 'activity-log') return `📋 Activity`
+    if (tab === 'notifications') return `🔔 Notifications`
+    if (tab === 'users') return `👥 Users`
     return tab
   }
 
   return (
-    <>
-      <div className="topbar" style={{
-        display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-        padding: '0 24px', position: 'relative', zIndex: 100
-      }}>
+    <header className="topbar-wrapper" style={{ flexShrink: 0 }}>
+      {/* ── TOPBAR CONTENT ── */}
+      <div className="topbar">
 
-        {/* ── BRANDING SECTION (COMPACT & CLAMPED) ── */}
-        <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-          {/* Logo Part - CLAMPED LEFT */}
-          <div style={{
-            height: '100%', padding: '0 8px 0 0', /* Extreme left */
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <div style={{
-              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0',
-              boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <img src="/images/logos/logo spmt fc.png" alt="SPMT"
-                style={{ height: 60, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
-            </div>
-          </div>
-
-          {/* Text Part (Compact) */}
-          <div style={{
-            padding: '0 8px', display: 'flex', flexDirection: 'column',
-            justifyContent: 'center', height: '100%'
-          }}>
-            <span style={{
-              fontSize: 18, fontWeight: 1000, color: 'var(--text)', /* Smaller as requested */
-              letterSpacing: '-0.02em', background: 'linear-gradient(to right, var(--accent), #3b82f6)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 0.9
-            }}>SPMT</span>
-            <span style={{
-              fontSize: 9, fontWeight: 800, color: 'var(--text-muted)',
-              letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1
-            }}>MONITORING</span>
-          </div>
+        {/* ── BRANDING SECTION (LOGO MASTERPIECE) ── */}
+        <div className="topbar-branding" style={{ flexShrink: 0 }}>
+          <img src="/images/logos/logo-link-monitor.png" alt="SPMT LINK MONITOR"
+            style={{
+              height: 75,
+              width: 120,
+              objectFit: 'contain',
+              objectPosition: 'center center',
+              borderRadius: 30,
+              filter: 'drop-shadow(0 0 10px rgba(99,102,241,0.3))'
+            }}
+            onError={(e) => { e.target.style.display = 'none'; }} />
         </div>
 
-        {/* ── METRICS SECTION (Symmetric 4x2 Grid) ── */}
-        <div className="topbar-metrics" style={{
-          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden'
-        }}>
+
+        {/* ── METRICS SECTION (Single-Row 8-Metric HUD) ── */}
+        <div className="topbar-metrics" style={{ visibility: activeNav === 'dashboard' ? 'visible' : 'hidden' }}>
           {metrics.map(m => {
             const active = activeMetric === m.label
             const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
             const statusClass = m.label === 'ONLINE' ? 'online' : (m.label === 'CRITICAL' ? 'critical' : (m.label === 'OFFLINE' ? 'offline' : ''))
-
             return (
-              <div key={m.label} title={`Detail ${m.label}`}
-                className={`metric-card ${statusClass}`}
-                style={{
-                  cursor: 'pointer', userSelect: 'none',
-                  background: active ? `${m.color}22` : undefined,
-                  borderColor: active ? m.color : undefined
-                }}
-                onClick={() => setActiveMetric(active ? null : m.label)}>
-
+              <div key={m.label} title={`Detail ${m.label}`} className={`metric-card ${statusClass}`} style={{ 
+                cursor: 'pointer', 
+                userSelect: 'none', 
+                background: active ? `${m.color}22` : m.bgColor, 
+                borderColor: active ? m.color : m.borderColor,
+                boxShadow: active ? `0 0 15px ${m.color}40` : `0 0 8px ${m.borderColor}20`
+              }} onClick={() => setActiveMetric(active ? null : m.label)}>
                 {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: 'var(--offline)', animation: 'pulse 1s infinite' }} />}
-
-                <span style={{ color: m.color }}>{m.value}</span>
-                <span style={{ color: m.color }}>{m.label}</span>
+                <span style={{ color: m.color, fontSize: 22, fontWeight: 1000 }}>{m.value}</span>
+                <span className="metric-label">{m.label}</span>
               </div>
             )
           })}
         </div>
 
-        {/* ── NAVIGATION SECTION (Region Locked: 35%) ── */}
         <div className="topbar-nav-container">
-          <div className="topbar-nav" style={{
-            display: 'flex', gap: 6, background: 'var(--accent-light)', border: '1px solid var(--border)',
-            borderRadius: 8, padding: 3, height: 40, flexShrink: 0
-          }}>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
             {navItems.map(tab => {
-              const label = navLabel(tab)
+              const labelText = navLabel(tab)
+              const [icon, ...textParts] = labelText.split(' ')
+              const title = textParts.join(' ')
+              const isActive = activeNav === tab
               return (
-                <button key={tab}
-                  style={{
-                    background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
-                    border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
-                    color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
-                    fontSize: 10, fontWeight: 800, padding: '0 10px', borderRadius: 6,
-                    cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 4px 10px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 4
-                  }}
-                  onClick={() => onNavChange(tab)}>{label}</button>
+                <div key={tab} className="nav-icon-container" onClick={() => onNavChange(tab)} title={title} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <button className={`nav-icon-btn ${isActive ? 'active' : ''}`}>
+                    <span style={{ fontSize: 28 }}>{icon}</span>
+                  </button>
+                  <span className="nav-icon-label">{title}</span>
+                  <div className="nav-overlay-text">{title}</div>
+                </div>
               )
             })}
           </div>
         </div>
 
-
-
-        {/* Actions */}
-        <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button onClick={onToggleTvMode} className="hover-glow" title="Full/Mini Screen"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 12px', height: 36, borderRadius: 8, background: isTvMode ? 'rgba(99,102,241,0.2)' : 'transparent', border: isTvMode ? '1px solid var(--accent)' : '1px solid transparent', color: isTvMode ? 'var(--accent)' : 'var(--text-sub)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-              <polyline points="17 2 12 7 7 2"></polyline>
-            </svg>
-            {!isTvMode && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em' }}>Full</span>}
+        <div className="topbar-actions" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onToggleTvMode} className="hover-glow" title="Full/Minimize Screen" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 8px', height: 36, borderRadius: 8, background: isTvMode ? 'rgba(34,211,238,0.1)' : 'transparent', border: 'none', color: isTvMode ? 'var(--accent)' : 'var(--text-sub)' }}>
+            <span className="material-symbols-rounded" style={{ fontSize: 40 }}>{isTvMode ? '📤' : '📺'}</span>
           </button>
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
-          <div style={{ flexShrink: 0, padding: '0 16px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
-              {clock.toLocaleTimeString('id-ID', { hour12: false })}
-            </div>
+          <div className="topbar-time" style={{ color: 'var(--text)', fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums', padding: '2px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 20, whiteSpace: 'nowrap' }}>
+            {clock.toLocaleTimeString('id-ID', { hour12: false })}
           </div>
 
-          {/* Profile avatar */}
           <div ref={profileRef} style={{ position: 'relative', flexShrink: 0 }}>
-            <button onClick={() => { setShowProfile(v => !v); if (profileRef.current) setProfileRect(profileRef.current.getBoundingClientRect()) }}
-              className="hover-glow"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--accent-light)', border: `1px solid var(--border)`, borderRadius: 20, padding: '4px 12px 4px 4px', cursor: 'pointer' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: rc, flexShrink: 0, textShadow: `0 0 5px ${rc}`, overflow: 'hidden' }}>
+            <button onClick={() => { setShowProfile(v => !v); if (profileRef.current) setProfileRect(profileRef.current.getBoundingClientRect()) }} className="hover-glow" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px', borderRadius: 25, background: 'var(--bg-card)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s', minWidth: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: rc, flexShrink: 0, overflow: 'hidden' }}>
                 {avatar ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (user?.username || '?')[0].toUpperCase()}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
-                <span style={{ color: 'var(--text)', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.username}</span>
-              </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>▾</span>
+              <span style={{ color: 'var(--text)', fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.username}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>▾</span>
             </button>
             {showProfile && <ProfileDropdown user={user} avatar={avatar} rect={profileRect} onProfile={onProfile} onLogout={onLogout} onSettings={onSettings} onAbout={onAbout} onClose={() => setShowProfile(false)} />}
           </div>
         </div>
       </div>
-
       {activeMetric && <MetricDetailModal type={activeMetric} websites={websites} summary={summary} onClose={() => setActiveMetric(null)} />}
-    </>
+    </header>
   )
 }

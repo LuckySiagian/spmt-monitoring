@@ -23,8 +23,13 @@ type Config struct {
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
+	
+	// ✅ SECURITY: Validate critical secrets are set
+	if secret := os.Getenv("JWT_SECRET"); secret == "" || secret == "default-secret-change-me" {
+		return nil, fmt.Errorf("JWT_SECRET must be set in environment variables (use: openssl rand -base64 32)")
+	}
 
-	jwtExpiry, _ := strconv.Atoi(getEnv("JWT_EXPIRY_HOURS", "24"))
+	jwtExpiry, _ := strconv.Atoi(getEnv("JWT_EXPIRY_HOURS", "2")) // ✅ SECURITY: Reduced from 24 to 2 hours
 
 	cfg := &Config{
 		DBHost:         getEnv("DB_HOST", "localhost"),
@@ -32,8 +37,8 @@ func Load() (*Config, error) {
 		DBUser:         getEnv("DB_USER", "postgres"),
 		DBPassword:     getEnv("DB_PASSWORD", ""),
 		DBName:         getEnv("DB_NAME", "spmt_monitoring"),
-		DBSSLMode:      getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:      getEnv("JWT_SECRET", "default-secret-change-me"),
+		DBSSLMode:      getEnv("DB_SSLMODE", "require"), // ✅ SECURITY: Changed from 'disable' to 'require' for encrypted connections
+		JWTSecret:      getEnv("JWT_SECRET", ""),
 		JWTExpiryHours: jwtExpiry,
 		ServerPort:     getEnv("SERVER_PORT", "8080"),
 		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:5173"),

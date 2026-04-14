@@ -73,6 +73,8 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.className = themeId
+    const isDark = THEME_OPTIONS.find(t => t.id === themeId)?.dark
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
   }, [themeId])
 
   const setTheme = useCallback((id) => {

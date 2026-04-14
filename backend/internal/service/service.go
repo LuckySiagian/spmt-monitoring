@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -60,8 +64,19 @@ func (s *Service) Register(ctx context.Context, req model.RegisterRequest) (*mod
 	if len(req.Username) < 3 {
 		return nil, errors.New("username must be at least 3 characters")
 	}
-	if len(req.Password) < 6 {
-		return nil, errors.New("password must be at least 6 characters")
+	
+	// ✅ SECURITY: Strengthen password requirements
+	if len(req.Password) < 12 {
+		return nil, errors.New("password must be at least 12 characters")
+	}
+	if !strings.ContainsAny(req.Password, "ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		return nil, errors.New("password must contain at least one uppercase letter")
+	}
+	if !strings.ContainsAny(req.Password, "0123456789") {
+		return nil, errors.New("password must contain at least one number")
+	}
+	if !strings.ContainsAny(req.Password, "!@#$%^&*()-_=+[]{};:,.<>?") {
+		return nil, errors.New("password must contain at least one special character (!@#$%^&*etc.)")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -190,6 +205,9 @@ func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequ
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
 	}
+	if err := s.verifyWebsiteURL(req.URL); err != nil {
+		return nil, err
+	}
 	if req.IntervalSeconds < 1 {
 		req.IntervalSeconds = 1
 	}
@@ -203,6 +221,9 @@ func (s *Service) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.Upd
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
 	}
+	if err := s.verifyWebsiteURL(req.URL); err != nil {
+		return nil, err
+	}
 	if req.IntervalSeconds < 1 {
 		req.IntervalSeconds = 1
 	}
@@ -210,6 +231,54 @@ func (s *Service) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.Upd
 		req.IntervalSeconds = 3
 	}
 	return s.repo.UpdateWebsite(ctx, id, req)
+}
+
+func (s *Service) verifyWebsiteURL(rawURL string) error {
+	rawURL = strings.TrimSpace(rawURL)
+	parsed, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return errors.New("invalid URL format; use http:// or https://")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return errors.New("URL must start with http:// or https://")
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return errors.New("invalid URL host")
+	}
+
+	lookupCtx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	if _, err := net.DefaultResolver.LookupHost(lookupCtx, host); err != nil {
+		return errors.New("cannot resolve host; please verify the domain name")
+	}
+
+	checkCtx, checkCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer checkCancel()
+	client := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	req, err := http.NewRequestWithContext(checkCtx, http.MethodHead, rawURL, nil)
+	if err != nil {
+		return errors.New("unable to validate URL request")
+	}
+	req.Header.Set("User-Agent", "SPMT Monitoring URL Validator")
+	resp, err := client.Do(req)
+	if err != nil {
+		// fallback to GET if HEAD is not accepted or prefers full page check
+		fallback, fallbackErr := http.NewRequestWithContext(checkCtx, http.MethodGet, rawURL, nil)
+		if fallbackErr != nil {
+			return errors.New("website not reachable; please check the URL")
+		}
+		fallback.Header.Set("User-Agent", "SPMT Monitoring URL Validator")
+		resp, err = client.Do(fallback)
+		if err != nil {
+			return errors.New("website not reachable; please check the URL")
+		}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("website returned status %d during validation", resp.StatusCode)
+	}
+	return nil
 }
 
 func (s *Service) DeleteWebsite(ctx context.Context, id uuid.UUID) error {
