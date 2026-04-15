@@ -157,7 +157,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         ctx.lineTo(serverX, serverY)
       }
       ctx.strokeStyle = (isSel || isHov) ? color : `rgba(${hexToRgb(color)},${alpha})`
-      ctx.lineWidth = (isSel || isHov) ? 2.5 : 1.2
+      ctx.lineWidth = (isSel || isHov) ? 4.0 : 2.0
       ctx.setLineDash([])
       ctx.stroke()
 
@@ -177,7 +177,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           py = ny + (serverY - ny) * t2
         }
         ctx.beginPath()
-        ctx.arc(px, py, 3, 0, Math.PI * 2)
+        ctx.arc(px, py, 5, 0, Math.PI * 2)
         ctx.fillStyle = color
         ctx.fill()
       }
@@ -185,16 +185,16 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
     // Server node
     const pulse = Math.sin(timeRef.current * 2) * 0.3 + 0.7
-    ctx.beginPath(); ctx.arc(serverX, serverY, 38, 0, Math.PI * 2)
+    ctx.beginPath(); ctx.arc(serverX, serverY, 55, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(59,130,246,${pulse * 0.15})`; ctx.fill()
-    ctx.beginPath(); ctx.arc(serverX, serverY, 28, 0, Math.PI * 2)
+    ctx.beginPath(); ctx.arc(serverX, serverY, 42, 0, Math.PI * 2)
     ctx.fillStyle = 'var(--bg-main)'; ctx.fill()
-    ctx.strokeStyle = `rgba(59,130,246,${pulse})`; ctx.lineWidth = 2; ctx.stroke()
-    ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 13px monospace'
+    ctx.strokeStyle = `rgba(59,130,246,${pulse})`; ctx.lineWidth = 3; ctx.stroke()
+    ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 18px monospace'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('SPMT', serverX, serverY - 4)
-    ctx.font = '10px monospace'; ctx.fillStyle = '#4a6fa5'
-    ctx.fillText('SERVER', serverX, serverY + 6)
+    ctx.fillText('SPMT', serverX, serverY - 6)
+    ctx.font = '14px monospace'; ctx.fillStyle = '#4a6fa5'
+    ctx.fillText('SERVER', serverX, serverY + 10)
 
     // Website nodes
     nodes.forEach(node => {
@@ -206,7 +206,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const isCrit = node.status === 'CRITICAL'
 
       // Node size - expands if selected or hovered
-      const r = isHov ? 36 : (isSel ? 32 : 24)
+      const r = isHov ? 54 : (isSel ? 48 : 36)
 
       // Critical pulse ring
       if (isCrit) {
@@ -250,7 +250,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const isDark = themeId && themeId.includes('dark')
 
       // Font weight changes on hover
-      ctx.font = `${(isSel || isHov) ? '900' : '600'} ${isHov ? '14px' : '13px'} system-ui`
+      ctx.font = `${(isSel || isHov) ? '900' : '600'} ${isHov ? '20px' : '16px'} system-ui`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
 
       // Label Box
@@ -259,9 +259,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       ctx.lineWidth = isHov ? 2 : 1
       ctx.beginPath()
       if (ctx.roundRect) {
-        ctx.roundRect(nx - tw / 2, labelY - 2, tw, isHov ? 24 : 20, 6)
+        ctx.roundRect(nx - tw / 2, labelY - 2, tw, isHov ? 32 : 26, 8)
       } else {
-        ctx.rect(nx - tw / 2, labelY - 2, tw, isHov ? 24 : 20)
+        ctx.rect(nx - tw / 2, labelY - 2, tw, isHov ? 32 : 26)
       }
       ctx.fill()
       ctx.stroke()
@@ -282,7 +282,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
   function drawInitial(ctx, name, nx, ny, isHov) {
     ctx.fillStyle = '#3b82f6'
-    ctx.font = `bold ${isHov ? '18px' : '15px'} system-ui`
+    ctx.font = `bold ${isHov ? '28px' : '22px'} system-ui`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText((name || 'W')[0].toUpperCase(), nx, ny - 2)
@@ -315,7 +315,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     const { width, height } = canvas
     for (const node of nodes) {
       const nx = node.x * width, ny = node.y * height
-      if (Math.sqrt((mx - nx) ** 2 + (my - ny) ** 2) < 32) {
+      if (Math.sqrt((mx - nx) ** 2 + (my - ny) ** 2) < 48) {
         onSelect?.(node.id === selectedId ? null : node.id)
         onOpenDetail?.({ id: node.id, name: node.name, url: node.url, status: node.status })
         return
@@ -355,13 +355,13 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       {hoveredNodeData && hoveredNodeObj && (
         <div style={{
           position: 'absolute', top: cardPos.top, left: cardPos.left, transform: cardPos.transform,
-          width: 300, background: 'rgba(15, 23, 42, 0.94)', backdropFilter: 'blur(20px)',
+          width: 400, background: 'rgba(15, 23, 42, 0.94)', backdropFilter: 'blur(20px)',
           border: `2px solid ${STATUS_COLORS[hoveredNodeData.status] || 'var(--accent)'}`,
-          borderRadius: 20, padding: '24px',
-          boxShadow: `0 0 60px rgba(0,0,0,0.8), 0 0 20px ${(STATUS_COLORS[hoveredNodeData.status] || '#6366f1')}33`,
+          borderRadius: 24, padding: '32px',
+          boxShadow: `0 0 80px rgba(0,0,0,0.8), 0 0 30px ${(STATUS_COLORS[hoveredNodeData.status] || '#6366f1')}33`,
           zIndex: 100, pointerEvents: 'none',
           animation: 'hologramIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-          display: 'flex', flexDirection: 'column', gap: 12
+          display: 'flex', flexDirection: 'column', gap: 16
         }}>
           <style>{`
             @keyframes hologramIn {
@@ -370,47 +370,47 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             }
           `}</style>
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: STATUS_COLORS[hoveredNodeData.status], boxShadow: `0 0 10px ${STATUS_COLORS[hoveredNodeData.status]}` }} />
-              <span style={{ fontSize: 13, fontWeight: 1000, color: '#fff', textTransform: 'uppercase' }}>{hoveredNodeData.name}</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: STATUS_COLORS[hoveredNodeData.status], boxShadow: `0 0 10px ${STATUS_COLORS[hoveredNodeData.status]}` }} />
+              <span style={{ fontSize: 18, fontWeight: 1000, color: '#fff', textTransform: 'uppercase' }}>{hoveredNodeData.name}</span>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 800, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 4 }}>{hoveredNodeData.status}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '4px 12px', borderRadius: 6 }}>{hoveredNodeData.status}</span>
           </div>
 
           {/* Endpoint Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>ENDPOINT & IP ADDRESS</div>
-            <div style={{ fontSize: 10, color: '#cbd5e1', wordBreak: 'break-all', fontFamily: 'monospace' }}>{hoveredNodeData.url}</div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>IP: {hoveredNodeData.ip_address || '---'}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>ENDPOINT & IP ADDRESS</div>
+            <div style={{ fontSize: 13, color: '#cbd5e1', wordBreak: 'break-all', fontFamily: 'monospace' }}>{hoveredNodeData.url}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>IP: {hoveredNodeData.ip_address || '---'}</div>
           </div>
 
           {/* Metrics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: 12 }}>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LATENCY</div>
-              <div style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.response_time_ms ? `${hoveredNodeData.response_time_ms}ms` : '---'}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LATENCY</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.response_time_ms ? `${hoveredNodeData.response_time_ms}ms` : '---'}</div>
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>HTTP CODE</div>
-              <div style={{ fontSize: 11, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.status_code || '---'}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>HTTP CODE</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.status_code || '---'}</div>
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>SSL STATUS</div>
-              <div style={{ fontSize: 10, fontWeight: 900, color: hoveredNodeData.ssl_valid ? '#10b981' : (hoveredNodeData.ssl_valid === false ? '#ef4444' : '#64748b') }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>SSL STATUS</div>
+              <div style={{ fontSize: 14, fontWeight: 900, color: hoveredNodeData.ssl_valid ? '#10b981' : (hoveredNodeData.ssl_valid === false ? '#ef4444' : '#64748b') }}>
                 {hoveredNodeData.ssl_valid === true ? '✓ VALID' : (hoveredNodeData.ssl_valid === false ? '✗ INVALID' : 'PND')}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LAST CHECK</div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LAST CHECK</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>
                 {hoveredNodeData.last_checked ? new Date(hoveredNodeData.last_checked).toLocaleTimeString([], { hour12: false }) : '---'}
               </div>
             </div>
           </div>
 
           {hoveredNodeData.root_cause && hoveredNodeData.status !== 'ONLINE' && (
-            <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, background: 'rgba(239,68,68,0.1)', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)' }}>
+            <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 800, background: 'rgba(239,68,68,0.1)', padding: '10px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)' }}>
               ⚠️ CAUSE: {hoveredNodeData.root_cause.toUpperCase()}
             </div>
           )}

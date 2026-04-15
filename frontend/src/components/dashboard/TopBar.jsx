@@ -125,12 +125,20 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
   const rc = { superadmin: '#8b5cf6', admin: '#3b82f6', viewer: '#64748b' }[user?.role] || '#64748b'
   const rl = { superadmin: 'SA', admin: 'AD', viewer: 'VW' }[user?.role] || '??'
-  const navLabel = tab => {
-    if (tab === 'dashboard') return `📊 ${t?.dashboard || 'Dashboard'}`
-    if (tab === 'websites') return `🌐 ${t?.websites || 'Websites'}`
-    if (tab === 'activity-log') return `📋 ${t?.activity || 'Activity'}`
-    if (tab === 'notifications') return `🔔 ${t?.notifications || 'Notifications'}`
-    if (tab === 'users') return `👥 ${t?.users || 'Users'}`
+  const navIcon = tab => {
+    if (tab === 'dashboard') return '📊'
+    if (tab === 'websites') return '🌐'
+    if (tab === 'activity-log') return '📋'
+    if (tab === 'notifications') return '🔔'
+    if (tab === 'users') return '👥'
+    return '📄'
+  }
+  const navTitle = tab => {
+    if (tab === 'dashboard') return t?.dashboard || 'Dashboard'
+    if (tab === 'websites') return t?.websites || 'Websites'
+    if (tab === 'activity-log') return t?.activity || 'Activity'
+    if (tab === 'notifications') return t?.notifications || 'Notifications'
+    if (tab === 'users') return t?.users || 'Users'
     return tab
   }
 
@@ -138,48 +146,55 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
     <>
       <div className="topbar" style={{
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-        padding: '0 24px', position: 'relative', zIndex: 100
+        padding: '0 32px', minHeight: '80px', position: 'relative', zIndex: 100
       }}>
 
-        {/* ── BRANDING SECTION ── */}
+        {/* ── BRANDING SECTION (Logo Only) ── */}
         <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
           <div style={{
-            height: '100%',
-            padding: '0 8px 0 0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            height: '100%', padding: '0 8px 0 0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <img
-              src="/images/logos/los.jpeg"
-              alt=""
-              style={{ height: 52, width: 'auto', maxWidth: '100%', objectFit: 'contain' }}
-            />
+            <div style={{
+              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <img src="/images/logos/lo.png" alt="SPMT"
+                style={{ height: 84, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
+            </div>
           </div>
         </div>
 
-        {/* ── METRICS SECTION (Symmetric 4x2 Grid) ── */}
+        {/* ── METRICS SECTION (Single Row) ── */}
         <div className="topbar-metrics" style={{
           visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
-          overflow: 'visible',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(70px, 1fr))',
-          gap: 6,
-          minWidth: 0,
-          flex: 1,
-          alignContent: 'center'
+          display: 'flex',
+          flexWrap: 'nowrap',
+          gap: '6px'
         }}>
           {metrics.map(m => {
             const active = activeMetric === m.label
             const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
-            const statusClass = m.label === 'ONLINE' ? 'online' : (m.label === 'CRITICAL' ? 'critical' : (m.label === 'OFFLINE' ? 'offline' : ''))
+            
+            // Generate clean class names for each metric type
+            const labelKey = m.label.toUpperCase().replace(/\s+/g, '-');
+            const statusClass = labelKey.includes('ONLINE') ? 'online' : 
+                               labelKey.includes('CRITICAL') ? 'critical' : 
+                               labelKey.includes('OFFLINE') ? 'offline' : 
+                               labelKey.includes('SLA') ? 'sla' : 
+                               labelKey.includes('TOTAL') ? 'total' : 
+                               labelKey.includes('AVG-RT') ? 'avg-rt' : 
+                               labelKey.includes('ALERTS') ? 'alerts' : 'unknown';
 
             return (
               <div key={m.label} title={`Detail ${m.label}`}
-                className={`metric-card ${statusClass}`}
+                className={`metric-card m-${statusClass}`}
                 style={{
-                  cursor: 'pointer',
-                  userSelect: 'none',
+                  cursor: 'pointer', userSelect: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   background: active ? `${m.color}22` : undefined,
                   borderColor: active ? m.color : undefined,
                   minWidth: 0,
@@ -187,10 +202,10 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                 }}
                 onClick={() => setActiveMetric(active ? null : m.label)}>
 
-                {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: 'var(--offline)', animation: 'pulse 1s infinite' }} />}
+                {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#ff4d4f', animation: 'pulse 1s infinite' }} />}
 
-                <span style={{ color: m.color }}>{m.value}</span>
-                <span style={{ color: m.color }}>{m.label}</span>
+                <span style={{ fontSize: '26px', fontWeight: 800, lineHeight: 1 }}>{m.value}</span>
+                <span style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.1 }}>{m.label}</span>
               </div>
             )
           })}
@@ -200,23 +215,20 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
         <div className="topbar-nav-container">
           <div className="topbar-nav" style={{
             display: 'flex', gap: 6, background: 'var(--accent-light)', border: '1px solid var(--border)',
-            borderRadius: 8, padding: 3, height: 40, flexShrink: 0
+            borderRadius: 8, padding: 3, height: 50, flexShrink: 0
           }}>
-            {navItems.map(tab => {
-              const label = navLabel(tab)
-              return (
-                <button key={tab}
-                  style={{
-                    background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
-                    border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
-                    color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
-                    fontSize: 10, fontWeight: 800, padding: '0 10px', borderRadius: 6,
-                    cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 4px 10px rgba(0,0,0,0.1)' : 'none',
-                    transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 4
-                  }}
-                  onClick={() => onNavChange(tab)}>{label}</button>
-              )
-            })}
+            {navItems.map(tab => (
+              <button key={tab} title={navTitle(tab)}
+                style={{
+                  background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
+                  border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
+                  color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
+                  fontSize: 18, padding: '0 12px', borderRadius: 6,
+                  cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 4px 10px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+                onClick={() => onNavChange(tab)}>{navIcon(tab)}</button>
+            ))}
           </div>
         </div>
 
@@ -226,17 +238,17 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
         <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button onClick={onToggleTvMode} className="hover-glow" title="Full/Mini Screen"
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 12px', height: 36, borderRadius: 8, background: isTvMode ? 'rgba(99,102,241,0.2)' : 'transparent', border: isTvMode ? '1px solid var(--accent)' : '1px solid transparent', color: isTvMode ? 'var(--accent)' : 'var(--text-sub)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
               <polyline points="17 2 12 7 7 2"></polyline>
             </svg>
-            {!isTvMode && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em' }}>Full</span>}
+            {!isTvMode && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em' }}>Full</span>}
           </button>
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
-          <div style={{ flexShrink: 0, padding: '0 16px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text)', fontSize: 16, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
+          <div style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
+            <div style={{ color: 'var(--text)', fontSize: 24, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
           </div>
@@ -245,14 +257,14 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           <div ref={profileRef} style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => { setShowProfile(v => !v); if (profileRef.current) setProfileRect(profileRef.current.getBoundingClientRect()) }}
               className="hover-glow"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--accent-light)', border: `1px solid var(--border)`, borderRadius: 20, padding: '4px 12px 4px 4px', cursor: 'pointer' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: rc, flexShrink: 0, textShadow: `0 0 5px ${rc}`, overflow: 'hidden' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--accent-light)', border: `1px solid var(--border)`, borderRadius: 25, padding: '6px 16px 6px 6px', cursor: 'pointer' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: rc, flexShrink: 0, textShadow: `0 0 5px ${rc}`, overflow: 'hidden' }}>
                 {avatar ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (user?.username || '?')[0].toUpperCase()}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
-                <span style={{ color: 'var(--text)', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.username}</span>
+                <span style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.username}</span>
               </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>▾</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>▾</span>
             </button>
             {showProfile && <ProfileDropdown user={user} avatar={avatar} rect={profileRect} onProfile={onProfile} onLogout={onLogout} onSettings={onSettings} onAbout={onAbout} onClose={() => setShowProfile(false)} />}
           </div>
