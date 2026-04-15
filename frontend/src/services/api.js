@@ -24,18 +24,24 @@ api.interceptors.response.use(res => res, err => {
   return Promise.reject(err)
 })
 
-export const authAPI    = { login: d=>api.post('/auth/login',d), register: d=>api.post('/auth/register',d) }
-export const websiteAPI = { getAll:()=>api.get('/websites'), create:d=>api.post('/websites',d), update:(id,d)=>api.put(`/websites/${id}`,d), delete:id=>api.delete(`/websites/${id}`), getLogs:(id,l=100)=>api.get(`/websites/${id}/logs?limit=${l}`) }
-export const dashboardAPI = { getSummary:()=>api.get('/dashboard/summary') }
-export const userAPI    = { getAll:()=>api.get('/users'), promote:id=>api.post('/users/promote',{user_id:id}), demote:id=>api.post('/users/demote',{user_id:id}) }
+export const authAPI    = { login: (d, c)=>api.post('/auth/login', d, c), register: (d, c)=>api.post('/auth/register', d, c) }
+export const websiteAPI = { 
+  getAll: (c)=>api.get('/websites', c), 
+  create: (d, c)=>api.post('/websites', d, c), 
+  update: (id, d, c)=>api.put(`/websites/${id}`, d, c), 
+  delete: (id, c)=>api.delete(`/websites/${id}`, c), 
+  getLogs: (id, l=100, c)=>api.get(`/websites/${id}/logs?limit=${l}`, c) 
+}
+export const dashboardAPI = { getSummary: (c)=>api.get('/dashboard/summary', c) }
+export const userAPI    = { getAll: (c)=>api.get('/users', c), promote: (id, c)=>api.post('/users/promote', {user_id:id}, c), demote: (id, c)=>api.post('/users/demote', {user_id:id}, c) }
 export const WS_URL     = `ws://${window.location.hostname}:8080/ws`
 export default api
 export const historyAPI = {
-  getStatusHistory: (range='24h', start='', end='') => {
-    if (range==='custom'&&start&&end) return api.get(`/dashboard/history?range=custom&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`)
-    return api.get(`/dashboard/history?range=${range}`)
+  getStatusHistory: (range='24h', start='', end='', c) => {
+    if (range==='custom'&&start&&end) return api.get(`/dashboard/history?range=custom&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, c)
+    return api.get(`/dashboard/history?range=${range}`, c)
   },
 }
-export const eventsAPI       = { getAll:(l=100)=>api.get(`/dashboard/events?limit=${l}`), getByWebsite:(id,l=50)=>api.get(`/websites/${id}/events?limit=${l}`) }
-export const notificationAPI = { getUnreadCount:()=>api.get('/notifications/unread-count'), markAllRead:()=>api.post('/notifications/mark-all-read') }
-export const userAdminAPI    = { create:d=>api.post('/users/create',d), delete:id=>api.delete(`/users/${id}`) }
+export const eventsAPI       = { getAll: (l=100, c)=>api.get(`/dashboard/events?limit=${l}`, c), getByWebsite: (id, l=50, c)=>api.get(`/websites/${id}/events?limit=${l}`, c) }
+export const notificationAPI = { getUnreadCount: (c)=>api.get('/notifications/unread-count', c), markAllRead: (c)=>api.post('/notifications/mark-all-read', {}, c) }
+export const userAdminAPI    = { create: (d, c)=>api.post('/users/create', d, c), delete: (id, c)=>api.delete(`/users/${id}`, c) }

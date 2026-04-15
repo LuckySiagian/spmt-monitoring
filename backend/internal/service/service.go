@@ -12,7 +12,17 @@ import (
 	"github.com/spmt/monitoring/internal/model"
 	"github.com/spmt/monitoring/internal/repository"
 	"golang.org/x/crypto/bcrypt"
+	"regexp"
 )
+
+var (
+	// Strict URL Regex: http/https followed by valid domain structure
+	urlRegex = regexp.MustCompile(`^https?://(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::\d+)?(?:/.*)?$`)
+)
+
+func isValidURLStrict(u string) bool {
+	return urlRegex.MatchString(u)
+}
 
 type Service struct {
 	repo      *repository.Repository
@@ -190,6 +200,9 @@ func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequ
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
 	}
+	if !isValidURLStrict(req.URL) {
+		return nil, errors.New("invalid URL format (e.g. https://example.com) or domain typo")
+	}
 	if req.IntervalSeconds < 1 {
 		req.IntervalSeconds = 1
 	}
@@ -202,6 +215,9 @@ func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequ
 func (s *Service) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.UpdateWebsiteRequest) (*model.Website, error) {
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
+	}
+	if !isValidURLStrict(req.URL) {
+		return nil, errors.New("invalid URL format (e.g. https://example.com) or domain typo")
 	}
 	if req.IntervalSeconds < 1 {
 		req.IntervalSeconds = 1

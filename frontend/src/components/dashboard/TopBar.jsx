@@ -156,7 +156,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
             <div style={{
-              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0',
+              background: '#0a74ff30', padding: '4px 12px', borderRadius: '0 10px 10px 0',
               boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
               <img src="/images/logos/lo.png" alt="SPMT"
@@ -219,11 +219,12 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           }}>
             {navItems.map(tab => (
               <button key={tab} title={navTitle(tab)}
+                className={`nav-btn-custom ${activeNav === tab ? 'active' : ''}`}
                 style={{
                   background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
                   border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
                   color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
-                  fontSize: 18, padding: '0 12px', borderRadius: 6,
+                  fontSize: 22, padding: '0 14px', borderRadius: 6,
                   cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 4px 10px rgba(0,0,0,0.1)' : 'none',
                   transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}
@@ -242,7 +243,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
               <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
               <polyline points="17 2 12 7 7 2"></polyline>
             </svg>
-            {!isTvMode && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em' }}>Full</span>}
+            {!isTvMode && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em' }}></span>}
           </button>
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />

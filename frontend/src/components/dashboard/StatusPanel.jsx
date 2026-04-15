@@ -75,21 +75,21 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
           </div>
           
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 15, fontWeight: 800, color: isOnline ? 'var(--online)' : c.color, fontFamily: 'monospace', background: 'rgba(0,0,0,0.05)', padding: '3px 10px', borderRadius: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: isOnline ? 'var(--online)' : c.color, fontFamily: 'monospace', background: 'var(--accent-light)', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: 4 }}>
               {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
             </span>
           </div>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>
              {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--critical)' : 'var(--text-sub)', fontFamily: 'monospace' }}>
               {fmtMs(w.response_time_ms)}
             </span>
-            <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.1em', color: '#fff', background: c.color, padding: '3px 10px', borderRadius: 5 }}>
+            <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', color: '#ffffff', background: c.color, padding: '3px 10px', borderRadius: 5, boxShadow: `0 2px 8px ${c.color}66` }}>
               {w.status}
             </span>
           </div>
@@ -113,10 +113,10 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>
-          <span style={{ width: 14, height: 14, background: 'var(--online)', borderRadius: '50%', marginRight: 12, animation: 'pulse 2s infinite', boxShadow: '0 0 10px var(--online)' }}></span>
+          <span style={{ width: 14, height: 14, background: 'var(--online)', borderRadius: '50%', marginRight: 12, animation: 'pulse 2.2s infinite', boxShadow: '0 0 12px var(--online)' }}></span>
           MONITORING STATUS
         </span>
-        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)', background: 'var(--accent-light)', border: '1px solid var(--border)', padding: '5px 16px', borderRadius: 14 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--accent)', background: 'var(--accent-light)', border: '1px solid var(--border)', padding: '5px 16px', borderRadius: 14 }}>
           {websites.length} WEBSITES
         </span>
       </div>
@@ -126,10 +126,10 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
         
         {/* LIVE FEED SECTION (Top 60%) */}
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column', borderBottom: '2px solid var(--border)' }}>
-          <div style={{ padding: '10px 20px', background: 'var(--bg-main)', fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)' }}>
             🌐 ACTIVE MONITORING FEED
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
             {sorted.length === 0 && (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: '40px 0' }}>// NO SERVICES CONFIGURED</div>
             )}
@@ -147,7 +147,7 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
 
         {/* GRAPH SECTION (Bottom 40%) */}
         <div style={{ height: '40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
-           <div style={{ padding: '10px 20px', background: 'var(--bg-main)', fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>
+           <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)' }}>
             📈 GLOBAL RESPONSE TIMES
           </div>
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden', padding: '10px' }}>

@@ -13,12 +13,36 @@ export default function DashboardPage({ onSummaryUpdate, onNewNotification, onWe
   const [realtimeSnap, setRealtimeSnap] = useState(null)
   const prevStatusRef = useRef({})
 
-  const loadWebsites = useCallback(async () => {
-    try { const res = await websiteAPI.getAll(); const data = res.data || []; setWebsites(data); onWebsitesUpdate?.(data); data.forEach(w => { if (!prevStatusRef.current[w.id]) prevStatusRef.current[w.id] = w.status }); pushSnap(data) } catch { }
-  }, [])
+  const loadWebsites = useCallback(async (signal) => {
+    try { 
+      const res = await websiteAPI.getAll({ signal }); 
+      const data = res.data || []; 
+      setWebsites(data); 
+      onWebsitesUpdate?.(data); 
+      data.forEach(w => { if (!prevStatusRef.current[w.id]) prevStatusRef.current[w.id] = w.status }); 
+      pushSnap(data) 
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+    }
+  }, [onWebsitesUpdate])
 
-  useEffect(() => { loadWebsites(); const iv = setInterval(loadWebsites, 60000); return () => clearInterval(iv) }, [loadWebsites])
-  useEffect(() => { if (refreshTrigger) loadWebsites() }, [refreshTrigger, loadWebsites])
+  useEffect(() => { 
+    const controller = new AbortController();
+    loadWebsites(controller.signal); 
+    const iv = setInterval(() => loadWebsites(controller.signal), 60000); 
+    return () => {
+      controller.abort();
+      clearInterval(iv);
+    }
+  }, [loadWebsites])
+
+  useEffect(() => { 
+    if (refreshTrigger) {
+      const controller = new AbortController();
+      loadWebsites(controller.signal);
+      return () => controller.abort();
+    }
+  }, [refreshTrigger, loadWebsites])
 
   const pushSnap = (list) => setRealtimeSnap({ online: list.filter(w => w.status === 'ONLINE').length, critical: list.filter(w => w.status === 'CRITICAL').length, offline: list.filter(w => w.status === 'OFFLINE').length, unknown: list.filter(w => !w.status || w.status === 'UNKNOWN').length })
 
