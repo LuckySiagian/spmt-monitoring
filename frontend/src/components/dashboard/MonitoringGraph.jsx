@@ -37,10 +37,10 @@ function buildLiveFrame(slots=60) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background:'rgba(255,255,255,0.96)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:8, padding:'10px 14px', fontSize:11, boxShadow:'0 4px 16px rgba(99,102,241,0.15)' }}>
-      <div style={{ color:'#6366f1', marginBottom:6, fontSize:10, fontWeight:700 }}>{label}</div>
+    <div style={{ background:'rgba(255,255,255,0.96)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:10, padding:'14px 18px', fontSize:14, boxShadow:'0 4px 16px rgba(99,102,241,0.15)' }}>
+      <div style={{ color:'#6366f1', marginBottom:8, fontSize:13, fontWeight:700 }}>{label}</div>
       {payload.map(p=>(
-        <div key={p.dataKey} style={{ color:p.color, fontWeight:600, marginBottom:2 }}>
+        <div key={p.dataKey} style={{ color:p.color, fontWeight:600, marginBottom:4 }}>
           ● {p.name}: <span style={{ color:'var(--text)' }}>{p.value??'—'}</span>
         </div>
       ))}
@@ -120,17 +120,17 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1, minHeight:0, background:'transparent' }}>
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 12px', borderBottom:'1px solid rgba(99,102,241,0.1)', background:'rgba(255,255,255,0.6)', flexShrink:0, flexWrap:'wrap', gap:6 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span style={{ fontSize:10, fontWeight:700, color:'var(--text-sub)', letterSpacing:'0.08em' }}>MONITORING GRAPH</span>
-          {loading && <span style={{ color:'#6366f1', fontSize:9 }}>● LOADING...</span>}
-          {range==='live' && !loading && <span style={{ fontSize:9, color:'#059669', background:'rgba(5,150,105,0.1)', border:'1px solid rgba(5,150,105,0.3)', borderRadius:4, padding:'1px 7px' }}>● LIVE · per menit</span>}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', borderBottom:'1px solid rgba(99,102,241,0.1)', background:'rgba(255,255,255,0.6)', flexShrink:0, flexWrap:'wrap', gap:6 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span style={{ fontSize:13, fontWeight:700, color:'var(--text-sub)', letterSpacing:'0.08em' }}>MONITORING GRAPH</span>
+          {loading && <span style={{ color:'#6366f1', fontSize:12 }}>● LOADING...</span>}
+          {range==='live' && !loading && <span style={{ fontSize:12, color:'#059669', background:'rgba(5,150,105,0.1)', border:'1px solid rgba(5,150,105,0.3)', borderRadius:6, padding:'2px 10px' }}>● LIVE · per menit</span>}
         </div>
         <div style={{ display:'flex', gap:4 }}>
           {RANGES.map(r=>(
             <button key={r.value} title={r.desc}
-              style={{ background:range===r.value?'rgba(79,70,229,0.12)':'transparent', border:range===r.value?'1px solid rgba(79,70,229,0.4)':'1px solid rgba(99,102,241,0.2)', color:range===r.value?'#4f46e5':'var(--text-muted)', fontSize:9, fontWeight:700, padding:'3px 10px', borderRadius:4, cursor:'pointer', transition:'all 0.15s' }}
+              style={{ background:range===r.value?'rgba(79,70,229,0.12)':'transparent', border:range===r.value?'1px solid rgba(79,70,229,0.4)':'1px solid rgba(99,102,241,0.2)', color:range===r.value?'#4f46e5':'var(--text-muted)', fontSize:12, fontWeight:700, padding:'4px 14px', borderRadius:6, cursor:'pointer', transition:'all 0.15s' }}
               onClick={()=>setRange(r.value)}>{r.label}</button>
           ))}
         </div>
@@ -153,10 +153,10 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
                 <linearGradient id="gUn" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#94a3b8" stopOpacity={0.2}/><stop offset="95%" stopColor="#94a3b8" stopOpacity={0.01}/></linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.08)"/>
-              <XAxis dataKey="label" tick={{ fill:'var(--text-muted)', fontSize:8 }} tickLine={false} axisLine={{ stroke:'rgba(99,102,241,0.15)' }} interval="preserveStartEnd"/>
-              <YAxis tick={{ fill:'var(--text-muted)', fontSize:9 }} tickLine={false} axisLine={{ stroke:'rgba(99,102,241,0.15)' }} allowDecimals={false}/>
+              <XAxis dataKey="label" tick={{ fill:'var(--text-muted)', fontSize:12 }} tickLine={false} axisLine={{ stroke:'rgba(99,102,241,0.15)' }} interval="preserveStartEnd"/>
+              <YAxis tick={{ fill:'var(--text-muted)', fontSize:13 }} tickLine={false} axisLine={{ stroke:'rgba(99,102,241,0.15)' }} allowDecimals={false}/>
               <Tooltip content={<CustomTooltip/>}/>
-              <Legend wrapperStyle={{ fontSize:9, color:'#64748b', paddingTop:4 }} formatter={v=>v.toUpperCase()}/>
+              <Legend wrapperStyle={{ fontSize:13, color:'#64748b', paddingTop:4 }} formatter={v=>v.toUpperCase()}/>
               <Area type="monotone" dataKey="online"   name="Online"   stroke="#059669" strokeWidth={2} fill="url(#gOn)" dot={false} activeDot={{r:4}} connectNulls={false}/>
               <Area type="monotone" dataKey="critical" name="Critical" stroke="#d97706" strokeWidth={2} fill="url(#gCr)" dot={false} activeDot={{r:4}} connectNulls={false}/>
               <Area type="monotone" dataKey="offline"  name="Offline"  stroke="#dc2626" strokeWidth={2} fill="url(#gOf)" dot={false} activeDot={{r:4}} connectNulls={false}/>
