@@ -62,18 +62,23 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const load = async () => {
+  const load = async (signal) => {
     try {
-      const res = await websiteAPI.getAll()
+      const res = await websiteAPI.getAll({ signal })
       setWebsites(res.data || [])
-    } catch (e) {
-      console.error(e)
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+      console.error(err)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { 
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+  }, [])
 
   const openAdd = () => {
     setForm({ name: '', url: '', description: '', interval_seconds: 3 })

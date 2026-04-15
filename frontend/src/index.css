@@ -174,8 +174,8 @@ body::before {
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.2);
   --text: #ffffff;
-  --text-sub: #f8fafc;
-  --text-muted: #94a3b8;
+  --text-sub: #f1f5f9;
+  --text-muted: #cbd5e1;
   --accent: #6366f1;
   --accent-light: rgba(99, 102, 241, 0.1);
   --online: #10b981;
@@ -208,12 +208,12 @@ body::before {
 
 .theme-dark-midnight {
   --bg-main: #0f172a;
-  --bg-header: #334155;
-  --bg-card: #1e293b;
+  --bg-header: #1e293b;
+  --bg-card: #111827;
   --accent: #818cf8;
   --text: #ffffff;
-  --text-sub: #f1f5f9;
-  --border: #475569;
+  --text-sub: #f8fafc;
+  --border: #334155;
   --header-height: 74px;
 }
 
@@ -240,13 +240,13 @@ body::before {
 }
 
 .theme-dark-carbon {
-  --bg-main: #171717;
-  --bg-header: #404040;
-  --bg-card: #262626;
-  --accent: #a3a3a3;
+  --bg-main: #121212;
+  --bg-header: #1c1c1c;
+  --bg-card: #181818;
+  --accent: #ffffff;
   --text: #ffffff;
-  --text-sub: #f5f5f5;
-  --border: #525252;
+  --text-sub: #e5e5e5;
+  --border: #333333;
   --header-height: 74px;
 }
 
@@ -285,12 +285,12 @@ body::before {
 
 .theme-dark-neon-glow {
   --bg-main: #000000;
-  --bg-header: #111111;
-  --bg-card: #111111;
+  --bg-header: #050505;
+  --bg-card: #080808;
   --accent: #00ff41;
   --text: #00ff41;
-  --text-sub: #00ff41;
-  --border: #00ff41;
+  --text-sub: #ccffda;
+  --border: #003b0f;
   --header-height: 74px;
 }
 
@@ -320,7 +320,7 @@ body::before {
   justify-content: space-between;
   gap: 12px;
   padding: 0 16px;
-  height: 120px !important; /* Increased from 95px for NOC monitor */
+  height: 90px !important; /* Increased from 95px for NOC monitor */
   background: var(--bg-header);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
@@ -375,15 +375,15 @@ body::before {
 }
 
 .metric-card span:first-child {
-  font-size: 22px !important; 
-  font-weight: 1000;
+  font-size: 18px !important; 
+  font-weight: 3000;
   font-family: 'JetBrains Mono', monospace;
   margin-right: 8px;
   /* Removed text-shadow to prevent blurring/glow */
 }
 
 .metric-card span:last-child {
-  font-size: 12px !important; 
+  font-size: 10px !important; 
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -428,6 +428,20 @@ body::before {
 [class*="theme-dark"] .metric-card.m-total    { background: #CBD5E1 !important; color: #000000 !important; border-color: #475569 !important; }
 [class*="theme-dark"] .metric-card.m-avg-rt   { background: #A78BFA !important; color: #000000 !important; border-color: #8b5cf6 !important; }
 [class*="theme-dark"] .metric-card.m-alerts   { background: #FB923C !important; color: #000000 !important; border-color: #f97316 !important; }
+
+/* ── NAV BUTTON HIGH CONTRAST SYNC ── */
+[class*="theme-light"] .nav-btn-custom.active {
+  background: #0f172a !important; /* Solid Dark */
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+
+[class*="theme-dark"] .nav-btn-custom.active {
+  background: #f8fafc !important; /* Solid Bright */
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 15px rgba(255,255,255,0.3) !important;
+}
 
 /* Remove any glowing/shadow from metric numbers permanently */
 .metric-card span:first-child,
@@ -686,17 +700,24 @@ tr:hover {
 /* ── Responsive Dashboard Grid ── */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 72% 28%;
-  gap: 8px;
+  grid-template-columns: minmax(0, 0.72fr) minmax(300px, 0.28fr);
+  gap: 12px;
   flex: 1;
   overflow: hidden;
-  padding: 8px;
+  padding: 12px;
   min-height: 0;
 }
+
+@media (max-width: 1400px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 0.65fr) minmax(300px, 0.35fr);
+  }
+}
+
 @media (max-width: 1100px) {
-  .topbar {
-     height: auto !important;
-     padding: 12px !important;
+  .dashboard-grid {
+    grid-template-columns: 1fr 340px;
+    gap: 8px;
   }
 }
 
@@ -706,12 +727,19 @@ tr:hover {
     flex-direction: column;
     overflow-y: auto !important;
     height: auto !important;
-    gap: 8px;
+    gap: 12px;
+  }
+  .dashboard-grid > div {
+    flex: none !important;
+    height: 500px;
   }
 }
 
 @media (max-width: 768px) {
   html { font-size: 14px; }
+  .dashboard-grid > div {
+    height: 400px;
+  }
   .topbar {
     flex-direction: column !important;
     height: auto !important;
@@ -719,15 +747,19 @@ tr:hover {
     gap: 8px;
   }
   .topbar-branding { width: 100%; justify-content: center; height: auto; padding: 4px; }
-  .topbar-metrics.single-row { 
+  .topbar-metrics { 
     width: 100%;
     overflow-x: auto;
-    padding: 4px 6px;
+    padding: 6px;
     height: auto;
     display: flex !important;
     justify-content: flex-start !important;
     flex-wrap: nowrap !important;
+    gap: 8px !important;
+    -webkit-overflow-scrolling: touch;
   }
+  .topbar-metrics::-webkit-scrollbar { height: 4px; }
+  .topbar-metrics::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
   .topbar-nav-container { width: 100%; }
   .topbar-nav { width: 100%; overflow-x: auto; height: 40px; padding: 0 10px; }
   .topbar-actions {

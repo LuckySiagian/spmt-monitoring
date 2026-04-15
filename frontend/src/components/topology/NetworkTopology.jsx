@@ -28,7 +28,8 @@ function getDomain(url) {
 function calcStarLayout(websites) {
   return websites.map((w, i) => {
     const angle = (i / Math.max(websites.length, 1)) * Math.PI * 2 - Math.PI / 2
-    const radius = Math.min(0.42, 0.20 + websites.length * 0.010)
+    // Reduced max radius from 0.44 to 0.38 to provide 12% safe padding on edges
+    const radius = Math.min(0.38, 0.28 + websites.length * 0.004)
     return {
       id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
       x: 0.5 + radius * Math.cos(angle),
@@ -206,7 +207,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const isCrit = node.status === 'CRITICAL'
 
       // Node size - expands if selected or hovered
-      const r = isHov ? 54 : (isSel ? 48 : 36)
+      const r = isHov ? 42 : (isSel ? 36 : 28)
 
       // Critical pulse ring
       if (isCrit) {
@@ -244,13 +245,17 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         drawInitial(ctx, node.name, nx, ny, isHov)
       }
 
-      // Name label
+      // Label Box
+      const canvasScale = Math.min(1, width / 1400) // Scale factor based on standard desktop width
+      const baseFontSize = 14 * canvasScale
+      const hoverFontSize = 18 * canvasScale
+      
       const name = node.name.length > 15 ? node.name.slice(0, 14) + '…' : node.name
       const labelY = ny + r + 8
       const isDark = themeId && themeId.includes('dark')
 
       // Font weight changes on hover
-      ctx.font = `${(isSel || isHov) ? '900' : '600'} ${isHov ? '20px' : '16px'} system-ui`
+      ctx.font = `${(isSel || isHov) ? '900' : '700'} ${isHov ? Math.max(14, hoverFontSize + 4) : Math.max(12, baseFontSize + 4)}px system-ui`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
 
       // Label Box

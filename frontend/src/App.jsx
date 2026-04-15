@@ -322,10 +322,28 @@ function AppInner() {
     } catch (e) { }
   }, [])
 
-  const loadSummary = useCallback(async () => { if (!loggedIn) return; try { const r = await dashboardAPI.getSummary(); setSummary(r.data) } catch { } }, [loggedIn])
+  const loadSummary = useCallback(async (signal) => { 
+    if (!loggedIn) return; 
+    try { 
+      const r = await dashboardAPI.getSummary({ signal }); 
+      setSummary(r.data) 
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+      // silent fail for polling
+    } 
+  }, [loggedIn])
   const handleWebsiteUpdate = useCallback(() => { loadSummary(); setRefreshTrigger(t => t + 1) }, [loadSummary])
 
-  useEffect(() => { if (loggedIn) { loadSummary(); const iv = setInterval(loadSummary, 2000); return () => clearInterval(iv) } }, [loggedIn, loadSummary])
+  useEffect(() => { 
+    if (!loggedIn) return;
+    const controller = new AbortController();
+    loadSummary(controller.signal); 
+    const iv = setInterval(() => loadSummary(controller.signal), 2000); 
+    return () => {
+      controller.abort();
+      clearInterval(iv);
+    }
+  }, [loggedIn, loadSummary])
 
   const navTo = useCallback((nav) => { if (nav === 'users' && !isSuperAdmin) return; setActiveNav(nav); localStorage.setItem('spmt_active_nav', nav) }, [isSuperAdmin])
 
