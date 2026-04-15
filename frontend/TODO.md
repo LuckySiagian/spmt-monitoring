@@ -5,10 +5,11 @@
 
 ## Steps (Following Approved Plan)
 
-### 1. TopBar.jsx Updates
+### 1. TopBar.jsx Updates (Perbaiki tampilan kotak online) ✅
 
+- [x] Align all metric boxes (Online/Critical/Offline/Unknown/SLA/Total/AVG RT/Alerts) in 1 horizontal row (no wrap)
+- [x] Enlarge text (value 20px+, label 13px+) and box sizes (72px wide, 56px high)
 - [ ] Replace branding with single logo.png only
-- [ ] Simplify metrics to 4 boxes (ONLINE, OFFLINE, CRITICAL, UNKNOWN) in 1 row
 - [ ] Responsive flex for mini/full screen
 
 ### 2. StatusPanel.jsx Updates

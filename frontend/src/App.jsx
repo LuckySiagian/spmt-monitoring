@@ -8,6 +8,7 @@ import WebsitesPage from './pages/WebsitesPage'
 import UsersPage from './pages/UsersPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
+import ToastContainer, { showToast } from './components/dashboard/Toast'
 import { dashboardAPI } from './services/api'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
@@ -344,7 +345,7 @@ function AppInner() {
   const handleClearAll = useCallback(() => setNotifications([]), [])
   const handleLogout = () => { setShowLogout(false); logout(); setLoggedIn(false); localStorage.removeItem('spmt_active_nav') }
 
-  if (!loggedIn) return <LoginPage onLogin={() => setLoggedIn(true)} />
+  if (!loggedIn) return <LoginPage onLogin={() => { setLoggedIn(true); showToast('Login berhasil! Selamat datang, ' + (user?.username || 'User'), 'success') }} />
 
   const navItems = ['dashboard', 'websites', 'activity-log', ...(isSuperAdmin ? ['users'] : [])]
 
@@ -378,4 +379,4 @@ function AppInner() {
   )
 }
 
-export default function App() { return <ThemeProvider><AuthProvider><AppInner /></AuthProvider></ThemeProvider> }
+export default function App() { return <ThemeProvider><AuthProvider><AppInner /><ToastContainer /></AuthProvider></ThemeProvider> }

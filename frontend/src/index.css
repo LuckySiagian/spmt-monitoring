@@ -16,8 +16,7 @@ body,
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text);
   overflow-x: hidden;
-  font-size: 16px;
-  /* Base font size increased from ~12-14px to 16px */
+  font-size: 18px; /* Increased from 16px for larger monitors */
 }
 
 /* ── Enterprise Dark Mode Background (Base) ── */
@@ -321,7 +320,7 @@ body::before {
   justify-content: space-between;
   gap: 12px;
   padding: 0 16px;
-  height: 95px !important; /* Balanced Height */
+  height: 120px !important; /* Increased from 95px for NOC monitor */
   background: var(--bg-header);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
@@ -332,14 +331,15 @@ body::before {
 }
 
 .topbar-metrics {
-  display: grid !important;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 4px;
+  display: flex !important;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
   padding: 4px;
-  flex: 0 1 auto; /* Be flexible but shrink if needed */
-  max-width: 500px;
+  flex: 1 1 auto;
+  max-width: none;
   min-width: 0;
+  /* Removed overflow-x: auto to prevent scrolling */
 }
 
 .topbar-nav-container {
@@ -353,13 +353,14 @@ body::before {
 
 .metric-card {
   display: flex;
-  flex-direction: row; /* Horizontal for HUD feel */
+  flex: 1; /* Allow cards to share space equally */
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0 12px;
-  border-radius: 6px;
-  min-width: 110px;
-  height: 36px !important;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  min-width: 0; /* Allow shrinking below base width */
+  height: 70px !important;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-left: 3px solid var(--border); /* Vertical Accent */
@@ -374,19 +375,19 @@ body::before {
 }
 
 .metric-card span:first-child {
-  font-size: 16px !important;
+  font-size: 22px !important; 
   font-weight: 1000;
   font-family: 'JetBrains Mono', monospace;
   margin-right: 8px;
-  text-shadow: 0 0 10px currentColor;
+  /* Removed text-shadow to prevent blurring/glow */
 }
 
 .metric-card span:last-child {
-  font-size: 8px !important;
+  font-size: 12px !important; 
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.9; /* Increased from 0.7 for better legibility */
 }
 
 /* HUD Animations */
@@ -396,19 +397,42 @@ body::before {
   100% { opacity: 0.6; box-shadow: inset 0 0 5px currentColor; }
 }
 
-.metric-card.online { 
-  border-left-color: #10b981 !important; 
-  color: #10b981; 
-}
-.metric-card.critical { 
-  border-left-color: #f59e0b !important; 
-  color: #f59e0b; 
-  animation: hudPulse 2s infinite ease-in-out;
-}
-.metric-card.offline { 
-  border-left-color: #ef4444 !important; 
-  color: #ef4444; 
-  animation: hudPulse 1.5s infinite ease-in-out;
+/* ── Status Variants (Permanent Colors) ── */
+.metric-card.m-online   { border-left-color: #10b981 !important; color: #10b981; }
+.metric-card.m-critical { border-left-color: #f59e0b !important; color: #f59e0b; animation: hudPulse 2s infinite ease-in-out; }
+.metric-card.m-offline  { border-left-color: #ef4444 !important; color: #ef4444; animation: hudPulse 1.5s infinite ease-in-out; }
+.metric-card.m-unknown  { border-left-color: #64748b !important; color: #64748b; }
+.metric-card.m-sla      { border-left-color: #3b82f6 !important; color: #3b82f6; }
+.metric-card.m-total    { border-left-color: #475569 !important; color: #475569; }
+.metric-card.m-avg-rt   { border-left-color: #8b5cf6 !important; color: #8b5cf6; }
+.metric-card.m-alerts   { border-left-color: #f97316 !important; color: #f97316; }
+
+/* ── LIGHT THEME VARIANTS: Dark Backgrounds, Solid White Text ── */
+[class*="theme-light"] .metric-card { background: #f1f5f9; color: #1e293b; border-color: #e2e8f0; } /* Default fallback */
+[class*="theme-light"] .metric-card.m-online   { background: #064E3B !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-critical { background: #92400E !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-offline  { background: #991B1B !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-unknown  { background: #1e293b !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-sla      { background: #1e3a8a !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-total    { background: #334155 !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-avg-rt   { background: #4c1d95 !important; color: #ffffff !important; }
+[class*="theme-light"] .metric-card.m-alerts   { background: #7c2d12 !important; color: #ffffff !important; }
+
+/* ── DARK THEME VARIANTS: Bright Backgrounds, Solid Black Text ── */
+[class*="theme-dark"] .metric-card { background: #0f172a; color: #f1f5f9; border-color: #1e293b; } /* Default fallback */
+[class*="theme-dark"] .metric-card.m-online   { background: #34D399 !important; color: #000000 !important; border-color: #10b981 !important; }
+[class*="theme-dark"] .metric-card.m-critical { background: #FBBF24 !important; color: #000000 !important; border-color: #f59e0b !important; }
+[class*="theme-dark"] .metric-card.m-offline  { background: #F87171 !important; color: #000000 !important; border-color: #ef4444 !important; }
+[class*="theme-dark"] .metric-card.m-unknown  { background: #94A3B8 !important; color: #000000 !important; border-color: #64748b !important; }
+[class*="theme-dark"] .metric-card.m-sla      { background: #60A5FA !important; color: #000000 !important; border-color: #3b82f6 !important; }
+[class*="theme-dark"] .metric-card.m-total    { background: #CBD5E1 !important; color: #000000 !important; border-color: #475569 !important; }
+[class*="theme-dark"] .metric-card.m-avg-rt   { background: #A78BFA !important; color: #000000 !important; border-color: #8b5cf6 !important; }
+[class*="theme-dark"] .metric-card.m-alerts   { background: #FB923C !important; color: #000000 !important; border-color: #f97316 !important; }
+
+/* Remove any glowing/shadow from metric numbers permanently */
+.metric-card span:first-child,
+.metric-card span:last-child {
+  text-shadow: none !important;
 }
 
 .topbar-branding {
@@ -588,25 +612,22 @@ tr:hover {
   transform: translateY(-2px);
 }
 
-/* ── TV Mode Customizations ── */
+/* ── TV Mode Customizations (Simplified for consistency) ── */
 .tv-mode .topbar-nav {
-  opacity: 0.6;
-  transform: scale(0.9);
-  transform-origin: right center;
+  /* Removed scaling to match normal view */
 }
 
 .tv-mode .topbar-actions {
-  opacity: 1 !important;
-  transform: scale(0.9);
+  /* Removed scaling to match normal view */
 }
 
 .tv-mode .topbar-metrics {
-  gap: 4px !important;
+  gap: 8px !important; /* Matched with normal view */
 }
 
 .tv-mode .metric-card {
-  padding: 4px 8px !important;
-  min-width: 60px !important;
+  padding: 8px 12px !important; /* Matched with normal view */
+  flex: 1 !important;
 }
 
 .tv-mode .glass-card {
