@@ -243,7 +243,7 @@ gap:'5px'
 
 brandBox:{
 background:'#ffffff',
-padding:'8px 16px',
+padding:'6px 12px',
 border: '1px solid var(--border)',
 borderRadius:'20px',
 display:'flex',
@@ -252,7 +252,7 @@ boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
 },
 
 brandLogo:{
-height:'34px',
+height:'24px',
 objectFit:'contain'
 }
 

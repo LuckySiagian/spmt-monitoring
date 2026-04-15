@@ -160,7 +160,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
               boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
               <img src="/images/logos/lo.png" alt="SPMT"
-                style={{ height: 84, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
+                style={{ height: 64, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
             </div>
           </div>
         </div>
