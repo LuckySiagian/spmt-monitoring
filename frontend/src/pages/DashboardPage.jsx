@@ -5,59 +5,24 @@ import NetworkTopology from '../components/topology/NetworkTopology'
 import StatusPanel from '../components/dashboard/StatusPanel'
 import ServiceDetailModal from '../components/dashboard/ServiceDetailModal'
 
-export default function DashboardPage({ onSummaryUpdate, onNewNotification, onWebsitesUpdate, refreshTrigger }) {
-  const [websites, setWebsites] = useState([])
+export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpdate, onNewNotification, wsConnected, setWsConnected, realtimeSnapshot }) {
   const [selectedId, setSelectedId] = useState(null)
-  const [wsConnected, setWsConnected] = useState(false)
   const [detailWebsite, setDetailWebsite] = useState(null)
-  const [realtimeSnap, setRealtimeSnap] = useState(null)
   const prevStatusRef = useRef({})
-
-  const loadWebsites = useCallback(async (signal) => {
-    try { 
-      const res = await websiteAPI.getAll({ signal }); 
-      const data = res.data || []; 
-      setWebsites(data); 
-      onWebsitesUpdate?.(data); 
-      data.forEach(w => { if (!prevStatusRef.current[w.id]) prevStatusRef.current[w.id] = w.status }); 
-      pushSnap(data) 
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-    }
-  }, [onWebsitesUpdate])
-
-  useEffect(() => { 
-    const controller = new AbortController();
-    loadWebsites(controller.signal); 
-    const iv = setInterval(() => loadWebsites(controller.signal), 60000); 
-    return () => {
-      controller.abort();
-      clearInterval(iv);
-    }
-  }, [loadWebsites])
-
-  useEffect(() => { 
-    if (refreshTrigger) {
-      const controller = new AbortController();
-      loadWebsites(controller.signal);
-      return () => controller.abort();
-    }
-  }, [refreshTrigger, loadWebsites])
-
-  const pushSnap = (list) => setRealtimeSnap({ online: list.filter(w => w.status === 'ONLINE').length, critical: list.filter(w => w.status === 'CRITICAL').length, offline: list.filter(w => w.status === 'OFFLINE').length, unknown: list.filter(w => !w.status || w.status === 'UNKNOWN').length })
 
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'monitor_update') {
       const p = msg.payload
-      setWebsites(prev => { const up = prev.map(w => w.id === p.website_id ? { ...w, status: p.status, status_code: p.status_code, response_time_ms: p.response_time_ms, ssl_valid: p.ssl_valid, last_checked: p.checked_at, ip_address: p.ip_address, root_cause: p.root_cause } : w); pushSnap(up); return up })
+      const updated = websites.map(w => w.id === p.website_id ? { ...w, status: p.status, status_code: p.status_code, response_time_ms: p.response_time_ms, ssl_valid: p.ssl_valid, last_checked: p.checked_at, ip_address: p.ip_address, root_cause: p.root_cause } : w);
+      onWebsitesUpdate?.(updated);
       dashboardAPI.getSummary().then(r => onSummaryUpdate?.(r.data)).catch(() => { })
-      setWsConnected(true)
+      setWsConnected?.(true)
     }
     if (msg.type === 'status_change') {
       const p = msg.payload
       onNewNotification?.({ type: p.new_status, name: p.website, websiteId: p.website_id, url: p.url, oldStatus: p.old_status, reason: p.root_cause, ip: p.ip_address, responseTime: p.response_time_ms, ts: Date.now(), read: false })
     }
-  }, [onSummaryUpdate, onNewNotification])
+  }, [websites, onWebsitesUpdate, onSummaryUpdate, onNewNotification])
 
   useWebSocket(handleWsMessage)
   const handleOpenDetail = useCallback(p => setDetailWebsite(websites.find(w => w.id === p.id) || p), [websites])
@@ -70,7 +35,7 @@ export default function DashboardPage({ onSummaryUpdate, onNewNotification, onWe
           <NetworkTopology websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} wsConnected={wsConnected} />
         </div>
         <div style={s.status}>
-          <StatusPanel websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} realtimeSnapshot={realtimeSnap} />
+          <StatusPanel websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} realtimeSnapshot={realtimeSnapshot} />
         </div>
       </div>
       {detailWebsite && <ServiceDetailModal website={detailWebsite} onClose={() => setDetailWebsite(null)} />}

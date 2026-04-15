@@ -237,13 +237,17 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
         {/* Actions */}
         <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button onClick={onToggleTvMode} className="hover-glow" title="Full/Mini Screen"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '0 12px', height: 36, borderRadius: 8, background: isTvMode ? 'rgba(99,102,241,0.2)' : 'transparent', border: isTvMode ? '1px solid var(--accent)' : '1px solid transparent', color: isTvMode ? 'var(--accent)' : 'var(--text-sub)' }}>
+          <button onClick={onToggleTvMode} className="hover-glow" title="Full Screen Mode"
+            style={{ 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, 
+              padding: '0 12px', height: 36, borderRadius: 8, 
+              background: 'transparent', border: '1px solid transparent', color: 'var(--text-sub)' 
+            }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
               <polyline points="17 2 12 7 7 2"></polyline>
             </svg>
-            {!isTvMode && <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em' }}></span>}
+            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em' }}></span>
           </button>
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />

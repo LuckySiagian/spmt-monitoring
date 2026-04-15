@@ -16,10 +16,8 @@ const RoleBadge = ({ role }) => {
   )
 }
 
-export default function UsersPage() {
+export default function UsersPage({ users, onUserUpdate }) {
   const { user: currentUser } = useAuth()
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showRegister, setShowRegister] = useState(false)
   const [regForm, setRegForm] = useState({ username: '', password: '', role: 'viewer' })
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -27,23 +25,13 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false)
   const [actionMsg, setActionMsg] = useState('')
 
-  const load = async () => {
-    try {
-      const res = await userAPI.getAll()
-      setUsers(res.data || [])
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }
-
-  useEffect(() => { load() }, [])
-
   const adminCount = users.filter(u => u.role === 'admin').length
 
   const handlePromote = async (userId) => {
     try {
       await userAPI.promote(userId)
       setActionMsg('User promoted to Admin')
-      await load()
+      onUserUpdate?.()
       setTimeout(() => setActionMsg(''), 3000)
     } catch (e) {
       setActionMsg(e.response?.data?.error || 'Failed to promote')
@@ -55,7 +43,7 @@ export default function UsersPage() {
     try {
       await userAPI.demote(userId)
       setActionMsg('User demoted to Viewer')
-      await load()
+      onUserUpdate?.()
       setTimeout(() => setActionMsg(''), 3000)
     } catch (e) {
       setActionMsg(e.response?.data?.error || 'Failed to demote')
@@ -70,7 +58,7 @@ export default function UsersPage() {
       await userAdminAPI.create(regForm)
       setShowRegister(false)
       setRegForm({ username: '', password: '', role: 'viewer' })
-      await load()
+      onUserUpdate?.()
       setActionMsg('User created successfully')
       setTimeout(() => setActionMsg(''), 3000)
     } catch (err) {
@@ -84,7 +72,7 @@ export default function UsersPage() {
     try {
       await userAdminAPI.delete(userId)
       setDeleteTarget(null)
-      await load()
+      onUserUpdate?.()
       setActionMsg('User deleted')
       setTimeout(() => setActionMsg(''), 3000)
     } catch (e) {
@@ -130,8 +118,8 @@ export default function UsersPage() {
       </div>
 
       <div style={styles.tableContainer}>
-        {loading ? (
-          <div style={styles.empty}>Loading...</div>
+        {!users || users.length === 0 ? (
+          <div style={styles.empty}>No users found.</div>
         ) : (
           <table style={styles.table}>
             <thead>

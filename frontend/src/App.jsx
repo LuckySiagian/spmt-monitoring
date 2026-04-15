@@ -9,7 +9,7 @@ import UsersPage from './pages/UsersPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
-import { dashboardAPI } from './services/api'
+import { dashboardAPI, websiteAPI, userAPI, eventsAPI } from './services/api'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
@@ -258,6 +258,8 @@ function AppInner() {
   const [activeNav, setActiveNav] = useState(getInitialNav)
   const [summary, setSummary] = useState(null)
   const [websites, setWebsites] = useState([])
+  const [users, setUsers] = useState([])
+  const [allEvents, setAllEvents] = useState([])
   const [notifications, setNotifications] = useState([])
   const [showLogout, setShowLogout] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -266,6 +268,8 @@ function AppInner() {
   const [showAllNotifs, setShowAllNotifs] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isTvMode, setTvMode] = useState(false)
+  const [wsConnected, setWsConnected] = useState(false)
+  const [globalRefreshKey, setGlobalRefreshKey] = useState(0)
 
   useEffect(() => { const h = () => { setLoggedIn(false); setSummary(null); setWebsites([]); setNotifications([]) }; window.addEventListener('auth:logout', h); return () => window.removeEventListener('auth:logout', h) }, [])
 
@@ -329,21 +333,71 @@ function AppInner() {
       setSummary(r.data) 
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      // silent fail for polling
     } 
   }, [loggedIn])
-  const handleWebsiteUpdate = useCallback(() => { loadSummary(); setRefreshTrigger(t => t + 1) }, [loadSummary])
+
+  const loadWebsites = useCallback(async (signal) => {
+    if (!loggedIn) return;
+    try {
+      const r = await websiteAPI.getAll({ signal });
+      setWebsites(r.data || []);
+    } catch (err) {
+      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
+    }
+  }, [loggedIn])
+
+  const loadUsers = useCallback(async () => {
+    if (!loggedIn || !isSuperAdmin) return;
+    try {
+      const r = await userAPI.getAll();
+      setUsers(r.data || []);
+    } catch (e) { }
+  }, [loggedIn, isSuperAdmin])
+
+  const loadEvents = useCallback(async () => {
+    if (!loggedIn) return;
+    try {
+      const r = await eventsAPI.getAll(500);
+      setAllEvents(r.data || []);
+    } catch (e) { }
+  }, [loggedIn])
+
+  const triggerGlobalRefresh = useCallback(() => {
+    setGlobalRefreshKey(k => k + 1)
+  }, [])
+
+  const handleWebsiteUpdate = useCallback(() => { 
+    loadSummary(); 
+    loadWebsites(); 
+    loadEvents();
+    triggerGlobalRefresh();
+    setRefreshTrigger(t => t + 1) 
+  }, [loadSummary, loadWebsites, loadEvents, triggerGlobalRefresh])
+
+  const handleUserUpdate = useCallback(() => {
+    loadUsers();
+    triggerGlobalRefresh();
+  }, [loadUsers, triggerGlobalRefresh])
 
   useEffect(() => { 
     if (!loggedIn) return;
     const controller = new AbortController();
     loadSummary(controller.signal); 
-    const iv = setInterval(() => loadSummary(controller.signal), 2000); 
+    loadWebsites(controller.signal);
+    loadUsers();
+    loadEvents();
+    
+    const ivSummary = setInterval(() => loadSummary(controller.signal), 2000); 
+    const ivWebsites = setInterval(() => loadWebsites(controller.signal), 30000); 
+    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, 60000); // 1m fallback
+    
     return () => {
       controller.abort();
-      clearInterval(iv);
+      clearInterval(ivSummary);
+      clearInterval(ivWebsites);
+      clearInterval(ivUsersEvents);
     }
-  }, [loggedIn, loadSummary])
+  }, [loggedIn, loadSummary, loadWebsites, loadUsers, loadEvents])
 
   const navTo = useCallback((nav) => { if (nav === 'users' && !isSuperAdmin) return; setActiveNav(nav); localStorage.setItem('spmt_active_nav', nav) }, [isSuperAdmin])
 
@@ -367,6 +421,13 @@ function AppInner() {
 
   const navItems = ['dashboard', 'websites', 'activity-log', ...(isSuperAdmin ? ['users'] : [])]
 
+  const realtimeSnapshot = {
+    online: websites.filter(w => w.status === 'ONLINE').length,
+    critical: websites.filter(w => w.status === 'CRITICAL').length,
+    offline: websites.filter(w => w.status === 'OFFLINE').length,
+    unknown: websites.filter(w => !w.status || w.status === 'UNKNOWN').length
+  }
+
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)' }}>
       <TopBar
@@ -381,11 +442,11 @@ function AppInner() {
         onSettings={() => setShowSettings(true)}
         onAbout={() => setShowAbout(true)}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-        {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} />}
-        {activeNav === 'websites' && <WebsitesPage onWebsiteUpdate={handleWebsiteUpdate} />}
-        {activeNav === 'activity-log' && <ActivityLogPage />}
-        {activeNav === 'users' && isSuperAdmin && <UsersPage />}
+      <div className="page-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} websites={websites} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} realtimeSnapshot={realtimeSnapshot} wsConnected={wsConnected} setWsConnected={setWsConnected} />}
+        {activeNav === 'websites' && <WebsitesPage websites={websites} onWebsiteUpdate={handleWebsiteUpdate} />}
+        {activeNav === 'activity-log' && <ActivityLogPage events={allEvents} />}
+        {activeNav === 'users' && isSuperAdmin && <UsersPage users={users} onUserUpdate={handleUserUpdate} />}
       </div>
 
       {showAllNotifs && <AllNotificationsPanel notifications={notifications} onDelete={handleDelete} onClearAll={handleClearAll} onClose={() => setShowAllNotifs(false)} />}
