@@ -51,34 +51,14 @@ const StatusBadge = ({ status }) => {
   )
 }
 
-export default function WebsitesPage({ onWebsiteUpdate }) {
+export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const { isAdmin } = useAuth()
-  const [websites, setWebsites] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 3 })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  const load = async (signal) => {
-    try {
-      const res = await websiteAPI.getAll({ signal })
-      setWebsites(res.data || [])
-    } catch (err) {
-      if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { 
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
-  }, [])
 
   const openAdd = () => {
     setForm({ name: '', url: '', description: '', interval_seconds: 3 })
@@ -102,10 +82,9 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
       } else {
         await websiteAPI.create(form)
       }
-      await load()
       setShowAdd(false)
       setEditTarget(null)
-      onWebsiteUpdate?.()
+      onWebsiteUpdate?.() // Triggers global reload in App.jsx
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save')
     } finally {
@@ -117,9 +96,8 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
     if (!deleteTarget) return
     try {
       await websiteAPI.delete(deleteTarget.id)
-      await load()
       setDeleteTarget(null)
-      onWebsiteUpdate?.()
+      onWebsiteUpdate?.() // Triggers global reload in App.jsx
     } catch (err) {
       console.error(err)
     }
@@ -140,9 +118,7 @@ export default function WebsitesPage({ onWebsiteUpdate }) {
       </div>
 
       <div className="website-table-container" style={wStyles.tableContainer}>
-        {loading ? (
-          <div style={wStyles.empty}>Loading...</div>
-        ) : websites.length === 0 ? (
+        {websites.length === 0 ? (
           <div style={wStyles.empty}>No websites configured. {isAdmin && 'Click "Add Website" to begin.'}</div>
         ) : (
           <table className="website-table" style={wStyles.table}>

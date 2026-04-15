@@ -6,14 +6,11 @@ const SB = { ONLINE: 'rgba(5,150,105,0.1)', CRITICAL: 'rgba(217,119,6,0.1)', OFF
 const Badge = ({ s }) => <span style={{ background: SB[s] || 'rgba(100,116,139,0.1)', color: SC[s] || '#64748b', border: `1px solid ${SC[s] || '#64748b'}33`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>{s}</span>
 const FILTERS = ['ALL', 'ONLINE', 'CRITICAL', 'OFFLINE']
 
-export default function ActivityLogPage() {
-  const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
+export default function ActivityLogPage({ events }) {
   const [filter, setFilter] = useState('ALL')
   const [page, setPage] = useState(1)
   const PER = 50
 
-  useEffect(() => { setLoading(true); eventsAPI.getAll(500).then(r => setEvents(r.data || [])).catch(() => setEvents([])).finally(() => setLoading(false)) }, [])
   const fmt = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
   const filtered = events.filter(ev => filter === 'ALL' || ev.new_status === filter)
   const total = Math.max(1, Math.ceil(filtered.length / PER))
@@ -36,8 +33,7 @@ export default function ActivityLogPage() {
           </div>
         </div>
         {/* Table */}
-        {loading ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Loading...</div>
-          : paged.length === 0 ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No events found.</div> : (
+        {!events || events.length === 0 ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No events found.</div> : (
             <>
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

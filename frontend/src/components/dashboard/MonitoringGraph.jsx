@@ -37,7 +37,16 @@ function buildLiveFrame(slots=60) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', backdropFilter: 'blur(10px)', borderRadius:10, padding:'14px 18px', fontSize:14, boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
+    <div style={{ 
+      background:'var(--bg-card)', 
+      border:'1px solid var(--border)', 
+      backdropFilter: 'blur(10px)', 
+      borderRadius:10, 
+      padding:'8px 14px', 
+      fontSize:14, 
+      boxShadow:'0 8px 32px rgba(0,0,0,0.3)',
+      transform: 'translateY(-105px)' // Shift up to prevent occlusion
+    }}>
       <div style={{ color:'var(--accent)', marginBottom:8, fontSize:13, fontWeight:800 }}>{label}</div>
       {payload.map(p=>(
         <div key={p.dataKey} style={{ color:p.color, fontWeight:700, marginBottom:4, display: 'flex', justifyContent: 'space-between', gap: 20 }}>
