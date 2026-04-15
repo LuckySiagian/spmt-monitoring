@@ -141,42 +141,33 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
         padding: '0 24px', position: 'relative', zIndex: 100
       }}>
 
-        {/* ── BRANDING SECTION (COMPACT & CLAMPED) ── */}
+        {/* ── BRANDING SECTION ── */}
         <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-          {/* Logo Part - CLAMPED LEFT */}
           <div style={{
-            height: '100%', padding: '0 8px 0 0', /* Extreme left */
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            height: '100%',
+            padding: '0 8px 0 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            <div style={{
-              background: '#FFFFFF', padding: '4px 12px', borderRadius: '0 10px 10px 0',
-              boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <img src="/images/logos/logo spmt fc.png" alt="SPMT"
-                style={{ height: 60, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
-            </div>
-          </div>
-
-          {/* Text Part (Compact) */}
-          <div style={{
-            padding: '0 8px', display: 'flex', flexDirection: 'column',
-            justifyContent: 'center', height: '100%'
-          }}>
-            <span style={{
-              fontSize: 18, fontWeight: 1000, color: 'var(--text)', /* Smaller as requested */
-              letterSpacing: '-0.02em', background: 'linear-gradient(to right, var(--accent), #3b82f6)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 0.9
-            }}>SPMT</span>
-            <span style={{
-              fontSize: 9, fontWeight: 800, color: 'var(--text-muted)',
-              letterSpacing: '0.15em', textTransform: 'uppercase', marginTop: 1
-            }}>MONITORING</span>
+            <img
+              src="/images/logos/los.jpeg"
+              alt=""
+              style={{ height: 52, width: 'auto', maxWidth: '100%', objectFit: 'contain' }}
+            />
           </div>
         </div>
 
         {/* ── METRICS SECTION (Symmetric 4x2 Grid) ── */}
         <div className="topbar-metrics" style={{
-          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden'
+          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
+          overflow: 'visible',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(70px, 1fr))',
+          gap: 6,
+          minWidth: 0,
+          flex: 1,
+          alignContent: 'center'
         }}>
           {metrics.map(m => {
             const active = activeMetric === m.label
@@ -187,9 +178,12 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
               <div key={m.label} title={`Detail ${m.label}`}
                 className={`metric-card ${statusClass}`}
                 style={{
-                  cursor: 'pointer', userSelect: 'none',
+                  cursor: 'pointer',
+                  userSelect: 'none',
                   background: active ? `${m.color}22` : undefined,
-                  borderColor: active ? m.color : undefined
+                  borderColor: active ? m.color : undefined,
+                  minWidth: 0,
+                  width: '100%'
                 }}
                 onClick={() => setActiveMetric(active ? null : m.label)}>
 
