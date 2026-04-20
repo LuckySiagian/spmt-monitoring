@@ -24,7 +24,8 @@ api.interceptors.response.use(res => res, err => {
   return Promise.reject(err)
 })
 
-export const authAPI    = { login: (d, c)=>api.post('/auth/login', d, c), register: (d, c)=>api.post('/auth/register', d, c) }
+export const authAPI    = { login: (d, c)=>api.post('/auth/login', d, c), register: (d, c)=>api.post('/auth/register', d, c), changePassword: (d, c)=>api.put('/auth/change-password', d, c), updateAvatar: (d, c)=>api.put('/auth/avatar', d, c) }
+export const publicAPI  = { getStatus: (c)=>api.get('/public/websites', c) }
 export const websiteAPI = { 
   getAll: (c)=>api.get('/websites', c), 
   create: (d, c)=>api.post('/websites', d, c), 

@@ -11,6 +11,7 @@ import (
 	"github.com/spmt/monitoring/internal/service"
 	ws "github.com/spmt/monitoring/internal/websocket"
 	"github.com/spmt/monitoring/internal/worker"
+	"time"
 )
 
 type Handler struct {
@@ -116,6 +117,42 @@ func (h *Handler) GetWebsites(w http.ResponseWriter, r *http.Request) {
 		sites = []*model.Website{}
 	}
 	respond(w, http.StatusOK, sites)
+}
+
+func (h *Handler) GetPublicWebsites(w http.ResponseWriter, r *http.Request) {
+	sites, err := h.svc.GetAllWebsites(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// We return a simplified version for the public
+	type PublicSite struct {
+		ID             uuid.UUID       `json:"id"`
+		Name           string          `json:"name"`
+		URL            string          `json:"url"`
+		Status         model.LogStatus `json:"status"`
+		ResponseTimeMs *int            `json:"response_time_ms"`
+		LastChecked    *time.Time      `json:"last_checked"`
+	}
+
+	publicSites := make([]PublicSite, 0)
+	for _, s := range sites {
+		status := model.StatusUnknown
+		if s.Status != "" {
+			status = model.LogStatus(s.Status)
+		}
+		publicSites = append(publicSites, PublicSite{
+			ID:             s.ID,
+			Name:           s.Name,
+			URL:            s.URL,
+			Status:         status,
+			ResponseTimeMs: s.ResponseTimeMs,
+			LastChecked:    s.LastChecked,
+		})
+	}
+
+	respond(w, http.StatusOK, publicSites)
 }
 
 func (h *Handler) CreateWebsite(w http.ResponseWriter, r *http.Request) {

@@ -83,6 +83,9 @@ func main() {
 	r.Post("/auth/login", h.Login)
 	r.Post("/auth/register", h.Register)
 
+	// Public Status Route
+	r.Get("/public/websites", h.GetPublicWebsites)
+
 	// WebSocket (public - auth via query param or handled client-side)
 	r.Get("/ws", h.ServeWS)
 
