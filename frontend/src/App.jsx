@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useWebSocket } from './hooks/useWebSocket'
 import { AuthProvider, useAuth } from './store/auth'
 import { ThemeProvider, useTheme } from './store/theme'
 import LoginPage from './pages/LoginPage'
@@ -10,6 +11,7 @@ import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
 import { dashboardAPI, websiteAPI, userAPI, eventsAPI } from './services/api'
+import PublicStatusPage from './pages/PublicStatusPage'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
@@ -271,7 +273,22 @@ function AppInner() {
   const [wsConnected, setWsConnected] = useState(false)
   const [globalRefreshKey, setGlobalRefreshKey] = useState(0)
 
-  useEffect(() => { const h = () => { setLoggedIn(false); setSummary(null); setWebsites([]); setNotifications([]) }; window.addEventListener('auth:logout', h); return () => window.removeEventListener('auth:logout', h) }, [])
+  const websitesRef = useRef(websites)
+  useEffect(() => { websitesRef.current = websites }, [websites])
+
+  const [isAuthView, setIsAuthView] = useState(false)
+
+  useEffect(() => {
+    const h = () => { 
+      setLoggedIn(false); 
+      setIsAuthView(false); // Reset to public view on logout
+      setSummary(null); 
+      setWebsites([]); 
+      setNotifications([]);
+    }
+    window.addEventListener('auth:logout', h)
+    return () => window.removeEventListener('auth:logout', h)
+  }, [])
 
   useEffect(() => {
     const fn = () => {
@@ -417,7 +434,18 @@ function AppInner() {
   const handleClearAll = useCallback(() => setNotifications([]), [])
   const handleLogout = () => { setShowLogout(false); logout(); setLoggedIn(false); localStorage.removeItem('spmt_active_nav') }
 
-  if (!loggedIn) return <LoginPage onLogin={() => { setLoggedIn(true); showToast('Login berhasil! Selamat datang, ' + (user?.username || 'User'), 'success') }} />
+  if (!loggedIn) {
+    if (isAuthView) {
+      return (
+        <LoginPage onLogin={() => {
+          setLoggedIn(true)
+          setIsAuthView(false)
+          showToast('Login berhasil! Selamat datang, ' + (user?.username || 'User'), 'success')
+        }} />
+      )
+    }
+    return <PublicStatusPage onLoginClick={() => setIsAuthView(true)} />
+  }
 
   const navItems = ['dashboard', 'websites', 'activity-log', ...(isSuperAdmin ? ['users'] : [])]
 
