@@ -64,7 +64,7 @@ export default function PublicStatusPage({ onLoginClick }) {
           </div>
         </div>
         <button onClick={onLoginClick} style={s.loginBtn}>
-           <span>Admin Sign In</span>
+           <span>Log-In</span>
         </button>
       </nav>
 
@@ -74,12 +74,10 @@ export default function PublicStatusPage({ onLoginClick }) {
         <div style={s.heroContent}>
           <div style={s.heroTextContainer}>
              <h2 style={s.heroMainText}>
-                KOMPETEN DALAM <br />
-                PENYEDIAAN LAYANAN <br />
-                MARITIM DAN <br />
-                KEPELABUHANAN
+                SIAP MEMANTAU <br />
+                WEBSITE SPMT <br />
              </h2>
-             <div style={s.heroLabel}>OFFICIAL SERVICE MONITORING</div>
+             <div style={s.heroLabel}>PELINDO MULTITERMINAL LINK MONITORING SYSTEM</div>
           </div>
         </div>
       </section>
@@ -247,7 +245,7 @@ const s = {
     width: '100%',
     maxWidth: '1200px'
   },
-  heroTextContainer: { borderLeft: '6px solid #0a74ff', paddingLeft: '32px' },
+  heroTextContainer: { borderLeft: '6px solid #0a95ffff', paddingLeft: '32px' },
   heroMainText: {
     color: '#fff',
     fontSize: '38px',
@@ -261,7 +259,7 @@ const s = {
     marginTop: '20px',
     fontSize: '13px',
     fontWeight: 800,
-    color: '#0a74ff',
+    color: '#ffffffff',
     letterSpacing: '0.15em',
     textTransform: 'uppercase'
   },
