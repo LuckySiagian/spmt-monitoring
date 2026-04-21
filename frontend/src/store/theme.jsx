@@ -44,27 +44,12 @@ export const TRANSLATIONS = {
 }
 
 export const THEME_OPTIONS = [
-  { id: 'theme-light', name: 'Clean Light', color: '#3b82f6', dark: false },
-  { id: 'theme-light-sky', name: 'Sky Blue', color: '#0284c7', dark: false },
-  { id: 'theme-light-emerald', name: 'Emerald', color: '#059669', dark: false },
-  { id: 'theme-light-lavender', name: 'Lavender', color: '#7c3aed', dark: false },
-  { id: 'theme-light-rose', name: 'Rose', color: '#e11d48', dark: false },
-  { id: 'theme-light-amber', name: 'Amber', color: '#d97706', dark: false },
-  { id: 'theme-light-slate', name: 'Slate', color: '#475569', dark: false },
-  { id: 'theme-light-teal', name: 'Teal', color: '#0d9488', dark: false },
-  { id: 'theme-light-indigo', name: 'Indigo', color: '#4f46e5', dark: false },
-  { id: 'theme-light-orange', name: 'Orange', color: '#ea580c', dark: false },
-  
-  { id: 'theme-dark', name: 'Enterprise Dark', color: '#6366f1', dark: true },
-  { id: 'theme-dark-obsidian', name: 'Obsidian', color: '#38bdf8', dark: true },
-  { id: 'theme-dark-forest', name: 'Forest', color: '#34d399', dark: true },
-  { id: 'theme-dark-midnight', name: 'Midnight', color: '#818cf8', dark: true },
-  { id: 'theme-dark-crimson', name: 'Crimson', color: '#f87171', dark: true },
-  { id: 'theme-dark-violet', name: 'Violet', color: '#a78bfa', dark: true },
-  { id: 'theme-dark-carbon', name: 'Carbon', color: '#a3a3a3', dark: true },
-  { id: 'theme-dark-ocean', name: 'Ocean Depth', color: '#7dd3fc', dark: true },
-  { id: 'theme-dark-plum', name: 'Deep Plum', color: '#f472b6', dark: true },
-  { id: 'theme-dark-neon-glow', name: 'Neon Glow', color: '#00ff41', dark: true }
+  { id: 'theme-crystal-cyan', name: 'Crystal Cyan', color: '#00d1b2', dark: false },
+  { id: 'theme-emerald-mint', name: 'Emerald Mint', color: '#00b894', dark: false },
+  { id: 'theme-solar-amber', name: 'Solar Amber', color: '#f39c12', dark: false },
+  { id: 'theme-electric-sky', name: 'Electric Sky', color: '#3498db', dark: false },
+  { id: 'theme-plasma-pink', name: 'Plasma Pink', color: '#e056fd', dark: false },
+  { id: 'theme-obsidian-soft', name: 'Soft Obsidian', color: '#2d3436', dark: false },
 ]
 
 export function ThemeProvider({ children }) {

@@ -6,7 +6,7 @@ const videos = [
   "/images/background/bg2.MP4"
 ]
 
-export default function LoginPage({ onLogin }) {
+export default function LoginPage({ onLogin, onBack }) {
   const { login } = useAuth()
 
   const [form, setForm] = useState({ username: '', password: '' })
@@ -37,6 +37,31 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <div style={s.root}>
+      <style>{`
+        .back-btn-animated {
+          animation: slideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards, pulseGlow 3s infinite;
+          transition: all 0.3s ease;
+        }
+        .back-btn-animated:hover {
+          transform: translateX(-5px) scale(1.05);
+          box-shadow: 0 0 25px rgba(37, 99, 235, 0.4);
+          background: rgba(255, 255, 255, 0.9) !important;
+          color: #2563eb !important;
+        }
+
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(50px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 10px rgba(37, 99, 235, 0.2); }
+          50% { box-shadow: 0 0 20px rgba(37, 99, 235, 0.5); }
+        }
+      `}</style>
+
+      <button onClick={onBack} style={s.backBtn} className="back-btn-animated">
+        <span>← BACK</span>
+      </button>
 
       {/* VIDEO BACKGROUND */}
       <video
@@ -121,16 +146,35 @@ export default function LoginPage({ onLogin }) {
 
 const s = {
 
-root:{
-width:'100%',
-height:'100vh',
-display:'flex',
-alignItems:'center',
-justifyContent:'center',
-overflow:'hidden',
-position:'relative',
-background:'#ffffff'
-},
+  root: {
+    width: '100%',
+    height: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    position: 'relative',
+    background: '#ffffff'
+  },
+  backBtn: {
+    position: 'absolute',
+    top: '30px',
+    right: '30px',
+    zIndex: 100,
+    padding: '10px 22px',
+    background: 'rgba(255, 255, 255, 0.7)',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(37, 99, 235, 0.3)',
+    borderRadius: '30px',
+    color: 'var(--text)',
+    fontSize: '12px',
+    fontWeight: 800,
+    letterSpacing: '0.1em',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+  },
 
 video:{
 position:'absolute',

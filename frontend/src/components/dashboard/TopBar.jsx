@@ -195,10 +195,16 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: active ? `${m.color}22` : undefined,
-                  borderColor: active ? m.color : undefined,
+                  background: active ? `${m.color}33` : 'rgba(0,0,0,0.03)',
+                  borderColor: m.color,
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
                   minWidth: 0,
-                  width: '100%'
+                  width: '100%',
+                  color: m.color,
+                  borderRadius: 10,
+                  transition: 'all 0.3s ease',
+                  position: 'relative'
                 }}
                 onClick={() => setActiveMetric(active ? null : m.label)}>
 
@@ -237,24 +243,43 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
         {/* Actions */}
         <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button onClick={onToggleTvMode} className="hover-glow" title="Full Screen Mode"
+          <button onClick={onToggleTvMode} title={isTvMode ? "Exit Full Screen" : "Enter Full Screen"}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 0 12px var(--accent)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 0 4px rgba(0,0,0,0.1)';
+            }}
             style={{ 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, 
-              padding: '0 12px', height: 36, borderRadius: 8, 
-              background: 'transparent', border: '1px solid transparent', color: 'var(--text-sub)' 
+              position: 'fixed', top: '8px', right: '8px', zIndex: 99999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 24, height: 24, borderRadius: 4, 
+              background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)',
+              border: '1px solid var(--accent)', color: 'var(--accent)',
+              cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              boxShadow: '0 0 4px rgba(0,0,0,0.1)'
             }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
-              <polyline points="17 2 12 7 7 2"></polyline>
-            </svg>
-            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.05em' }}></span>
+            {isTvMode ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+              </svg>
+            )}
           </button>
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
-          <div style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)' }}>
-            <div style={{ color: 'var(--text)', fontSize: 24, fontWeight: 800, fontFamily: 'monospace', letterSpacing: '0.08em', textShadow: '0 0 8px rgba(255,255,255,0.2)' }}>
+          <div style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ color: 'var(--accent)', fontSize: 20, fontWeight: 800, fontFamily: '"Orbitron", monospace', letterSpacing: '0.08em', lineHeight: 1.1 }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
+            </div>
+            <div style={{ color: 'var(--text-sub)', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em', marginTop: 2 }}>
+              {clock.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
             </div>
           </div>
 

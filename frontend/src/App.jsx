@@ -72,6 +72,11 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
 function SettingsModal({ onClose }) {
   const { lang, setLanguage, LANGUAGES, themeId, setTheme, THEME_OPTIONS } = useTheme()
   const [sound, setSound] = useState(() => localStorage.getItem('spmt_sound') !== 'off')
+  // We'll track the selected theme locally before saving so it can be previewed or just applied immediately
+  const handleThemeChange = (id) => {
+    setTheme(id)
+  }
+
   const save = () => {
     localStorage.setItem('spmt_sound', sound ? 'on' : 'off')
     window.location.reload()
@@ -79,13 +84,35 @@ function SettingsModal({ onClose }) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 14, width: 440, maxWidth: '94vw', boxShadow: '0 16px 48px rgba(99,102,241,0.2)', animation: 'fadeIn 0.15s ease' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>⚙️ Settings</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}>✕</button>
+      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 14, width: 440, maxWidth: '94vw', boxShadow: 'var(--shadow-glow)', animation: 'fadeIn 0.15s ease' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-header)', borderTopLeftRadius: 14, borderTopRightRadius: 14 }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>⚙️ System Settings</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '18px 20px', maxHeight: '65vh', overflowY: 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', marginBottom: 10 }}>⚙️ MONITORING PREFERENCES</div>
+          
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 16 }}>🎨 SCI-FI THEME SELECTION</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 24 }}>
+            {THEME_OPTIONS.map(theme => (
+              <div 
+                key={theme.id}
+                onClick={() => handleThemeChange(theme.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px',
+                  background: themeId === theme.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.03)',
+                  border: `1px solid ${themeId === theme.id ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: 8, cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: themeId === theme.id ? `0 0 10px ${theme.color}20 inset` : 'none'
+                }}
+              >
+                <div style={{ width: 16, height: 16, borderRadius: '50%', background: theme.color, boxShadow: `0 0 8px ${theme.color}`, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: themeId === theme.id ? 'var(--text)' : 'var(--text-sub)' }}>{theme.name}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 10 }}>⚙️ MONITORING PREFERENCES</div>
           {[
             { l: '🔔 Notification Sound', s: sound, set: setSound },
             { l: '📡 Intensive Network Scan', s: localStorage.getItem('spmt_scan') === 'on', set: (v) => localStorage.setItem('spmt_scan', v ? 'on' : 'off') },
@@ -93,29 +120,25 @@ function SettingsModal({ onClose }) {
             { l: '📊 Detailed Metrics Tooltips', s: localStorage.getItem('spmt_tooltips') !== 'off', set: (v) => localStorage.setItem('spmt_tooltips', v ? 'on' : 'off') },
             { l: '🔄 Real-time Topology Sync', s: localStorage.getItem('spmt_topo_sync') !== 'off', set: (v) => localStorage.setItem('spmt_topo_sync', v ? 'on' : 'off') },
           ].map(item => (
-            <div key={item.l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(99,102,241,0.07)' }}>
+            <div key={item.l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.l}</span>
               <button
                 onClick={() => {
                   if (typeof item.set === 'function' && item.set.length === 1) {
                     item.set(!item.s);
-                    window.location.reload(); // Simple way to apply localstorage changes
                   } else {
                     item.set(v => !v);
                   }
                 }}
-                style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', background: item.s ? '#4f46e5' : '#e2e8f0' }}>
+                style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', background: item.s ? 'var(--accent)' : 'rgba(0,0,0,0.3)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}>
                 <span style={{ position: 'absolute', top: 2, left: item.s ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
               </button>
             </div>
           ))}
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 12, fontStyle: 'italic' }}>
-            ⚡ System language is locked to **English** for standard NOC operations. Data refreshes every 2s.
-          </div>
         </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(99,102,241,0.1)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={onClose} style={{ background: 'var(--border)', border: '1px solid rgba(99,102,241,0.15)', color: '#64748b', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={save} style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', border: 'none', color: 'var(--text)', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Save</button>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, background: 'var(--bg-header)', borderBottomLeftRadius: 14, borderBottomRightRadius: 14 }}>
+          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+          <button onClick={save} style={{ background: 'var(--accent)', border: 'none', color: '#000', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)' }}>Save & Apply</button>
         </div>
       </div>
     </div>,
@@ -276,12 +299,17 @@ function AppInner() {
   const websitesRef = useRef(websites)
   useEffect(() => { websitesRef.current = websites }, [websites])
 
-  const [isAuthView, setIsAuthView] = useState(false)
+  const [isAuthView, setIsAuthView] = useState(() => localStorage.getItem('spmt_auth_mode') === 'true')
+
+  const toggleAuthView = (show) => {
+    setIsAuthView(show)
+    localStorage.setItem('spmt_auth_mode', show ? 'true' : 'false')
+  }
 
   useEffect(() => {
     const h = () => { 
       setLoggedIn(false); 
-      setIsAuthView(false); // Reset to public view on logout
+      toggleAuthView(false); // Reset to public view on logout
       setSummary(null); 
       setWebsites([]); 
       setNotifications([]);
@@ -432,19 +460,28 @@ function AppInner() {
   const handleMarkAllRead = useCallback(() => setNotifications(p => p.map(n => ({ ...n, read: true }))), [])
   const handleDelete = useCallback((idx) => setNotifications(p => p.filter((_, i) => i !== idx)), [])
   const handleClearAll = useCallback(() => setNotifications([]), [])
-  const handleLogout = () => { setShowLogout(false); logout(); setLoggedIn(false); localStorage.removeItem('spmt_active_nav') }
+  const handleLogout = () => { 
+    setShowLogout(false); 
+    logout(); 
+    setLoggedIn(false); 
+    localStorage.removeItem('spmt_active_nav');
+    window.location.reload(); // Force full refresh for clean public state
+  }
 
   if (!loggedIn) {
     if (isAuthView) {
       return (
-        <LoginPage onLogin={() => {
-          setLoggedIn(true)
-          setIsAuthView(false)
-          showToast('Login berhasil! Selamat datang, ' + (user?.username || 'User'), 'success')
-        }} />
+        <LoginPage 
+          onLogin={() => {
+            setLoggedIn(true)
+            toggleAuthView(false)
+            showToast('Login berhasil! Selamat datang, ' + (user?.username || 'User'), 'success')
+          }} 
+          onBack={() => toggleAuthView(false)}
+        />
       )
     }
-    return <PublicStatusPage onLoginClick={() => setIsAuthView(true)} />
+    return <PublicStatusPage onLoginClick={() => toggleAuthView(true)} />
   }
 
   const navItems = ['dashboard', 'websites', 'activity-log', ...(isSuperAdmin ? ['users'] : [])]
@@ -457,7 +494,12 @@ function AppInner() {
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)', position: 'relative' }}>
+      
+      {/* Sci-Fi Ambient Glows (Light Mode) */}
+      <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, var(--accent-light) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none', opacity: 0.5 }} />
+      <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: '30vw', height: '30vw', background: 'radial-gradient(circle, var(--accent-light) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none', opacity: 0.5 }} />
+
       <TopBar
         summary={summary} activeNav={activeNav} onNavChange={navTo}
         websites={websites} notifications={notifications}
@@ -470,7 +512,7 @@ function AppInner() {
         onSettings={() => setShowSettings(true)}
         onAbout={() => setShowAbout(true)}
       />
-      <div className="page-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+      <div className="page-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, zIndex: 1, position: 'relative' }}>
         {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} websites={websites} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} realtimeSnapshot={realtimeSnapshot} wsConnected={wsConnected} setWsConnected={setWsConnected} />}
         {activeNav === 'websites' && <WebsitesPage websites={websites} onWebsiteUpdate={handleWebsiteUpdate} />}
         {activeNav === 'activity-log' && <ActivityLogPage events={allEvents} />}

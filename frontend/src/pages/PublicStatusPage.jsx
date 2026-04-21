@@ -3,22 +3,27 @@ import { publicAPI } from '../services/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 
 const SC = {
-  ONLINE:   '#10b981', // Emerald 500
-  CRITICAL: '#f59e0b', // Amber 500
-  OFFLINE:  '#ef4444', // Red 500
-  UNKNOWN:  '#94a3b8', // Slate 400
+  ONLINE: 'var(--online)',
+  CRITICAL: 'var(--critical)',
+  OFFLINE: 'var(--offline)',
 }
 
 export default function PublicStatusPage({ onLoginClick }) {
   const [websites, setWebsites] = useState([])
   const [loading, setLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState(new Date())
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [filter, setFilter] = useState('ALL')
+
+  // Clock effect
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const loadData = useCallback(async () => {
     try {
       const res = await publicAPI.getStatus()
       setWebsites(res.data || [])
-      setLastUpdated(new Date())
     } catch (e) {
       console.error('Failed to load public status', e)
     } finally {
@@ -41,137 +46,262 @@ export default function PublicStatusPage({ onLoginClick }) {
   useWebSocket(handleWsMessage)
 
   const stats = {
-    total:    websites.length,
-    online:   websites.filter(w => w.status === 'ONLINE').length,
+    online: websites.filter(w => w.status === 'ONLINE').length,
     critical: websites.filter(w => w.status === 'CRITICAL').length,
-    offline:  websites.filter(w => w.status === 'OFFLINE').length,
+    offline: websites.filter(w => w.status === 'OFFLINE').length,
   }
 
-  const allGood = stats.total > 0 && stats.online === stats.total
-  const hasIssues = stats.critical > 0 || stats.offline > 0
+  const filteredWebsites = websites.filter(w => {
+    if (filter === 'ALL') return true
+    return w.status === filter
+  })
+
+  const formatDateTime = (date) => {
+    return date.toLocaleString('id-ID', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
 
   return (
     <div style={s.root}>
+      {/* HUD Background elements */}
+      <div style={s.bgGlow1} />
+      <div style={s.bgGlow2} />
+      <div style={s.gridOverlay} />
+
       {/* Navbar Section */}
       <nav style={s.nav}>
         <div style={s.logoGroup}>
-          <div style={s.logoBox}>
-             <img src="/images/logos/lo.png" alt="PELINDO" style={s.logoImg} />
-          </div>
-          <div style={s.navTitle}>
-            <h1 style={s.navTitleH1}>SPMT MONITORING</h1>
-            <span style={s.navSubtitle}>Pelindo Multi Terminal · Status Center</span>
-          </div>
-        </div>
-        <button onClick={onLoginClick} style={s.loginBtn}>
-           <span>Log-In</span>
-        </button>
-      </nav>
-
-      {/* NEW HERO SECTION - PELINDO STYLE */}
-      <section style={s.heroSection}>
-        <div style={s.heroOverlay} />
-        <div style={s.heroContent}>
-          <div style={s.heroTextContainer}>
-             <h2 style={s.heroMainText}>
-                SIAP MEMANTAU <br />
-                WEBSITE SPMT <br />
-             </h2>
-             <div style={s.heroLabel}>PELINDO MULTITERMINAL LINK MONITORING SYSTEM</div>
-          </div>
-        </div>
-      </section>
-
-      <main style={s.main}>
-        {/* Real-time Banner */}
-        <div style={{ 
-          ...s.statusBanner, 
-          background: allGood ? 'rgba(16, 185, 129, 0.08)' : hasIssues ? 'rgba(239, 68, 68, 0.08)' : '#f8fafc',
-          borderColor: allGood ? '#10b98144' : hasIssues ? '#ef444444' : '#e2e8f0'
-        }}>
-          <div style={s.bannerLeft}>
-            <div style={{...s.bannerIcon, color: allGood ? '#10b981' : hasIssues ? '#ef4444' : '#64748b'}}>
-              {allGood ? '✓' : hasIssues ? '⚠' : '⟳'}
-            </div>
-            <div>
-              <h3 style={s.bannerTitle}>{allGood ? 'Everyone is happy. All systems are operational.' : hasIssues ? 'Infrastructure performance alert active.' : 'Fetching environment status...'}</h3>
-              <p style={s.bannerMeta}>Last scan performed at {lastUpdated.toLocaleTimeString('id-ID')} · Updates every 10s</p>
-            </div>
+          <div style={s.logoWrapper}>
+            <img src="/images/logos/lo.png" alt="PLTM-S Logo" style={s.logoImg} />
           </div>
           
-          <div style={s.quickStats}>
-             <div style={s.qsItem}><strong>{stats.online}</strong><span>Online</span></div>
-             <div style={s.qsDivider} />
-             <div style={s.qsItem}><strong style={{color: stats.offline > 0 ? '#ef4444' : 'inherit'}}>{stats.offline}</strong><span>Down</span></div>
+          {/* Header Status Metrics - Moved here */}
+          <div style={s.headerStats}>
+            <div className={`status-box all ${filter === 'ALL' ? 'active' : ''}`} 
+                 onClick={() => setFilter('ALL')}
+                 style={{...s.hudStatItem, color: 'var(--accent)', cursor: 'pointer'}}>
+              <span style={s.hudStatLabel}>ALL</span>
+              <span style={s.hudStatValue}>{websites.length}</span>
+            </div>
+            <div className={`status-box online ${filter === 'ONLINE' ? 'active' : ''}`} 
+                 onClick={() => setFilter(filter === 'ONLINE' ? 'ALL' : 'ONLINE')}
+                 style={{...s.hudStatItem, color: SC.ONLINE, cursor: 'pointer'}}>
+              <span style={s.hudStatLabel}>ONLINE</span>
+              <span style={s.hudStatValue}>{stats.online}</span>
+            </div>
+            <div className={`status-box critical ${filter === 'CRITICAL' ? 'active' : ''}`}
+                 onClick={() => setFilter(filter === 'CRITICAL' ? 'ALL' : 'CRITICAL')}
+                 style={{...s.hudStatItem, color: SC.CRITICAL, cursor: 'pointer'}}>
+              <span style={s.hudStatLabel}>CRITICAL</span>
+              <span style={s.hudStatValue}>{stats.critical}</span>
+            </div>
+            <div className={`status-box offline ${filter === 'OFFLINE' ? 'active' : ''}`}
+                 onClick={() => setFilter(filter === 'OFFLINE' ? 'ALL' : 'OFFLINE')}
+                 style={{...s.hudStatItem, color: SC.OFFLINE, cursor: 'pointer'}}>
+              <span style={s.hudStatLabel}>OFFLINE</span>
+              <span style={s.hudStatValue}>{stats.offline}</span>
+            </div>
           </div>
         </div>
 
-        {/* Services Grid - 3 Columns Compact */}
+        <div style={s.navRight}>
+          <button className="cyber-btn" onClick={onLoginClick}>
+            <span>LOGIN SYSTEM</span>
+          </button>
+          <div style={s.clockBox}>
+             <div style={s.clockLabel}>SYSTEM TIME</div>
+             <div style={s.clockTime}>{currentTime.toLocaleTimeString('id-ID', { hour12: false })}</div>
+             <div style={s.clockDate}>{currentTime.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+          </div>
+        </div>
+      </nav>
+
+      <main style={s.main}>
+
+        {/* Services Grid - Boxes */}
         <div style={s.grid}>
           {loading ? (
-             [1,2,3,4,5,6].map(i => <div key={i} style={s.skeleton} />)
+             [1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} style={s.skeleton} />)
           ) : (
-            websites.map((w, idx) => (
-              <div key={w.id} style={{ ...s.card, animationDelay: `${idx * 0.04}s` }}>
-                <div style={s.cardHeader}>
-                  <div style={s.cardIdentity}>
-                    <div style={s.serviceTitle}>{w.name}</div>
-                    <div style={s.serviceUrl}>{w.url.replace(/^https?:\/\//, '')}</div>
-                  </div>
-                  <div style={{ ...s.statusTag, color: SC[w.status], background: SC[w.status] + '12' }}>
-                     {w.status}
-                  </div>
-                </div>
+            filteredWebsites.map((w, idx) => {
+              let statusColor = SC.ONLINE;
+              if (w.status === 'CRITICAL') statusColor = SC.CRITICAL;
+              if (w.status === 'OFFLINE') statusColor = SC.OFFLINE;
 
-                <div style={s.cardBody}>
-                  <div style={s.metricGroup}>
-                    <div style={s.metric}>
-                      <span style={s.mLabel}>Response</span>
-                      <span style={s.mValue}>{w.response_time_ms ? `${w.response_time_ms}ms` : '—'}</span>
-                    </div>
-                    <div style={s.metric}>
-                      <span style={s.mLabel}>Uptime</span>
-                      <span style={s.mValue}>{w.status === 'ONLINE' ? '100%' : '99.9%'}</span>
-                    </div>
-                  </div>
+              const domain = w.url ? w.url.replace('https://', '').replace('http://', '').split('/')[0] : '';
 
-                  {/* MINI UPTIME BAR */}
-                  <div style={s.uptimeContainer}>
-                    <div style={s.bar}>
-                      {[...Array(30)].map((_, i) => (
-                        <div key={i} style={{
-                          ...s.segment,
-                          background: i === 29 ? SC[w.status] : (Math.random() > 0.985 ? '#ef4444' : '#10b981'),
-                          opacity: 0.4 + (i * 0.02)
-                        }} />
-                      ))}
+              return (
+                <div key={w.id} className="diamond-node" style={{ 
+                  animationDelay: `${idx * 0.05}s`, 
+                  '--status-color': statusColor 
+                }}>
+                  <div className="diamond-shape">
+                    <div className="diamond-content">
+                       <img 
+                         src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} 
+                         style={s.nodeIcon} 
+                         alt=""
+                         onError={(e) => e.target.style.display = 'none'}
+                       />
+                       <div style={{...s.nodeName, color: statusColor}}>{w.name}</div>
+                       <div style={s.nodeLatency}>{w.status === 'OFFLINE' ? 'OFFLINE' : `${w.response_time_ms || 0}ms`}</div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </main>
 
-      <footer style={s.footer}>
-         <div style={s.footerInner}>
-            <div style={s.footerBrand}>
-               <img src="/images/logos/lo.png" alt="" style={{ height: 32, filter: 'grayscale(1) brightness(2)' }} />
-               <span>PT Pelindo Multi Terminal</span>
-            </div>
-            <p>&copy; 2026 PT Pelabuhan Indonesia (Persero). Security monitored via internal NOC.</p>
-         </div>
-      </footer>
-
       <style>{`
-        @keyframes fadeInScale {
-          from { opacity: 0; transform: scale(0.98) translateY(10px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+        @keyframes cyberFadeIn {
+          0% { opacity: 0; transform: translateY(20px) scale(0.95); filter: blur(5px); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
-        @keyframes pulse {
-          0% { opacity: 0.6; } 50% { opacity: 0.3; } 100% { opacity: 0.6; }
+        @keyframes pulseGlow {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.2); }
+          100% { opacity: 1; transform: scale(1); }
         }
+        
+        .cyber-btn {
+          position: relative;
+          padding: 10px 24px;
+          background: rgba(0, 163, 255, 0.1);
+          border: 1px solid #00a3ff;
+          cursor: pointer;
+          overflow: hidden;
+          transition: all 0.3s ease;
+          clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .cyber-btn span {
+          position: relative;
+          z-index: 2;
+          color: var(--accent);
+          font-family: 'Rajdhani', sans-serif;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 2px;
+        }
+
+        .cyber-btn:hover {
+          background: var(--accent-light);
+          box-shadow: 0 0 15px var(--accent-light) inset;
+        }
+
+        .cyber-btn::before {
+          content: '';
+          position: absolute;
+          top: 0; left: -100%;
+          width: 50%; height: 100%;
+          background: linear-gradient(90deg, transparent, var(--accent-light), transparent);
+          transform: skewX(-45deg);
+          transition: left 0.5s ease;
+          z-index: 1;
+        }
+
+        .cyber-btn:hover::before {
+          left: 150%;
+        }
+
+        .node-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(10px);
+          animation: cyberFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          opacity: 0;
+          transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+          clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
+        }
+
+        .node-card:hover { transform: translateY(-5px); }
+
+        .diamond-node {
+          width: 125px;
+          height: 125px;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: cyberFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          opacity: 0;
+        }
+
+        .diamond-shape {
+          width: 100px;
+          height: 100px;
+          background: var(--bg-card);
+          border: 2px solid var(--status-color);
+          transform: rotate(45deg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s ease;
+          box-shadow: 0 0 10px var(--status-color)11;
+          position: relative;
+        }
+
+        .diamond-node:hover .diamond-shape {
+          transform: rotate(45deg) scale(1.1);
+          box-shadow: 0 0 20px var(--status-color)55;
+          background: white;
+        }
+
+        .status-box.active {
+          background: white;
+          border: 2px solid currentColor;
+          box-shadow: 0 0 15px currentColor;
+          transform: scale(1.05);
+        }
+
+        .diamond-content {
+          transform: rotate(-45deg);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          width: 100%;
+        }
+
+        .status-box {
+          border: 1px solid currentColor;
+          background: rgba(255,255,255,0.8);
+          padding: 8px 16px;
+          border-radius: 8px;
+          transition: all 0.3s;
+          min-width: 100px;
+        }
+        .status-box:hover {
+          background: white;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px currentColor;
+        }
+        .status-box.online { animation: glowPulseOnline 2s infinite; }
+        .status-box.critical { animation: glowPulseCritical 2s infinite; }
+        .status-box.offline { animation: glowPulseOffline 2s infinite; }
+
+        @keyframes glowPulseOnline { 0%, 100% { box-shadow: 0 0 5px var(--online); } 50% { box-shadow: 0 0 15px var(--online); } }
+        @keyframes glowPulseCritical { 0%, 100% { box-shadow: 0 0 5px var(--critical); } 50% { box-shadow: 0 0 15px var(--critical); } }
+        @keyframes glowPulseOffline { 0%, 100% { box-shadow: 0 0 5px var(--offline); } 50% { box-shadow: 0 0 15px var(--offline); } }
       `}</style>
     </div>
   )
@@ -181,167 +311,210 @@ const s = {
   root: {
     width: '100%',
     minHeight: '100vh',
-    background: '#ffffff',
-    color: '#1e293b',
-    fontFamily: '"Outfit", "Inter", sans-serif',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  nav: {
-    padding: '0 5%',
-    height: '72px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: '#fff',
-    borderBottom: '1px solid #f1f5f9',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100
-  },
-  logoGroup: { display: 'flex', alignItems: 'center', gap: '14px' },
-  logoBox: {
-    padding: '6px 12px',
-    background: '#0a74ff15',
-    borderRadius: '0 8px 8px 0',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderLeft: '4px solid #0a74ff'
-  },
-  logoImg: { height: '38px', objectFit: 'contain' },
-  navTitle: { display: 'flex', flexDirection: 'column' },
-  navTitleH1: { margin: 0, fontSize: '15px', fontWeight: 900, letterSpacing: '0.02em', color: '#0f172a' },
-  navSubtitle: { fontSize: '10px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' },
-  loginBtn: {
-    padding: '8px 20px',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
-    background: '#fff',
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#0f172a',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-  },
-  heroSection: {
-    height: '420px',
-    position: 'relative',
-    background: '#0f172a url("/images/background/hero_port.png") center/cover no-repeat',
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 8%'
-  },
-  heroOverlay: {
-    position: 'absolute',
-    inset: 0,
-    background: 'linear-gradient(to right, rgba(15, 23, 42, 0.8) 20%, rgba(15, 23, 42, 0.4) 60%, transparent 100%)',
-    zIndex: 1
-  },
-  heroContent: {
-    position: 'relative',
-    zIndex: 2,
-    width: '100%',
-    maxWidth: '1200px'
-  },
-  heroTextContainer: { borderLeft: '6px solid #0a95ffff', paddingLeft: '32px' },
-  heroMainText: {
-    color: '#fff',
-    fontSize: '38px',
-    lineHeight: 1.1,
-    fontWeight: 900,
-    margin: 0,
-    letterSpacing: '-0.01em',
-    textShadow: '0 4px 12px rgba(0,0,0,0.3)'
-  },
-  heroLabel: {
-    marginTop: '20px',
-    fontSize: '13px',
-    fontWeight: 800,
-    color: '#ffffffff',
-    letterSpacing: '0.15em',
-    textTransform: 'uppercase'
-  },
-  main: {
-    flex: 1,
-    padding: '32px 5%',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    width: '100%',
-    boxSizing: 'border-box'
-  },
-  statusBanner: {
-    padding: '20px 24px',
-    borderRadius: '16px',
-    border: '1px solid',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '32px'
-  },
-  bannerLeft: { display: 'flex', alignItems: 'center', gap: '20px' },
-  bannerIcon: { fontSize: '32px', fontWeight: 900 },
-  bannerTitle: { margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800 },
-  bannerMeta: { margin: 0, fontSize: '12px', color: '#64748b' },
-  quickStats: { display: 'flex', gap: '24px' },
-  qsItem: { display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'center' },
-  qsDivider: { width: '1px', background: '#e2e8f0' },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '20px'
-  },
-  card: {
-    background: '#fff',
-    borderRadius: '14px',
-    border: '1px solid #f1f5f9',
-    padding: '16px',
+    background: 'var(--bg-main)',
+    backgroundImage: `linear-gradient(rgba(241, 245, 249, 0.3), rgba(241, 245, 249, 0.3)), url('/at-pelindo-bg.png')`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundAttachment: 'fixed',
+    color: 'var(--text)',
+    fontFamily: '"Rajdhani", "Inter", sans-serif',
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-    animation: 'fadeInScale 0.5s ease forwards',
-    opacity: 0
+    position: 'relative',
+    overflowX: 'hidden'
   },
-  cardHeader: {
+  logoGroup: { display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1 },
+  logoWrapper: {
+    padding: '4px',
+    maxWidth: '200px',
+    display: 'flex',
+    alignItems: 'center'
+  },
+  logoImg: { height: '80px', maxWidth: '100%', objectFit: 'contain' },
+  navRight: { display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1 },
+  bgGlow2: {
+    display: 'none'
+  },
+  gridOverlay: {
+    position: 'absolute',
+    inset: 0,
+    backgroundImage: 'linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px)',
+    backgroundSize: '40px 40px',
+    zIndex: 0,
+    pointerEvents: 'none',
+    opacity: 0.5
+  },
+  nav: {
+    padding: '0 40px',
+    height: '110px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '14px'
+    alignItems: 'center',
+    background: 'var(--bg-header)',
+    borderBottom: '2px solid var(--border)',
+    backdropFilter: 'blur(15px)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)'
   },
-  cardIdentity: { flex: 1, minWidth: 0 },
-  serviceTitle: {
+  headerStats: {
+    display: 'flex',
+    gap: '20px',
+    marginLeft: '30px'
+  },
+  clockBox: {
+    background: 'rgba(0,0,0,0.03)',
+    border: '1px solid var(--border)',
+    padding: '6px 16px',
+    borderRadius: '10px',
+    textAlign: 'center',
+    minWidth: '140px'
+  },
+  clockLabel: { fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px' },
+  clockTime: { fontSize: '20px', fontWeight: 800, fontFamily: '"Orbitron", monospace', color: 'var(--accent)' },
+  clockDate: { fontSize: '10px', color: 'var(--text-sub)', fontWeight: 600 },
+  main: {
+    flex: 1,
+    padding: '20px 3%',
+    maxWidth: '1800px',
+    margin: '0 auto',
+    width: '100%',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+    position: 'relative',
+    zIndex: 1
+  },
+  dashboardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '24px 40px',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
+    boxShadow: 'var(--shadow)',
+    backdropFilter: 'blur(8px)',
+    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))'
+  },
+  hudTitle: {
+    fontSize: '18px',
+    fontWeight: 700,
+    fontFamily: '"Orbitron", sans-serif',
+    color: 'var(--text)',
+    letterSpacing: '3px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px'
+  },
+  hudTitleDecor: {
+    width: '4px',
+    height: '24px',
+    background: 'var(--accent)',
+    boxShadow: '0 0 10px var(--accent-light)'
+  },
+  hudStats: {
+    display: 'flex',
+    gap: '50px'
+  },
+  hudStatItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  hudStatLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '3px',
+    opacity: 0.9,
+    textShadow: '0 0 5px rgba(0,0,0,0.5)'
+  },
+  hudStatValue: {
+    fontSize: '32px',
+    fontWeight: 700,
+    fontFamily: '"Orbitron", monospace'
+  },
+  grid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(10, 1fr)',
+    gap: '12px',
+    padding: '10px 0'
+  },
+  nodeHeader: {
+    padding: '20px 24px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid rgba(255,255,255,0.05)'
+  },
+  nodeIcon: { width: 45, height: 45, marginBottom: 2, borderRadius: '4px' },
+  nodeLatency: { fontSize: '9px', fontWeight: 700, fontFamily: '"Orbitron", monospace', marginTop: 1 },
+  nodeName: {
     fontSize: '14px',
     fontWeight: 800,
-    color: '#0f172a',
+    letterSpacing: '0.2px',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    marginBottom: '2px'
+    maxWidth: '90px'
   },
-  serviceUrl: { fontSize: '11px', color: '#94a3b8', fontFamily: 'monospace' },
-  statusTag: { padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 800 },
-  cardBody: { display: 'flex', flexDirection: 'column', gap: '14px' },
-  metricGroup: { display: 'flex', gap: '20px' },
-  metric: { display: 'flex', flexDirection: 'column', gap: '2px' },
-  mLabel: { fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' },
-  mValue: { fontSize: '13px', fontWeight: 800, color: '#334155' },
-  uptimeContainer: { marginTop: '2px' },
-  bar: { display: 'flex', gap: '2px' },
-  segment: { flex: 1, height: '10px', borderRadius: '2px' },
-  skeleton: { height: '140px', background: '#f8fafc', borderRadius: '14px', animation: 'pulse 1.5s infinite' },
-  footer: {
-    padding: '40px 5%',
-    background: '#0f172a',
-    color: '#94a3b8'
+  nodeStatusBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    background: 'rgba(0,0,0,0.5)',
+    padding: '4px 12px',
+    borderRadius: '4px',
+    border: '1px solid rgba(255,255,255,0.1)'
   },
-  footerInner: {
-    maxWidth: '1400px',
-    margin: '0 auto',
+  statusDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    animation: 'pulseGlow 2s infinite'
+  },
+  nodeBody: {
+    padding: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    position: 'relative'
+  },
+  nodeDataRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    fontSize: '11px'
+    paddingBottom: '10px',
+    borderBottom: '1px dotted rgba(255,255,255,0.1)'
   },
-  footerBrand: { display: 'flex', alignItems: 'center', gap: '12px', color: '#fff', fontWeight: 700 }
+  dataLabel: {
+    fontSize: '11px',
+    color: '#64748b',
+    fontWeight: 600,
+    letterSpacing: '2px'
+  },
+  dataValue: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: 'var(--text-sub)',
+    fontFamily: '"Orbitron", monospace',
+    textAlign: 'right'
+  },
+  nodeFooterBar: {
+    height: '4px',
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0
+  },
+  skeleton: {
+    height: '180px',
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(0, 163, 255, 0.1)',
+    animation: 'pulseGlow 2s infinite',
+    clipPath: 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))'
+  }
 }
+
