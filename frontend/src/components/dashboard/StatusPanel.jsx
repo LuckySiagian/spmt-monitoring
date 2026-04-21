@@ -8,10 +8,10 @@ const getDomain = u => { try { return new URL(u).hostname } catch { return u } }
 
 // ── Status colors ─────────────────────────────────────────────
 const BADGE = {
-  ONLINE:   { bg: 'rgba(22,163,74,0.12)', color: '#16a34a', glow: 'none' },
-  CRITICAL: { bg: 'rgba(217,119,6,0.12)', color: '#d97706', glow: 'none' },
-  OFFLINE:  { bg: 'rgba(220,38,38,0.12)',  color: '#dc2626', glow: 'none' },
-  UNKNOWN:  { bg: 'rgba(71,85,105,0.12)',   color: '#475569', glow: 'none' },
+  ONLINE:   { color: 'var(--online)', glow: 'rgba(0,184,148,0.1)' },
+  CRITICAL: { color: 'var(--critical)', glow: 'rgba(255,165,2,0.1)' },
+  OFFLINE:  { color: 'var(--offline)', glow: 'rgba(255,71,87,0.1)' },
+  UNKNOWN:  { color: 'var(--text-muted)', glow: 'none' },
 }
 
 // ── Sub-components ────────────────────────────────────────────
@@ -45,53 +45,56 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
       className={`glass-card hover-glow ${w.status === 'OFFLINE' ? 'glitch-offline' : ''}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px',
-        cursor: 'pointer', transition: 'all 0.2s',
-        border: isSelected ? `2.5px solid ${c.color}` : '1px solid var(--border)',
-        background: isSelected ? `var(--accent-light)` : 'var(--bg-main)',
-        marginBottom: 10, borderRadius: 10,
-        boxShadow: isSelected ? `0 0 20px ${c.color}33` : 'var(--shadow)'
+        cursor: 'pointer', transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease',
+        border: '1px solid',
+        borderColor: isSelected ? c.color : 'var(--border)',
+        background: isSelected ? 'rgba(0,0,0,0.02)' : 'var(--bg-card)',
+        marginBottom: 12, borderRadius: 0,
+        boxShadow: isSelected ? `0 0 10px ${c.color}15 inset` : 'var(--shadow)',
+        clipPath: 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))',
+        position: 'relative'
       }}
       onClick={() => {
         onSelect?.(w.id === isSelected ? null : w.id)
         onOpenDetail?.(w)
       }}
     >
-      <div style={{ transform: 'scale(1.2)', marginRight: 4 }}>
+      {/* Dynamic Status Vertical Line */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: c.color, boxShadow: `0 0 8px ${c.color}` }} />
+
+      <div style={{ transform: 'scale(1.2)', marginRight: 6, marginLeft: 6 }}>
         <Favicon url={w.url} name={w.name} />
       </div>
       
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            {/* Status Dot */}
-            <span style={{ 
-              width: 14, height: 14, borderRadius: '50%', background: c.color, 
-              boxShadow: `0 0 12px ${c.color}`, flexShrink: 0,
-              animation: w.status === 'CRITICAL' || w.status === 'OFFLINE' ? 'pulse 1s infinite' : 'none' 
-            }} />
-            <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={w.name}>
+            <span style={{ fontSize: 16, fontWeight: 800, fontFamily: '"Orbitron", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '1px' }} title={w.name}>
               {w.name}
             </span>
           </div>
           
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 15, fontWeight: 800, color: isOnline ? 'var(--online)' : c.color, fontFamily: 'monospace', background: 'var(--accent-light)', border: '1px solid var(--border)', padding: '3px 10px', borderRadius: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: isOnline ? 'var(--online)' : c.color, fontFamily: '"Orbitron", monospace', background: 'rgba(0,0,0,0.03)', border: `1px solid ${c.color}33`, padding: '2px 8px', borderRadius: 4 }}>
               {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
             </span>
           </div>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'monospace', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>
              {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--critical)' : 'var(--text-sub)', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--critical)' : 'var(--text-sub)', fontFamily: '"Orbitron", monospace' }}>
               {fmtMs(w.response_time_ms)}
             </span>
-            <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', color: '#ffffff', background: c.color, padding: '3px 10px', borderRadius: 5, boxShadow: `0 2px 8px ${c.color}66` }}>
-              {w.status}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.03)', padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.color}15` }}>
+               <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, boxShadow: `0 0 5px ${c.color}`, animation: 'pulse 1.5s infinite' }} />
+               <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.1em', color: c.color }}>
+                 {w.status}
+               </span>
+            </div>
           </div>
         </div>
       </div>
@@ -126,10 +129,11 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
         
         {/* LIVE FEED SECTION (Top 60%) */}
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column', borderBottom: '2px solid var(--border)' }}>
-          <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)' }}>
-            🌐 ACTIVE MONITORING FEED
+          <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, fontFamily: '"Orbitron", sans-serif', color: 'var(--accent)', letterSpacing: '2px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 4, height: 16, background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
+            ACTIVE MONITORING FEED
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
             {sorted.length === 0 && (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: '40px 0' }}>// NO SERVICES CONFIGURED</div>
             )}
@@ -147,8 +151,9 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
 
         {/* GRAPH SECTION (Bottom 40%) */}
         <div style={{ height: '40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
-           <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)' }}>
-            📈 GLOBAL RESPONSE TIMES
+           <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, fontFamily: '"Orbitron", sans-serif', color: 'var(--accent)', letterSpacing: '2px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 4, height: 16, background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
+            GLOBAL RESPONSE TIMES
           </div>
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden', padding: '10px' }}>
             <MonitoringGraph realtimeSnapshot={realtimeSnapshot} />

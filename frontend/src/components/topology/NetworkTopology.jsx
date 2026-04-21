@@ -94,6 +94,13 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const [topoMode, setMode] = useState('star') // 'star' | 'tree'
   const [hoveredId, setHoveredId] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1100)
+  const bgImgRef = useRef(null)
+
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/at-pelindo-bg.png'
+    img.onload = () => { bgImgRef.current = img }
+  }, [])
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1100)
@@ -130,14 +137,27 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     timeRef.current += 0.018
     ctx.clearRect(0, 0, width, height)
 
+    // Global Background Image on Canvas
+    if (bgImgRef.current) {
+      ctx.save()
+      ctx.globalAlpha = 0.18 // More visible now as it's component-specific
+      // Draw zoomed/centered
+      const img = bgImgRef.current
+      const scale = Math.max(width / img.width, height / img.height)
+      const x = (width / 2) - (img.width / 2) * scale
+      const y = (height / 2) - (img.height / 2) * scale
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale)
+      ctx.restore()
+    }
+
     // Background grid
-    ctx.strokeStyle = 'rgba(99,102,241,0.04)'
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)'
     ctx.lineWidth = 1
     for (let x = 0; x < width; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke() }
     for (let y = 0; y < height; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke() }
 
     // Server position
-    const serverX = topoMode === 'tree' ? width * 0.5 : width * 0.5
+    const serverX = width * 0.5
     const serverY = topoMode === 'tree' ? height * 0.88 : height * 0.5
 
     // Draw connections + data packets
@@ -187,15 +207,15 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     // Server node
     const pulse = Math.sin(timeRef.current * 2) * 0.3 + 0.7
     ctx.beginPath(); ctx.arc(serverX, serverY, 55, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(59,130,246,${pulse * 0.15})`; ctx.fill()
+    ctx.fillStyle = `rgba(0, 209, 178, ${pulse * 0.08})`; ctx.fill()
     ctx.beginPath(); ctx.arc(serverX, serverY, 42, 0, Math.PI * 2)
-    ctx.fillStyle = 'var(--bg-main)'; ctx.fill()
-    ctx.strokeStyle = `rgba(59,130,246,${pulse})`; ctx.lineWidth = 3; ctx.stroke()
-    ctx.fillStyle = '#3b82f6'; ctx.font = 'bold 18px monospace'
+    ctx.fillStyle = '#ffffff'; ctx.fill()
+    ctx.strokeStyle = `rgba(0, 209, 178, ${pulse})`; ctx.lineWidth = 3; ctx.stroke()
+    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 18px "Orbitron", monospace'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText('SPMT', serverX, serverY - 6)
-    ctx.font = '14px monospace'; ctx.fillStyle = '#4a6fa5'
-    ctx.fillText('SERVER', serverX, serverY + 10)
+    ctx.font = '12px "Orbitron", monospace'; ctx.fillStyle = 'var(--accent)'
+    ctx.fillText('SERVER', serverX, serverY + 12)
 
     // Website nodes
     nodes.forEach(node => {
@@ -222,27 +242,35 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       ctx.fillStyle = glow.replace('0.4', String((isCrit ? 0.25 : 0.12) * hPulse)); ctx.fill()
 
       // Node body
-      ctx.beginPath(); ctx.arc(nx, ny, r, 0, Math.PI * 2)
-      ctx.fillStyle = 'rgba(248,250,252,0.95)'; ctx.fill()
+      // Hexagon shape for nodes (Sci-Fi Light)
+      ctx.beginPath()
+      for(let i=0; i<6; i++) {
+        const a = (Math.PI/3) * i
+        ctx[i===0?'moveTo':'lineTo'](nx + r * Math.cos(a), ny + r * Math.sin(a))
+      }
+      ctx.closePath()
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; ctx.fill()
       ctx.shadowBlur = isHov ? 15 : (isSel ? 10 : 0)
       ctx.shadowColor = color
       ctx.strokeStyle = color; ctx.lineWidth = (isSel || isHov) ? 3 : isCrit ? 2 : 1.5; ctx.stroke()
       ctx.shadowBlur = 0 // reset shadow
 
-      // Favicon / initial
+      // Favicon / initial inside hexagon
       const domain = getDomain(node.url)
       const favicon = faviconCache.current[domain]
-      const imgSize = r * 1.55 | 0
+      const imgSize = r * 1.5 | 0
       if (favicon) {
         try {
           ctx.save()
-          const half = imgSize / 2; ctx.beginPath(); ctx.arc(nx, ny - 1, half, 0, Math.PI * 2)
+          const half = imgSize / 2;
+          ctx.beginPath()
+          for(let i=0; i<6; i++) { const a = (Math.PI/3)*i; ctx[i===0?'moveTo':'lineTo'](nx + (r-2)*Math.cos(a), ny - 1 + (r-2)*Math.sin(a)) }
           ctx.clip()
           ctx.drawImage(favicon, nx - half, ny - 1 - half, imgSize, imgSize)
           ctx.restore()
-        } catch { drawInitial(ctx, node.name, nx, ny, isHov) }
+        } catch { drawInitial(ctx, node.name, nx, ny, isHov, color) }
       } else {
-        drawInitial(ctx, node.name, nx, ny, isHov)
+        drawInitial(ctx, node.name, nx, ny, isHov, color)
       }
 
       // Label Box
@@ -259,8 +287,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
 
       // Label Box
-      ctx.fillStyle = isDark ? 'rgba(30, 41, 59, 1)' : 'rgba(255, 255, 255, 1)'
-      ctx.strokeStyle = isHov ? color : (isDark ? 'rgba(99, 102, 241, 0.4)' : 'rgba(0, 0, 0, 0.1)')
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
+      ctx.strokeStyle = isHov ? color : 'rgba(0, 0, 0, 0.08)'
       ctx.lineWidth = isHov ? 2 : 1
       ctx.beginPath()
       if (ctx.roundRect) {
@@ -274,7 +302,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       // Label Text
       ctx.textAlign = 'center'
       ctx.textBaseline = 'top'
-      ctx.fillStyle = isHov ? color : (isDark ? '#f8fafc' : '#1e1b4b')
+      ctx.fillStyle = isHov ? color : '#334155'
       ctx.fillText(name, nx, labelY + (isHov ? 4 : 2))
 
       // Status dot
@@ -285,9 +313,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     animFrameRef.current = requestAnimationFrame(draw)
   }, [nodes, selectedId, hoveredId, topoMode])
 
-  function drawInitial(ctx, name, nx, ny, isHov) {
-    ctx.fillStyle = '#3b82f6'
-    ctx.font = `bold ${isHov ? '28px' : '22px'} system-ui`
+  function drawInitial(ctx, name, nx, ny, isHov, color) {
+    ctx.fillStyle = color || 'var(--text-sub)'
+    ctx.font = `900 ${isHov ? '28px' : '22px'} "Orbitron", system-ui`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText((name || 'W')[0].toUpperCase(), nx, ny - 2)
