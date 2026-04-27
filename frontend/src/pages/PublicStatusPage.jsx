@@ -6,13 +6,63 @@ const SC = {
   ONLINE: '#117903ff',
   CRITICAL: '#f59e0b',
   OFFLINE: '#ff4757',
-  ALL: '#ffffff'
+  ALL: '#c0b57dff'
 }
 
 const videos = [
   "/images/background/bg1.MP4",
   "/images/background/bg2.MP4"
 ]
+
+function InfoModal({ onClose }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: 20, width: 600, maxWidth: '100%', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', animation: 'fadeIn 0.2s ease' }}>
+        <div style={{ padding: '20px 24px', background: 'var(--primary)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>!</div>
+            <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.02em' }}>MONITORING GUIDE</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', opacity: 0.8 }}>×</button>
+        </div>
+        
+        <div style={{ padding: 30 }}>
+          <div style={{ marginBottom: 25 }}>
+            <div style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.1em', marginBottom: 15, textTransform: 'uppercase' }}>Status Legend & Conditions</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                { s: 'ONLINE', c: '#117903', t: 'HTTP 200-399 + RT < 3000ms', d: 'Website sehat, responsif, dan seluruh parameter (DNS/SSL) valid.' },
+                { s: 'CRITICAL', c: '#f59e0b', t: 'HTTP 5xx / RT > 5000ms / SSL Invalid', d: 'Website terdeteksi lambat atau mengalami gangguan fungsional.' },
+                { s: 'OFFLINE', c: '#ff4757', t: 'DNS Fail / Connection Refused / Timeout', d: 'Website tidak dapat diakses sama sekali dari jaringan monitoring.' }
+              ].map(item => (
+                <div key={item.s} style={{ display: 'flex', gap: 16, padding: 14, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: '50%', background: item.c, marginTop: 4, flexShrink: 0, boxShadow: `0 0 10px ${item.c}44` }} />
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: item.c }}>{item.s}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', padding: '2px 8px', background: '#e2e8f0', borderRadius: 4 }}>{item.t}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: '#475569', lineHeight: 1.5 }}>{item.d}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding: 20, background: 'rgba(15, 23, 42, 0.03)', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: '#1e293b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>⚙️</span> ENGINE MONITORING
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+              Sistem kami melakukan pengecekan kesehatan secara berkala dengan 3 pilihan standar (<b>30s, 60s, atau 120s</b>). Data yang Anda lihat di dashboard ini bersifat <b>Real-Time (Fresh)</b> yang dikirimkan secara langsung tanpa perlu menyegarkan (refresh) halaman manual.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const CircularProgress = ({ value, total, color, label, isActive, onClick }) => {
   const size = 70
@@ -115,6 +165,8 @@ export default function PublicStatusPage({ onLoginClick }) {
     return () => clearInterval(iv)
   }, [loadData])
 
+  const [showInfo, setShowInfo] = useState(false)
+
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'monitor_update' || msg.type === 'status_change') loadData()
   }, [loadData])
@@ -157,6 +209,21 @@ export default function PublicStatusPage({ onLoginClick }) {
           <CircularProgress label="ONLINE" value={stats.online} total={stats.all} color={SC.ONLINE} isActive={filter === 'ONLINE'} onClick={() => setFilter('ONLINE')} />
           <CircularProgress label="CRITICAL" value={stats.critical} total={stats.all} color={SC.CRITICAL} isActive={filter === 'CRITICAL'} onClick={() => setFilter('CRITICAL')} />
           <CircularProgress label="OFFLINE" value={stats.offline} total={stats.all} color={SC.OFFLINE} isActive={filter === 'OFFLINE'} onClick={() => setFilter('OFFLINE')} />
+          
+          <button 
+            onClick={() => setShowInfo(true)}
+            style={{ 
+              width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', 
+              border: '1px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: 16, fontWeight: 900, 
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.3s ease', marginLeft: 10
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            title="Monitoring Info"
+          >
+            !
+          </button>
         </div>
 
         <div style={s.headerRight}>
@@ -210,6 +277,13 @@ export default function PublicStatusPage({ onLoginClick }) {
           })}
         </div>
       </div>
+      {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   )
 }

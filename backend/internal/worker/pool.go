@@ -505,8 +505,13 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) 
 		CheckedAt:      logEntry.CheckedAt,
 	})
 
+	rtVal := 0
+	if logEntry.ResponseTimeMs != nil {
+		rtVal = *logEntry.ResponseTimeMs
+	}
+
 	log.Printf("[Worker] %s → %s | rt=%vms dns=%v icmp=%v tcp=%v ip=%s | %s",
-		w.Name, logEntry.Status, logEntry.ResponseTimeMs,
+		w.Name, logEntry.Status, rtVal,
 		logEntry.DNSResolved, logEntry.ICMPStatus, logEntry.TCPPortOpen,
 		logEntry.IPAddress, logEntry.RootCause)
 }

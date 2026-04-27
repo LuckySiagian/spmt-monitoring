@@ -167,9 +167,9 @@ function AboutModal({ onClose }) {
           </div>
           {[
             ['🎯 Tujuan', 'Memantau ketersediaan dan kinerja seluruh website & layanan digital Pelindo Multi Terminal secara real-time 24/7.'],
-            ['🔍 Cara Kerja', 'Backend Go melakukan pengecekan HTTP/DNS/ICMP/TCP setiap 10 detik per website. Hasilnya dikirim via WebSocket sehingga tampil instan tanpa perlu refresh.'],
+            ['🔍 Cara Kerja', 'Backend Go melakukan pengecekan HTTP/DNS/ICMP/TCP setiap 30-120 detik (sesuai pilihan). Hasilnya dikirim via WebSocket sehingga tampil instan tanpa perlu refresh.'],
             ['🛡️ Keamanan', 'JWT Token + role-based access: SuperAdmin (akses penuh), Admin (kelola website), Viewer (hanya baca).'],
-            ['📊 Fitur', 'Network Topology real-time · Monitoring Graph historis · Activity Log · Notifikasi otomatis · User Management.'],
+            ['📊 Fitur', 'Network Topology (maks. 50 website) · Monitoring Graph (100 pts) · Activity Log · Notifikasi otomatis.'],
           ].map(([t, d]) => (
             <div key={t} style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(99,102,241,0.03)', borderRadius: 8, border: '1px solid rgba(99,102,241,0.08)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{t}</div>

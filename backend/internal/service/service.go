@@ -197,17 +197,18 @@ func (s *Service) GetAllWebsites(ctx context.Context) ([]*model.Website, error) 
 }
 
 func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequest) (*model.Website, error) {
+	existing, err := s.repo.GetAllWebsites(ctx)
+	if err == nil && len(existing) >= 50 {
+		return nil, errors.New("maximum limit of 50 websites reached")
+	}
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
 	}
 	if !isValidURLStrict(req.URL) {
 		return nil, errors.New("invalid URL format (e.g. https://example.com) or domain typo")
 	}
-	if req.IntervalSeconds < 1 {
-		req.IntervalSeconds = 1
-	}
-	if req.IntervalSeconds > 3 {
-		req.IntervalSeconds = 3
+	if req.IntervalSeconds < 10 {
+		req.IntervalSeconds = 10
 	}
 	return s.repo.CreateWebsite(ctx, req)
 }
@@ -219,11 +220,8 @@ func (s *Service) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.Upd
 	if !isValidURLStrict(req.URL) {
 		return nil, errors.New("invalid URL format (e.g. https://example.com) or domain typo")
 	}
-	if req.IntervalSeconds < 1 {
-		req.IntervalSeconds = 1
-	}
-	if req.IntervalSeconds > 3 {
-		req.IntervalSeconds = 3
+	if req.IntervalSeconds < 10 {
+		req.IntervalSeconds = 10
 	}
 	return s.repo.UpdateWebsite(ctx, id, req)
 }
