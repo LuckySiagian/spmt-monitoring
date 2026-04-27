@@ -171,11 +171,32 @@ function AboutModal({ onClose }) {
             ['🛡️ Keamanan', 'JWT Token + role-based access: SuperAdmin (akses penuh), Admin (kelola website), Viewer (hanya baca).'],
             ['📊 Fitur', 'Network Topology real-time · Monitoring Graph historis · Activity Log · Notifikasi otomatis · User Management.'],
           ].map(([t, d]) => (
-            <div key={t} style={{ marginBottom: 12, padding: '10px 14px', background: 'rgba(99,102,241,0.04)', borderRadius: 8, border: '1px solid rgba(99,102,241,0.1)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{t}</div>
-              <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.7 }}>{d}</div>
+            <div key={t} style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(99,102,241,0.03)', borderRadius: 8, border: '1px solid rgba(99,102,241,0.08)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{t}</div>
+              <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6 }}>{d}</div>
             </div>
           ))}
+
+          {/* Sinergi Section */}
+          <div style={{ marginTop: 20, borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase' }}>Sinergi & Core Values</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {[
+                { img: 'pelindo.png', title: 'PELINDO', desc: 'Integrasi layanan pelabuhan nasional.' },
+                { img: 'danan.png', title: 'DANAN', desc: 'Inovasi teknologi digital terintegrasi.' },
+                { img: 'bumn', title: 'BUMN', desc: 'Transformasi digital ekonomi nasional.' },
+                { img: 'akhlak', title: 'AKHLAK', desc: 'Nilai inti budaya kerja yang luhur.' }
+              ].map(b => (
+                <div key={b.title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                  <img src={`/images/logos/${b.img}${b.img.includes('.') ? '' : '.png'}`} alt={b.title} style={{ height: 20, width: 'auto', maxWidth: 40, objectFit: 'contain' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: 9, fontWeight: 900, color: 'var(--primary)' }}>{b.title}</span>
+                    <span style={{ fontSize: 8, color: '#64748b', lineHeight: 1.2 }}>{b.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>,
@@ -494,7 +515,7 @@ function AppInner() {
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)', position: 'relative' }}>
+    <div className={themeId} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)', position: 'relative' }}>
       
       {/* Sci-Fi Ambient Glows (Light Mode) */}
       <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, var(--accent-light) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none', opacity: 0.5 }} />

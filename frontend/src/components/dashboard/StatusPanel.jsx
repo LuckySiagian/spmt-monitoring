@@ -69,13 +69,13 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            <span style={{ fontSize: 16, fontWeight: 800, fontFamily: '"Orbitron", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '1px' }} title={w.name}>
+            <span style={{ fontSize: 16, fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }} title={w.name}>
               {w.name}
             </span>
           </div>
           
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: isOnline ? 'var(--online)' : c.color, fontFamily: '"Orbitron", monospace', background: 'rgba(0,0,0,0.03)', border: `1px solid ${c.color}33`, padding: '2px 8px', borderRadius: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: isOnline ? '#00d4ff' : c.color, fontFamily: '"Inter", sans-serif', background: 'rgba(0,0,0,0.03)', border: `1px solid ${c.color}33`, padding: '2px 8px', borderRadius: 4 }}>
               {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
             </span>
           </div>
@@ -86,7 +86,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
              {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--critical)' : 'var(--text-sub)', fontFamily: '"Orbitron", monospace' }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif' }}>
               {fmtMs(w.response_time_ms)}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.03)', padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.color}15` }}>
@@ -129,7 +129,7 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
         
         {/* LIVE FEED SECTION (Top 60%) */}
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column', borderBottom: '2px solid var(--border)' }}>
-          <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, fontFamily: '"Orbitron", sans-serif', color: 'var(--accent)', letterSpacing: '2px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--primary)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 4, height: 16, background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
             ACTIVE MONITORING FEED
           </div>
@@ -151,8 +151,8 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
 
         {/* GRAPH SECTION (Bottom 40%) */}
         <div style={{ height: '40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
-           <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 800, fontFamily: '"Orbitron", sans-serif', color: 'var(--accent)', letterSpacing: '2px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 4, height: 16, background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
+           <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--primary)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 4, height: 16, background: 'var(--primary)', boxShadow: '0 0 8px var(--primary)' }} />
             GLOBAL RESPONSE TIMES
           </div>
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden', padding: '10px' }}>

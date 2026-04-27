@@ -211,10 +211,10 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     ctx.beginPath(); ctx.arc(serverX, serverY, 42, 0, Math.PI * 2)
     ctx.fillStyle = '#ffffff'; ctx.fill()
     ctx.strokeStyle = `rgba(0, 209, 178, ${pulse})`; ctx.lineWidth = 3; ctx.stroke()
-    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 18px "Orbitron", monospace'
+    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 18px "Inter", sans-serif'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
     ctx.fillText('SPMT', serverX, serverY - 6)
-    ctx.font = '12px "Orbitron", monospace'; ctx.fillStyle = 'var(--accent)'
+    ctx.font = '12px "Inter", sans-serif'; ctx.fillStyle = 'var(--accent)'
     ctx.fillText('SERVER', serverX, serverY + 12)
 
     // Website nodes
@@ -315,7 +315,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
   function drawInitial(ctx, name, nx, ny, isHov, color) {
     ctx.fillStyle = color || 'var(--text-sub)'
-    ctx.font = `900 ${isHov ? '28px' : '22px'} "Orbitron", system-ui`
+    ctx.font = `900 ${isHov ? '28px' : '22px'} "Inter", sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText((name || 'W')[0].toUpperCase(), nx, ny - 2)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { websiteAPI } from '../services/api'
 import { useAuth } from '../store/auth'
+import Badge from '../components/common/Badge'
 
 const Modal = ({ title, onClose, children }) => (
   <div style={mStyles.overlay}>
@@ -37,19 +38,7 @@ const Textarea = ({ label, ...props }) => (
   </div>
 )
 
-const StatusBadge = ({ status }) => {
-  const map = {
-    ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    CRITICAL: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-    OFFLINE: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
-  }
-  const c = map[status] || { bg: 'var(--bg-main)', color: '#4a5568', border: 'var(--border)' }
-  return (
-    <span style={{ ...wStyles.badge, background: c.bg, color: c.color, border: `1px solid ${c.border}` }}>
-      {status || 'PENDING'}
-    </span>
-  )
-}
+// Replaced local StatusBadge with common Badge component
 
 export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const { isAdmin } = useAuth()
@@ -144,7 +133,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                   </td>
                   <td style={wStyles.td} className="hide-mobile"><a href={w.url} target="_blank" rel="noreferrer" style={wStyles.link}>{w.url}</a></td>
                   <td style={wStyles.td} className="hide-mobile">{w.interval_seconds}s</td>
-                  <td style={wStyles.td}><StatusBadge status={w.status} /></td>
+                  <td style={wStyles.td}><Badge status={w.status} /></td>
                   <td style={wStyles.td} className="hide-mobile">{w.status_code ?? '—'}</td>
                   <td style={{ ...wStyles.td, color: w.response_time_ms > 3000 ? '#f59e0b' : '#10b981' }}>
                     {w.response_time_ms != null ? `${w.response_time_ms}ms` : '—'}
@@ -215,7 +204,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
 const wStyles = {
   page: { display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 8, overflow: 'hidden', background: 'var(--bg-main)' },
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '10px' },
-  title: { fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' },
+  title: { fontSize: 24, fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' },
   sub: { fontSize: 11, color: 'var(--text-muted)', marginTop: 2 },
   addBtn: {
     background: 'linear-gradient(135deg, #2563eb, #3b82f6)', color: 'var(--text)',
