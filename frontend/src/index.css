@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 *,
 *::before,
@@ -141,7 +141,7 @@ body,
   font-size: 18px; /* Increased from 16px for larger monitors */
 }
 
-/* ── Enterprise Dark Mode Background (Base) ── */
+/* â”€â”€ Enterprise Dark Mode Background (Base) â”€â”€ */
 body {
   background: var(--bg-main);
   min-height: 100vh;
@@ -170,7 +170,7 @@ body::before {
   min-height: 100vh;
 }
 
-/* ── Base Theme: Light Sci-Fi (Cyber-Clean) ── */
+/* â”€â”€ Base Theme: Light Sci-Fi (Cyber-Clean) â”€â”€ */
 :root {
   /* Core Colors */
   --primary: #001f3f; /* Deep Blue from P logo */
@@ -199,7 +199,7 @@ body::before {
   --container-padding: 24px;
 }
 
-/* ── LIGHT SCI-FI PALETTES ── */
+/* â”€â”€ LIGHT SCI-FI PALETTES â”€â”€ */
 .theme-crystal-cyan {
   --accent: #00d1b2;
   --accent-light: rgba(0, 209, 178, 0.15);
@@ -314,7 +314,7 @@ body::before {
   100% { opacity: 0.6; box-shadow: inset 0 0 5px currentColor; }
 }
 
-/* ── Status Variants (Permanent Colors) ── */
+/* â”€â”€ Status Variants (Permanent Colors) â”€â”€ */
 .metric-card.m-online   { border-left-color: #10b981 !important; color: #10b981; }
 .metric-card.m-critical { border-left-color: #f59e0b !important; color: #f59e0b; animation: hudPulse 2s infinite ease-in-out; }
 .metric-card.m-offline  { border-left-color: #ef4444 !important; color: #ef4444; animation: hudPulse 1.5s infinite ease-in-out; }
@@ -324,7 +324,7 @@ body::before {
 .metric-card.m-avg-rt   { border-left-color: #8b5cf6 !important; color: #8b5cf6; }
 .metric-card.m-alerts   { border-left-color: #f97316 !important; color: #f97316; }
 
-/* ── LIGHT THEME VARIANTS: Dark Backgrounds, Solid White Text ── */
+/* â”€â”€ LIGHT THEME VARIANTS: Dark Backgrounds, Solid White Text â”€â”€ */
 [class*="theme-light"] .metric-card { background: #f1f5f9; color: #1e293b; border-color: #e2e8f0; } /* Default fallback */
 [class*="theme-light"] .metric-card.m-online   { background: #064E3B !important; color: #ffffff !important; }
 [class*="theme-light"] .metric-card.m-critical { background: #92400E !important; color: #ffffff !important; }
@@ -335,7 +335,7 @@ body::before {
 [class*="theme-light"] .metric-card.m-avg-rt   { background: #4c1d95 !important; color: #ffffff !important; }
 [class*="theme-light"] .metric-card.m-alerts   { background: #7c2d12 !important; color: #ffffff !important; }
 
-/* ── DARK THEME VARIANTS: Bright Backgrounds, Solid Black Text ── */
+/* â”€â”€ DARK THEME VARIANTS: Bright Backgrounds, Solid Black Text â”€â”€ */
 [class*="theme-dark"] .metric-card { background: #0f172a; color: #f1f5f9; border-color: #1e293b; } /* Default fallback */
 [class*="theme-dark"] .metric-card.m-online   { background: #34D399 !important; color: #000000 !important; border-color: #10b981 !important; }
 [class*="theme-dark"] .metric-card.m-critical { background: #FBBF24 !important; color: #000000 !important; border-color: #f59e0b !important; }
@@ -346,7 +346,7 @@ body::before {
 [class*="theme-dark"] .metric-card.m-avg-rt   { background: #A78BFA !important; color: #000000 !important; border-color: #8b5cf6 !important; }
 [class*="theme-dark"] .metric-card.m-alerts   { background: #FB923C !important; color: #000000 !important; border-color: #f97316 !important; }
 
-/* ── NAV BUTTON HIGH CONTRAST SYNC ── */
+/* â”€â”€ NAV BUTTON HIGH CONTRAST SYNC â”€â”€ */
 [class*="theme-light"] .nav-btn-custom.active {
   background: #0f172a !important; /* Solid Dark */
   color: #ffffff !important;
@@ -382,7 +382,7 @@ body::before {
   margin-left: auto;
 }
 
-/* ── UI Components & Utilities ── */
+/* â”€â”€ UI Components & Utilities â”€â”€ */
 
 .glass-card {
   background: var(--bg-card);
@@ -399,7 +399,7 @@ body::before {
   box-shadow: var(--shadow-glow);
 }
 
-/* ── Scrollbar ── */
+/* â”€â”€ Scrollbar â”€â”€ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -418,7 +418,7 @@ body::before {
   background: var(--accent);
 }
 
-/* ── Buttons, Inputs, Tables ── */
+/* â”€â”€ Buttons, Inputs, Tables â”€â”€ */
 button {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
@@ -455,6 +455,84 @@ input::placeholder {
   color: var(--text-muted);
 }
 
+/* â”€â”€ INTERACTIVE ANIMATIONS â”€â”€ */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes bubbleOut {
+  0% { transform: translateY(0) scale(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-60px) scale(1.5); opacity: 0; }
+}
+
+@keyframes gentleVibrate {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(3deg); }
+  75% { transform: rotate(-3deg); }
+}
+
+@keyframes intenseVibrate {
+  0%, 100% { transform: rotate(0) scale(1.1); }
+  10%, 30%, 50%, 70%, 90% { transform: rotate(8deg) scale(1.2); }
+  20%, 40%, 60%, 80% { transform: rotate(-8deg) scale(1.2); }
+}
+
+@keyframes rainbowMove {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+.hover-float:hover {
+  transform: translateY(-8px) scale(1.05);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.bubble-wrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 10;
+}
+
+.bubble-anim {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  animation: bubbleOut 1.5s infinite ease-out;
+}
+
+.rainbow-text {
+  background: linear-gradient(
+    to right, 
+    #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rainbowMove 3s linear infinite;
+}
+
+.nav-label {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--primary);
+  opacity: 0;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.nav-btn-custom:hover .nav-label {
+  opacity: 1;
+  bottom: -18px;
+}
 /* Override table styles inside list pages */
 th {
   background: var(--bg-header) !important;
@@ -508,7 +586,7 @@ tr:hover {
   border: 1px solid rgba(255, 71, 87, 0.2);
 }
 
-/* ── Animations ── */
+/* â”€â”€ Animations â”€â”€ */
 @keyframes bgPulse {
   0% {
     opacity: 0.2;
@@ -574,7 +652,7 @@ tr:hover {
   transform: translateY(-2px);
 }
 
-/* ── TopBar & Dashboard Unified Sizing ── */
+/* â”€â”€ TopBar & Dashboard Unified Sizing â”€â”€ */
 .topbar-metrics {
   gap: 10px !important;
 }
@@ -583,7 +661,7 @@ tr:hover {
   padding: 12px 18px !important;
 }
 
-/* ── Hologram & Cyberpunk Effects ── */
+/* â”€â”€ Hologram & Cyberpunk Effects â”€â”€ */
 @keyframes radarSweep {
   from {
     transform: translate(-50%, -50%) rotate(0deg);
@@ -628,11 +706,11 @@ tr:hover {
 }
 
 
-/* ════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    RESPONSIVE (STRICT DEVICE CONTROL)
-   ════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* ── Responsive Dashboard Grid ── */
+/* â”€â”€ Responsive Dashboard Grid â”€â”€ */
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.72fr) minmax(300px, 0.28fr);
@@ -720,14 +798,14 @@ tr:hover {
   }
 }
 
-/* ── Container Responsive Defaults ── */
+/* â”€â”€ Container Responsive Defaults â”€â”€ */
 .responsive-table {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* ── Single row status panel ── */
+/* â”€â”€ Single row status panel â”€â”€ */
 .status-row-wrap {
   display: flex;
   flex-direction: column;
@@ -768,7 +846,7 @@ tr:hover {
   letter-spacing: 0.08em;
 }
 
-/* ── Image pages with hover text from bottom ── */
+/* â”€â”€ Image pages with hover text from bottom â”€â”€ */
 .page-image-wrap {
   width: 100%;
   height: 100%;
@@ -835,3 +913,11 @@ tr:hover {
   }
 }
 
+/* ── Interactive State Classes ── */
+.vibrate-gentle:hover {
+  animation: gentleVibrate 0.6s infinite ease-in-out;
+}
+
+.vibrate-intense {
+  animation: intenseVibrate 0.3s infinite ease-in-out !important;
+}

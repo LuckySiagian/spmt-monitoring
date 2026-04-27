@@ -3,7 +3,7 @@ import { publicAPI } from '../services/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 
 const SC = {
-  ONLINE: '#00f2fe',
+  ONLINE: '#117903ff',
   CRITICAL: '#f59e0b',
   OFFLINE: '#ff4757',
   ALL: '#ffffff'
@@ -221,23 +221,25 @@ const s = {
     fontFamily: '"Inter", sans-serif'
   },
   videoOverlay: {
-    position: 'absolute', inset: 0, zIndex: -1, background: '#567ec0cd'
+    position: 'absolute', inset: 0, zIndex: -1, background: '#f1f5f9'
   },
   videoBg: {
     width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8
   },
   videoTint: {
     position: 'absolute', inset: 0,
-    background: 'transparent'
+    background: 'linear-gradient(135deg, rgba(157, 156, 156, 0.26) 0%, rgba(231, 233, 234, 0.2) 100%)'
   },
   header: {
-    margin: '30px', padding: '0 40px', height: '100px',
+    margin: '20px 30px', padding: '0 40px', height: '90px',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: '20px', background: '#6b85a2fd'
+    borderRadius: '20px', background: 'rgba(12, 57, 86, 0.45)',
+    backdropFilter: 'blur(10px)', border: '1px solid rgba(84, 155, 195, 1)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
   },
   headerLeft: { display: 'flex', alignItems: 'center' },
   logoCard: {
-    background: '#e0f2fe', padding: '6px 16px', borderRadius: '12px',
+    background: '#c8d6dfff', padding: '6px 16px', borderRadius: '12px',
     boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: '1px solid #bae6fd',
     display: 'flex', alignItems: 'center', justifyContent: 'center'
   },
@@ -249,14 +251,15 @@ const s = {
     color: '#000000ff', padding: '10px 26px', borderRadius: '30px', cursor: 'pointer',
     fontSize: '11px', fontWeight: 900, letterSpacing: '0.12em',
     transition: 'all 0.3s ease',
-    boxShadow: '0 4px 15px rgba(8, 29, 190, 0.81)'
+    boxShadow: '0 4px 15px rgba(0, 0, 0, 1)'
   },
   timeContainer: { textAlign: 'right' },
   time: {
     fontSize: '24px', fontWeight: 800, lineHeight: 1,
-    fontVariantNumeric: 'tabular-nums', width: '135px', display: 'inline-block'
+    fontVariantNumeric: 'tabular-nums', width: '135px', display: 'inline-block',
+    color: '#feffffff'
   },
-  date: { fontSize: '10px', fontWeight: 700, color: 'rgba(243, 238, 238, 1)', marginTop: '4px' },
+  date: { fontSize: '10px', fontWeight: 700, color: '#d8dde5ff', marginTop: '4px' },
   main: {
     flex: 1, padding: '0 40px 20px 40px',
     overflowY: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center'
@@ -274,15 +277,24 @@ const s = {
     alignItems: 'center', justifyContent: 'center', padding: '12px 8px',
     minHeight: '135px',
     transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    cursor: 'pointer', background: 'rgba(255, 255, 255, 0.05)',
+    cursor: 'pointer', background: 'rgba(255, 255, 255, 0.47)',
     backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    border: '1px solid rgba(25, 87, 202, 0.86)',
   },
   cardTop: { marginBottom: '10px' },
   favicon: { width: '42px', height: '42px', objectFit: 'contain' },
   faviconPlaceholder: { fontSize: '40px' },
   cardBody: { textAlign: 'center' },
-  websiteName: { fontSize: '12px', fontWeight: 700, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '110px' },
+  websiteName: { 
+    fontSize: '13px', 
+    fontWeight: 800, 
+    marginBottom: '4px', 
+    whiteSpace: 'nowrap', 
+    overflow: 'hidden', 
+    textOverflow: 'ellipsis', 
+    width: '110px',
+    color: '#05153cff'
+  },
   latency: { 
     fontSize: '11px', 
     fontWeight: 800, 
@@ -294,6 +306,6 @@ const s = {
     display: 'flex', flexDirection: 'column', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)',
     paddingTop: '4px', gap: '2px'
   },
-  infoLabel: { fontSize: '7px', fontWeight: 900, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em' },
-  infoValue: { fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }
+  infoLabel: { fontSize: '7px', fontWeight: 900, color: 'rgba(15, 23, 42, 0.6)', letterSpacing: '0.05em' },
+  infoValue: { fontSize: '9px', fontWeight: 700, color: 'rgba(255, 255, 255, 1)' }
 }

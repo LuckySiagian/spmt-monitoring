@@ -95,6 +95,8 @@ export default function NotificationBell({ notifications = [], onMarkRead, onMar
   const bellRef = useRef(null)
   const unread = notifications.filter(n => !n.read).length
 
+  const [isHovered, setIsHovered] = useState(false)
+
   useEffect(() => {
     const h = e => { if (bellRef.current && bellRef.current.contains(e.target)) return; const dd = document.getElementById(DD_ID); if (dd && dd.contains(e.target)) return; setOpen(false) }
     document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h)
@@ -107,15 +109,39 @@ export default function NotificationBell({ notifications = [], onMarkRead, onMar
   return (
     <>
       <div ref={bellRef} style={{ position: 'relative', flexShrink: 0 }}>
-        <button style={{ position: 'relative', background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.2)', color: '#6366f1', borderRadius: 8, padding: '7px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.14)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(79,70,229,0.08)'}
+        <button 
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className={`bell-btn ${isHovered ? 'vibrate-gentle' : ''}`}
+          style={{ 
+            position: 'relative', background: 'rgba(79,70,229,0.08)', 
+            border: '1px solid rgba(79,70,229,0.2)', color: '#6366f1', 
+            borderRadius: 10, padding: '10px 12px', cursor: 'pointer', 
+            display: 'flex', alignItems: 'center', transition: 'all 0.2s',
+            boxShadow: isHovered ? '0 0 15px rgba(99, 102, 241, 0.2)' : 'none'
+          }}
           onClick={() => setOpen(v => !v)} title="Notifications">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg 
+            className={unread > 0 && !isHovered ? 'vibrate-intense' : ''}
+            width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            style={{ transition: 'transform 0.2s' }}
+          >
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
-          {unread > 0 && <span style={{ position: 'absolute', top: -6, right: -6, background: '#ff0000cc', color: '#fffcfcff', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px', minWidth: 16, textAlign: 'center', border: '2px solid #000000ff' }}>{unread > 99 ? '99+' : unread}</span>}
+          {unread > 0 && (
+            <span style={{ 
+              position: 'absolute', top: -8, right: -8, 
+              background: '#ff0000', color: '#fff', 
+              fontSize: '11px', fontWeight: 900, borderRadius: 12, 
+              padding: '2px 7px', minWidth: 20, textAlign: 'center', 
+              border: '2px solid #fff',
+              boxShadow: '0 2px 8px rgba(255, 0, 0, 0.4)',
+              zIndex: 10
+            }}>
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
         </button>
       </div>
       {open && <NotifDropdown notifications={notifications} unread={unread} bellRef={bellRef} onMarkAll={handleMarkAll} onItemClick={handleItemClick} onViewAll={handleViewAll} />}

@@ -150,7 +150,7 @@ const s = {
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'relative',
-    background: '#efe4e4ff'
+    background: '#e7e9ebff'
   },
   backBtn: {
     position: 'absolute',
@@ -185,7 +185,7 @@ zIndex:0
   overlay:{
     position:'absolute',
     inset:0,
-    background:'transparent',
+    background:'linear-gradient(135deg, rgba(209, 213, 223, 0.33) 0%, rgba(60, 88, 122, 0.3) 100%)',
     zIndex:1
   },
 
@@ -196,10 +196,10 @@ width:'400px',
 maxWidth:'90%',
 padding:'40px',
 borderRadius:'14px',
-background:'rgba(255, 255, 255, 0.9)',
-backdropFilter:'blur(10px)',
-border:'1px solid rgba(0,0,0,0.05)',
-boxShadow:'0 20px 60px rgba(0, 0, 0, 0.1)',
+background:'rgba(255, 255, 255, 0.95)',
+backdropFilter:'blur(15px)',
+border:'1px solid rgba(255,255,255,0.8)',
+boxShadow:'0 24px 60px rgba(0, 0, 0, 0.08)',
 display:'flex',
 flexDirection:'column',
 alignItems:'center'
