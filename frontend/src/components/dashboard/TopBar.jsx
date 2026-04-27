@@ -49,7 +49,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
           </div>
         </div>
 
-        
+
       </div>
 
       <div style={{ padding: '4px' }}>
@@ -74,13 +74,22 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
   )
 }
 
-export default function TopBar({ summary, onNavChange, activeNav, websites = [], notifications = [], onMarkRead, onMarkAllRead, navItems = ['dashboard', 'websites', 'activity-log'], onNavigate, onLogout, onSettings, onAbout, onProfile, isTvMode, onToggleTvMode }) {
+export default function TopBar({
+  summary, activeNav, onNavChange, onLogout,
+  websites, notifications, onMarkRead, onMarkAllRead, navItems = ['dashboard', 'websites', 'activity-log'], onNavigate,
+  isTvMode, onToggleTvMode, onProfile, onSettings, onAbout
+}) {
   const { user } = useAuth()
-  const { t } = useTheme()
-  const [activeMetric, setActiveMetric] = useState(null)
+  const { themeId, setTheme, t } = useTheme()
   const [clock, setClock] = useState(new Date())
+  const [showLogout, setShowLogout] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [showTheme, setShowTheme] = useState(false)
   const [profileRect, setProfileRect] = useState(null)
+  const [activeMetric, setActiveMetric] = useState(null)
+  const [hoveredMetric, setHoveredMetric] = useState(null)
+  const [hoveredNav, setHoveredNav] = useState(null)
+  const [isClockHovered, setIsClockHovered] = useState(false)
   const [avatar, setAvatar] = useState(() => localStorage.getItem(`spmt_avatar_${user?.username}`) || null)
   const profileRef = useRef(null)
 
@@ -137,16 +146,16 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
   return (
     <>
       <div className="topbar" style={{
-        display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
-        padding: '0 32px', minHeight: '80px', position: 'relative', zIndex: 100
+        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        padding: '0 22px', minHeight: '80px', position: 'relative', zIndex: 100
       }}>
 
         {/* ── BRANDING SECTION (Logo Only) ── */}
         <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-          <div style={{ 
-            display: 'flex', alignItems: 'center', 
+          <div style={{
+            display: 'flex', alignItems: 'center',
             background: '#e0f2fe', padding: '6px 14px', borderRadius: '12px',
-            border: '1px solid #bae6fd', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+            border: '1px solid #bae6fd', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.87)'
           }}>
             <img src="/images/logos/lo.png" alt="Logo"
               style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
@@ -163,20 +172,22 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           {metrics.map(m => {
             const active = activeMetric === m.label
             const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
-            
+
             // Generate clean class names for each metric type
             const labelKey = m.label.toUpperCase().replace(/\s+/g, '-');
-            const statusClass = labelKey.includes('ONLINE') ? 'online' : 
-                               labelKey.includes('CRITICAL') ? 'critical' : 
-                               labelKey.includes('OFFLINE') ? 'offline' : 
-                               labelKey.includes('SLA') ? 'sla' : 
-                               labelKey.includes('TOTAL') ? 'total' : 
-                               labelKey.includes('AVG-RT') ? 'avg-rt' : 
-                               labelKey.includes('ALERTS') ? 'alerts' : 'unknown';
+            const statusClass = labelKey.includes('ONLINE') ? 'online' :
+              labelKey.includes('CRITICAL') ? 'critical' :
+                labelKey.includes('OFFLINE') ? 'offline' :
+                  labelKey.includes('SLA') ? 'sla' :
+                    labelKey.includes('TOTAL') ? 'total' :
+                      labelKey.includes('AVG-RT') ? 'avg-rt' :
+                        labelKey.includes('ALERTS') ? 'alerts' : 'unknown';
 
             return (
               <div key={m.label} title={`Detail ${m.label}`}
-                className={`metric-card m-${statusClass}`}
+                className={`metric-card m-${statusClass} hover-float`}
+                onMouseEnter={() => setHoveredMetric(m.label)}
+                onMouseLeave={() => setHoveredMetric(null)}
                 style={{
                   cursor: 'pointer', userSelect: 'none',
                   display: 'flex',
@@ -191,14 +202,29 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                   width: '100%',
                   color: m.color,
                   borderRadius: 10,
-                  transition: 'all 0.3s ease',
-                  position: 'relative'
+                  transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  position: 'relative',
+                  zIndex: hoveredMetric === m.label ? 100 : 1
                 }}
                 onClick={() => setActiveMetric(active ? null : m.label)}>
 
+                {/* Bubble Animation */}
+                {hoveredMetric === m.label && (
+                  <div className="bubble-wrap">
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} className="bubble-anim" style={{
+                        left: `${Math.random() * 80 + 10}%`,
+                        width: `${Math.random() * 10 + 4}px`,
+                        height: `${Math.random() * 10 + 4}px`,
+                        animationDelay: `${Math.random() * 1}s`
+                      }} />
+                    ))}
+                  </div>
+                )}
+
                 {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#ff4d4f', animation: 'pulse 1s infinite' }} />}
 
-                <span style={{ fontSize: '26px', fontWeight: 800, lineHeight: 1 }}>{m.value}</span>
+                <span style={{ fontSize: '16px', fontWeight: 800, lineHeight: 1 }}>{m.value}</span>
                 <span style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.1 }}>{m.label}</span>
               </div>
             )
@@ -208,22 +234,29 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
         {/* ── NAVIGATION SECTION (Pill Style) ── */}
         <div className="topbar-nav-container" style={{ marginLeft: 'auto', marginRight: 'auto' }}>
           <div className="topbar-nav" style={{
-            display: 'flex', gap: 3, background: '#a9a89aff',
-            borderRadius: '25px', padding: '4px', height: '58px', flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            display: 'flex', gap: 1, background: '#24411762',
+            borderRadius: '25px', padding: '4px', height: '54px', flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(53, 188, 218, 0.73)'
           }}>
             {navItems.map(tab => (
               <button key={tab} title={navTitle(tab)}
                 className={`nav-btn-custom ${activeNav === tab ? 'active' : ''}`}
+                onMouseEnter={() => setHoveredNav(tab)}
+                onMouseLeave={() => setHoveredNav(null)}
                 style={{
                   background: activeNav === tab ? 'var(--primary)' : 'transparent',
                   border: 'none',
                   color: activeNav === tab ? '#fff' : 'rgba(255,255,255,0.6)',
-                  fontSize: '18px', padding: '0 16px', borderRadius: '20px',
-                  cursor: 'pointer', height: '100%', transition: 'all 0.2s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  fontSize: '22px', padding: '0 20px', borderRadius: '20px',
+                  cursor: 'pointer', height: '100%', transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'relative',
+                  transform: hoveredNav === tab ? 'scale(1.2) translateY(-5px)' : 'scale(1)'
                 }}
-                onClick={() => onNavChange(tab)}>{navIcon(tab)}</button>
+                onClick={() => onNavChange(tab)}>
+                {navIcon(tab)}
+                <span className="nav-label">{navTitle(tab)}</span>
+              </button>
             ))}
           </div>
         </div>
@@ -241,11 +274,11 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
               e.currentTarget.style.transform = 'scale(1)';
               e.currentTarget.style.boxShadow = '0 0 4px rgba(0,0,0,0.1)';
             }}
-            style={{ 
-              position: 'fixed', top: '8px', right: '8px', zIndex: 99999,
+            style={{
+              position: 'fixed', top: '4px', right: '6px', zIndex: 99999,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 24, height: 24, borderRadius: 4, 
-              background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(8px)',
+              width: 20, height: 20, borderRadius: 5,
+              background: 'rgba(228, 235, 241, 1)', backdropFilter: 'blur(8px)',
               border: '1px solid var(--accent)', color: 'var(--accent)',
               cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
               boxShadow: '0 0 4px rgba(0,0,0,0.1)'
@@ -263,8 +296,12 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
-          <div style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: '160px' }}>
-            <div style={{ color: 'var(--primary)', fontSize: '22px', fontWeight: 800, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+          <div
+            onMouseEnter={() => setIsClockHovered(true)}
+            onMouseLeave={() => setIsClockHovered(false)}
+            className="hover-float"
+            style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: '160px', transition: 'all 0.3s ease' }}>
+            <div className={isClockHovered ? 'rainbow-text' : ''} style={{ color: 'var(--primary)', fontSize: '22px', fontWeight: 800, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>

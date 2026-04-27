@@ -138,7 +138,7 @@ function SettingsModal({ onClose }) {
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, background: 'var(--bg-header)', borderBottomLeftRadius: 14, borderBottomRightRadius: 14 }}>
           <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-          <button onClick={save} style={{ background: 'var(--accent)', border: 'none', color: '#000', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)' }}>Save & Apply</button>
+          <button onClick={save} style={{ background: 'var(--accent)', border: 'none', color: '#ffffffff', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)' }}>Save & Apply</button>
         </div>
       </div>
     </div>,
@@ -183,7 +183,7 @@ function AboutModal({ onClose }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {[
                 { img: 'pelindo.png', title: 'PELINDO', desc: 'Integrasi layanan pelabuhan nasional.' },
-                { img: 'danan.png', title: 'DANAN', desc: 'Inovasi teknologi digital terintegrasi.' },
+                { img: 'danan.png', title: 'DANANTARA', desc: 'Inovasi teknologi digital terintegrasi.' },
                 { img: 'bumn', title: 'BUMN', desc: 'Transformasi digital ekonomi nasional.' },
                 { img: 'akhlak', title: 'AKHLAK', desc: 'Nilai inti budaya kerja yang luhur.' }
               ].map(b => (
@@ -496,7 +496,7 @@ function AppInner() {
           onLogin={() => {
             setLoggedIn(true)
             toggleAuthView(false)
-            showToast('Login berhasil! Selamat datang, ' + (user?.username || 'User'), 'success')
+            showToast('Login Successfully')
           }} 
           onBack={() => toggleAuthView(false)}
         />
