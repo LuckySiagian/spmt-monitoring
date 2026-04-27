@@ -56,9 +56,7 @@ export function ThemeProvider({ children }) {
   const [lang] = useState('en')
   const [themeId, setThemeId] = useState(() => localStorage.getItem('spmt_theme') || 'theme-light')
 
-  useEffect(() => {
-    document.documentElement.className = themeId
-  }, [themeId])
+  // The theme is now applied locally in App.jsx to prevent affecting Public/Login pages
 
   const setTheme = useCallback((id) => {
     setThemeId(id)

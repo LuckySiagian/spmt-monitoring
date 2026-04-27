@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react'
 import { userAPI, userAdminAPI } from '../services/api'
 import { useAuth } from '../store/auth'
 
+import Badge from '../components/common/Badge'
+
 const RoleBadge = ({ role }) => {
   const map = {
-    superadmin: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: 'rgba(139,92,246,0.3)' },
-    admin: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: 'rgba(59,130,246,0.3)' },
-    viewer: { bg: 'rgba(148,163,184,0.1)', color: 'var(--text-sub)', border: 'rgba(148,163,184,0.2)' },
+    superadmin: { color: '#8b5cf6', label: 'SUPERADMIN' },
+    admin: { color: '#3b82f6', label: 'ADMIN' },
+    viewer: { color: 'var(--text-muted)', label: 'VIEWER' },
   }
   const c = map[role] || map.viewer
   return (
-    <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>
-      {role?.toUpperCase()}
+    <span style={{ 
+      background: `${c.color}15`, color: c.color, border: `1px solid ${c.color}33`, 
+      borderRadius: 6, padding: '4px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '0.05em' 
+    }}>
+      {c.label}
     </span>
   )
 }
@@ -124,9 +129,10 @@ export default function UsersPage({ users, onUserUpdate }) {
           <table style={styles.table}>
             <thead>
               <tr>
-                {['USERNAME', 'ROLE', 'CREATED AT', 'ACTIONS'].map(h => (
-                  <th key={h} style={styles.th}>{h}</th>
-                ))}
+                <th style={styles.th}>USERNAME</th>
+                <th style={styles.th}>ROLE</th>
+                <th style={styles.th} className="hide-mobile">CREATED AT</th>
+                <th style={styles.th}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -147,7 +153,7 @@ export default function UsersPage({ users, onUserUpdate }) {
                     </div>
                   </td>
                   <td style={styles.td}><RoleBadge role={u.role} /></td>
-                  <td style={{ ...styles.td, color: 'var(--text-muted)', fontSize: 11 }}>
+                  <td className="hide-mobile" style={{ ...styles.td, color: 'var(--text-muted)', fontSize: 11 }}>
                     {new Date(u.created_at).toLocaleString('id-ID')}
                   </td>
                   <td style={styles.td}>
@@ -242,7 +248,7 @@ export default function UsersPage({ users, onUserUpdate }) {
 const styles = {
   page: { display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 8, overflow: 'hidden', background: 'var(--bg-main)' },
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '10px' },
-  title: { fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' },
+  title: { fontSize: 24, fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' },
   sub: { fontSize: 11, color: 'var(--text-muted)', marginTop: 2 },
   addBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: 'var(--text)', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', cursor: 'pointer' },
   actionMsg: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 6, padding: '8px 14px', fontSize: 12, flexShrink: 0 },

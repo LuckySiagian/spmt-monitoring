@@ -37,10 +37,10 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
       </div>
 
       <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>SELECT THEME</div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>CHOSE THEME</div>
 
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>LIGHT MODE</div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>Themes</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {lightThemes.map(t => (
               <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
@@ -49,15 +49,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
           </div>
         </div>
 
-        <div>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>DARK MODE</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {darkThemes.map(t => (
-              <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
-                style={{ width: 24, height: 24, borderRadius: '50%', background: t.color, border: themeId === t.id ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
-            ))}
-          </div>
-        </div>
+        
       </div>
 
       <div style={{ padding: '4px' }}>
@@ -111,14 +103,14 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
   const alertCount = summary?.active_alerts ?? 0
   const metrics = [
-    { label: t?.online || 'ONLINE', value: summary?.online_count ?? 0, color: 'var(--online)' },
-    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: 'var(--critical)' },
-    { label: t?.offline || 'OFFLINE', value: summary?.offline_count ?? 0, color: 'var(--offline)' },
-    { label: t?.unknown || 'UNKNOWN', value: summary?.unknown_count ?? 0, color: 'var(--text-muted)' },
-    { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: 'var(--accent)' },
-    { label: t?.total || 'TOTAL', value: summary?.total_websites ?? 0, color: 'var(--text-sub)' },
-    { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#7c3aed' },
-    { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? 'var(--offline)' : 'var(--text-muted)' },
+    { label: t?.online || 'ONLINE', value: summary?.online_count ?? 0, color: '#10b981' },
+    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: '#f59e0b' },
+    { label: t?.offline || 'OFFLINE', value: summary?.offline_count ?? 0, color: '#ef4444' },
+    { label: t?.unknown || 'UNKNOWN', value: summary?.unknown_count ?? 0, color: '#94a3b8' },
+    { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#0ea5e9' },
+    { label: t?.total || 'TOTAL', value: summary?.total_websites ?? 0, color: '#64748b' },
+    { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#8b5cf6' },
+    { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? '#ef4444' : '#94a3b8' },
   ]
 
   const slaPct = Number(summary?.sla_percent || 100);
@@ -151,17 +143,13 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
         {/* ── BRANDING SECTION (Logo Only) ── */}
         <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
-          <div style={{
-            height: '100%', padding: '0 8px 0 0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          <div style={{ 
+            display: 'flex', alignItems: 'center', 
+            background: '#e0f2fe', padding: '6px 14px', borderRadius: '12px',
+            border: '1px solid #bae6fd', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
           }}>
-            <div style={{
-              background: '#0a74ff30', padding: '4px 12px', borderRadius: '0 10px 10px 0',
-              boxShadow: '2px 0 8px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <img src="/images/logos/lo.png" alt="SPMT"
-                style={{ height: 64, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
-            </div>
+            <img src="/images/logos/lo.png" alt="Logo"
+              style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
           </div>
         </div>
 
@@ -195,7 +183,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  background: active ? `${m.color}33` : 'rgba(0,0,0,0.03)',
+                  background: active ? `${m.color}55` : `${m.color}44`,
                   borderColor: m.color,
                   borderWidth: '1px',
                   borderStyle: 'solid',
@@ -217,22 +205,23 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
           })}
         </div>
 
-        {/* ── NAVIGATION SECTION (Region Locked: 35%) ── */}
-        <div className="topbar-nav-container">
+        {/* ── NAVIGATION SECTION (Pill Style) ── */}
+        <div className="topbar-nav-container" style={{ marginLeft: 'auto', marginRight: 'auto' }}>
           <div className="topbar-nav" style={{
-            display: 'flex', gap: 6, background: 'var(--accent-light)', border: '1px solid var(--border)',
-            borderRadius: 8, padding: 3, height: 50, flexShrink: 0
+            display: 'flex', gap: 3, background: '#a9a89aff',
+            borderRadius: '25px', padding: '4px', height: '58px', flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}>
             {navItems.map(tab => (
               <button key={tab} title={navTitle(tab)}
                 className={`nav-btn-custom ${activeNav === tab ? 'active' : ''}`}
                 style={{
-                  background: activeNav === tab ? 'var(--bg-card)' : 'transparent',
-                  border: activeNav === tab ? '1px solid var(--border)' : '1px solid transparent',
-                  color: activeNav === tab ? 'var(--accent)' : 'var(--text-sub)',
-                  fontSize: 22, padding: '0 14px', borderRadius: 6,
-                  cursor: 'pointer', height: '100%', whiteSpace: 'nowrap', boxShadow: activeNav === tab ? '0 4px 10px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  background: activeNav === tab ? 'var(--primary)' : 'transparent',
+                  border: 'none',
+                  color: activeNav === tab ? '#fff' : 'rgba(255,255,255,0.6)',
+                  fontSize: '18px', padding: '0 16px', borderRadius: '20px',
+                  cursor: 'pointer', height: '100%', transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}
                 onClick={() => onNavChange(tab)}>{navIcon(tab)}</button>
             ))}
@@ -274,12 +263,12 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
 
           <NotificationBell notifications={notifications} onMarkRead={onMarkRead} onMarkAllRead={onMarkAllRead} onNavigate={onNavigate} />
 
-          <div style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ color: 'var(--accent)', fontSize: 20, fontWeight: 800, fontFamily: '"Orbitron", monospace', letterSpacing: '0.08em', lineHeight: 1.1 }}>
+          <div style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: '160px' }}>
+            <div style={{ color: 'var(--primary)', fontSize: '22px', fontWeight: 800, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
-            <div style={{ color: 'var(--text-sub)', fontSize: 10, fontWeight: 700, letterSpacing: '0.02em', marginTop: 2 }}>
-              {clock.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            <div style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>
+              {clock.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
             </div>
           </div>
 
@@ -288,7 +277,7 @@ export default function TopBar({ summary, onNavChange, activeNav, websites = [],
             <button onClick={() => { setShowProfile(v => !v); if (profileRef.current) setProfileRect(profileRef.current.getBoundingClientRect()) }}
               className="hover-glow"
               style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--accent-light)', border: `1px solid var(--border)`, borderRadius: 25, padding: '6px 16px 6px 6px', cursor: 'pointer' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: rc, flexShrink: 0, textShadow: `0 0 5px ${rc}`, overflow: 'hidden' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: rc, flexShrink: 0, overflow: 'hidden' }}>
                 {avatar ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (user?.username || '?')[0].toUpperCase()}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>

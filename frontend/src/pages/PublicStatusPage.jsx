@@ -3,9 +3,62 @@ import { publicAPI } from '../services/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 
 const SC = {
-  ONLINE: 'var(--online)',
-  CRITICAL: 'var(--critical)',
-  OFFLINE: 'var(--offline)',
+  ONLINE: '#00f2fe',
+  CRITICAL: '#f59e0b',
+  OFFLINE: '#ff4757',
+  ALL: '#ffffff'
+}
+
+const videos = [
+  "/images/background/bg1.MP4",
+  "/images/background/bg2.MP4"
+]
+
+const CircularProgress = ({ value, total, color, label, isActive, onClick }) => {
+  const size = 70
+  const strokeWidth = 6
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const progress = total > 0 ? (value / total) * circumference : 0
+
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer',
+        padding: '8px 16px', borderRadius: '12px',
+        background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+        transition: 'all 0.3s ease',
+        border: isActive ? `1px solid ${color}44` : '1px solid transparent'
+      }}>
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={strokeWidth} />
+          <circle
+            cx={size / 2} cy={size / 2} r={radius} fill="none"
+            stroke={color} strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference - progress}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
+          />
+        </svg>
+        <div style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '14px', fontWeight: 800, color: '#fff'
+        }}>
+          {value}
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', minWidth: '60px' }}>
+        <span style={{ fontSize: '9px', fontWeight: 900, color: '#fff', letterSpacing: '0.15em', opacity: 0.8 }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+          <span style={{ fontSize: '20px', fontWeight: 900, color: '#fff' }}>{value}</span>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/ {total}</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function PublicStatusPage({ onLoginClick }) {
@@ -13,8 +66,36 @@ export default function PublicStatusPage({ onLoginClick }) {
   const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [filter, setFilter] = useState('ALL')
+  const [videoIndex, setVideoIndex] = useState(0)
 
-  // Clock effect
+  const handleVideoEnd = () => {
+    setVideoIndex((prev) => (prev + 1) % videos.length)
+  }
+
+  const getStatusInfo = (w) => {
+    if (w.status === 'OFFLINE') return 'TIMEOUT | OFFLINE'
+
+    const code = w.status_code || 200
+    const ms = w.response_time_ms > 0 ? `${w.response_time_ms}ms` : '---'
+
+    let msg = 'OK'
+    if (code === 404) msg = 'NOT FOUND'
+    else if (code >= 500) msg = 'SERVER ERR'
+    else if (code >= 400) msg = 'ERROR'
+
+    return `${code} ${msg} | ${ms}`
+  }
+
+  const getFavicon = (website) => {
+    if (website.favicon_url) return website.favicon_url;
+    try {
+      const domain = new URL(website.url).hostname;
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+    } catch (e) {
+      return null;
+    }
+  }
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
@@ -24,11 +105,8 @@ export default function PublicStatusPage({ onLoginClick }) {
     try {
       const res = await publicAPI.getStatus()
       setWebsites(res.data || [])
-    } catch (e) {
-      console.error('Failed to load public status', e)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
@@ -38,483 +116,184 @@ export default function PublicStatusPage({ onLoginClick }) {
   }, [loadData])
 
   const handleWsMessage = useCallback((msg) => {
-    if (msg.type === 'monitor_update' || msg.type === 'status_change') {
-      loadData()
-    }
+    if (msg.type === 'monitor_update' || msg.type === 'status_change') loadData()
   }, [loadData])
 
   useWebSocket(handleWsMessage)
 
   const stats = {
+    all: websites.length,
     online: websites.filter(w => w.status === 'ONLINE').length,
     critical: websites.filter(w => w.status === 'CRITICAL').length,
     offline: websites.filter(w => w.status === 'OFFLINE').length,
   }
 
-  const filteredWebsites = websites.filter(w => {
-    if (filter === 'ALL') return true
-    return w.status === filter
-  })
-
-  const formatDateTime = (date) => {
-    return date.toLocaleString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  }
+  const filteredWebsites = websites.filter(w => filter === 'ALL' || w.status === filter)
 
   return (
     <div style={s.root}>
-      {/* HUD Background elements */}
-      <div style={s.bgGlow1} />
-      <div style={s.bgGlow2} />
-      <div style={s.gridOverlay} />
+      {/* BACKGROUND VIDEO OVERLAY */}
+      <div style={s.videoOverlay}>
+        <video
+          autoPlay muted playsInline
+          onEnded={handleVideoEnd}
+          className="night-port-video"
+          style={s.videoBg}
+          src={videos[videoIndex]}
+        />
+        <div style={s.videoTint} />
+      </div>
 
-      {/* Navbar Section */}
-      <nav style={s.nav}>
-        <div style={s.logoGroup}>
-          <div style={s.logoWrapper}>
-            <img src="/images/logos/lo.png" alt="PLTM-S Logo" style={s.logoImg} />
-          </div>
-          
-          {/* Header Status Metrics - Moved here */}
-          <div style={s.headerStats}>
-            <div className={`status-box all ${filter === 'ALL' ? 'active' : ''}`} 
-                 onClick={() => setFilter('ALL')}
-                 style={{...s.hudStatItem, color: 'var(--accent)', cursor: 'pointer'}}>
-              <span style={s.hudStatLabel}>ALL</span>
-              <span style={s.hudStatValue}>{websites.length}</span>
-            </div>
-            <div className={`status-box online ${filter === 'ONLINE' ? 'active' : ''}`} 
-                 onClick={() => setFilter(filter === 'ONLINE' ? 'ALL' : 'ONLINE')}
-                 style={{...s.hudStatItem, color: SC.ONLINE, cursor: 'pointer'}}>
-              <span style={s.hudStatLabel}>ONLINE</span>
-              <span style={s.hudStatValue}>{stats.online}</span>
-            </div>
-            <div className={`status-box critical ${filter === 'CRITICAL' ? 'active' : ''}`}
-                 onClick={() => setFilter(filter === 'CRITICAL' ? 'ALL' : 'CRITICAL')}
-                 style={{...s.hudStatItem, color: SC.CRITICAL, cursor: 'pointer'}}>
-              <span style={s.hudStatLabel}>CRITICAL</span>
-              <span style={s.hudStatValue}>{stats.critical}</span>
-            </div>
-            <div className={`status-box offline ${filter === 'OFFLINE' ? 'active' : ''}`}
-                 onClick={() => setFilter(filter === 'OFFLINE' ? 'ALL' : 'OFFLINE')}
-                 style={{...s.hudStatItem, color: SC.OFFLINE, cursor: 'pointer'}}>
-              <span style={s.hudStatLabel}>OFFLINE</span>
-              <span style={s.hudStatValue}>{stats.offline}</span>
-            </div>
+      {/* TOP HEADER PANEL */}
+      <div className="glass-panel" style={s.header}>
+        <div style={s.headerLeft}>
+          <div style={s.logoCard}>
+            <img src="/images/logos/lo.png" alt="Logo" style={s.logo} />
           </div>
         </div>
 
-        <div style={s.navRight}>
-          <button className="cyber-btn" onClick={onLoginClick}>
-            <span>LOGIN SYSTEM</span>
+        <div style={s.headerCenter}>
+          <CircularProgress label="ALL" value={stats.all} total={stats.all} color={SC.ALL} isActive={filter === 'ALL'} onClick={() => setFilter('ALL')} />
+          <CircularProgress label="ONLINE" value={stats.online} total={stats.all} color={SC.ONLINE} isActive={filter === 'ONLINE'} onClick={() => setFilter('ONLINE')} />
+          <CircularProgress label="CRITICAL" value={stats.critical} total={stats.all} color={SC.CRITICAL} isActive={filter === 'CRITICAL'} onClick={() => setFilter('CRITICAL')} />
+          <CircularProgress label="OFFLINE" value={stats.offline} total={stats.all} color={SC.OFFLINE} isActive={filter === 'OFFLINE'} onClick={() => setFilter('OFFLINE')} />
+        </div>
+
+        <div style={s.headerRight}>
+          <button onClick={onLoginClick} style={s.loginBtn} className="hover-lift">
+            Log-In
           </button>
-          <div style={s.clockBox}>
-             <div style={s.clockLabel}>SYSTEM TIME</div>
-             <div style={s.clockTime}>{currentTime.toLocaleTimeString('id-ID', { hour12: false })}</div>
-             <div style={s.clockDate}>{currentTime.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
+          <div style={s.timeContainer}>
+            <div style={s.time}>{currentTime.toLocaleTimeString('id-ID', { hour12: false })}</div>
+            <div style={s.date}>{currentTime.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}</div>
           </div>
         </div>
-      </nav>
+      </div>
 
-      <main style={s.main}>
-
-        {/* Services Grid - Boxes */}
+      {/* MAIN GRID */}
+      <div style={s.main}>
         <div style={s.grid}>
-          {loading ? (
-             [1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} style={s.skeleton} />)
-          ) : (
-            filteredWebsites.map((w, idx) => {
-              let statusColor = SC.ONLINE;
-              if (w.status === 'CRITICAL') statusColor = SC.CRITICAL;
-              if (w.status === 'OFFLINE') statusColor = SC.OFFLINE;
+          {filteredWebsites.map((w) => {
+            const finalFavicon = getFavicon(w);
+            return (
+              <div key={w.id} className="glass-panel neon-underglow-teal ripple-card hover-expand" style={s.card}>
+                <div className="ripple-wave" />
 
-              const domain = w.url ? w.url.replace('https://', '').replace('http://', '').split('/')[0] : '';
+                {/* Air Bubbles Effect */}
+                <div className="bubble" style={{ left: '10%', width: '10px', height: '10px', animationDelay: '0s' }} />
+                <div className="bubble" style={{ left: '30%', width: '6px', height: '6px', animationDelay: '0.4s' }} />
+                <div className="bubble" style={{ left: '50%', width: '12px', height: '12px', animationDelay: '0.8s' }} />
+                <div className="bubble" style={{ left: '70%', width: '8px', height: '8px', animationDelay: '1.2s' }} />
+                <div className="bubble" style={{ left: '85%', width: '5px', height: '5px', animationDelay: '1.6s' }} />
 
-              return (
-                <div key={w.id} className="diamond-node" style={{ 
-                  animationDelay: `${idx * 0.05}s`, 
-                  '--status-color': statusColor 
-                }}>
-                  <div className="diamond-shape">
-                    <div className="diamond-content">
-                       <img 
-                         src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} 
-                         style={s.nodeIcon} 
-                         alt=""
-                         onError={(e) => e.target.style.display = 'none'}
-                       />
-                       <div style={{...s.nodeName, color: statusColor}}>{w.name}</div>
-                       <div style={s.nodeLatency}>{w.status === 'OFFLINE' ? 'OFFLINE' : `${w.response_time_ms || 0}ms`}</div>
+                <div className="card-content-wrap">
+                  <div style={s.cardTop}>
+                    {finalFavicon ? (
+                      <img src={finalFavicon} alt="" style={s.favicon} />
+                    ) : (
+                      <div style={s.faviconPlaceholder}>🌐</div>
+                    )}
+                  </div>
+                  <div style={s.cardBody}>
+                    <div style={s.websiteName}>{w.name}</div>
+                    <div style={{ 
+                      ...s.latency, 
+                      color: w.status === 'ONLINE' ? SC.ONLINE : w.status === 'OFFLINE' ? SC.OFFLINE : SC.CRITICAL,
+                      filter: `drop-shadow(0 0 8px ${w.status === 'ONLINE' ? SC.ONLINE : w.status === 'OFFLINE' ? SC.OFFLINE : SC.CRITICAL}44)`
+                    }}>
+                      {getStatusInfo(w)}
                     </div>
                   </div>
                 </div>
-              )
-            })
-          )}
+              </div>
+            )
+          })}
         </div>
-      </main>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;600;700&display=swap');
-
-        @keyframes cyberFadeIn {
-          0% { opacity: 0; transform: translateY(20px) scale(0.95); filter: blur(5px); }
-          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-        }
-        @keyframes pulseGlow {
-          0% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.2); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        
-        .cyber-btn {
-          position: relative;
-          padding: 10px 24px;
-          background: rgba(0, 163, 255, 0.1);
-          border: 1px solid #00a3ff;
-          cursor: pointer;
-          overflow: hidden;
-          transition: all 0.3s ease;
-          clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .cyber-btn span {
-          position: relative;
-          z-index: 2;
-          color: var(--accent);
-          font-family: 'Rajdhani', sans-serif;
-          font-size: 14px;
-          font-weight: 700;
-          letter-spacing: 2px;
-        }
-
-        .cyber-btn:hover {
-          background: var(--accent-light);
-          box-shadow: 0 0 15px var(--accent-light) inset;
-        }
-
-        .cyber-btn::before {
-          content: '';
-          position: absolute;
-          top: 0; left: -100%;
-          width: 50%; height: 100%;
-          background: linear-gradient(90deg, transparent, var(--accent-light), transparent);
-          transform: skewX(-45deg);
-          transition: left 0.5s ease;
-          z-index: 1;
-        }
-
-        .cyber-btn:hover::before {
-          left: 150%;
-        }
-
-        .node-card {
-          background: var(--bg-card);
-          border: 1px solid var(--border);
-          display: flex;
-          flex-direction: column;
-          position: relative;
-          overflow: hidden;
-          backdrop-filter: blur(10px);
-          animation: cyberFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          opacity: 0;
-          transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
-          clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px));
-        }
-
-        .node-card:hover { transform: translateY(-5px); }
-
-        .diamond-node {
-          width: 125px;
-          height: 125px;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          animation: cyberFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          opacity: 0;
-        }
-
-        .diamond-shape {
-          width: 100px;
-          height: 100px;
-          background: var(--bg-card);
-          border: 2px solid var(--status-color);
-          transform: rotate(45deg);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.3s ease;
-          box-shadow: 0 0 10px var(--status-color)11;
-          position: relative;
-        }
-
-        .diamond-node:hover .diamond-shape {
-          transform: rotate(45deg) scale(1.1);
-          box-shadow: 0 0 20px var(--status-color)55;
-          background: white;
-        }
-
-        .status-box.active {
-          background: white;
-          border: 2px solid currentColor;
-          box-shadow: 0 0 15px currentColor;
-          transform: scale(1.05);
-        }
-
-        .diamond-content {
-          transform: rotate(-45deg);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          width: 100%;
-        }
-
-        .status-box {
-          border: 1px solid currentColor;
-          background: rgba(255,255,255,0.8);
-          padding: 8px 16px;
-          border-radius: 8px;
-          transition: all 0.3s;
-          min-width: 100px;
-        }
-        .status-box:hover {
-          background: white;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px currentColor;
-        }
-        .status-box.online { animation: glowPulseOnline 2s infinite; }
-        .status-box.critical { animation: glowPulseCritical 2s infinite; }
-        .status-box.offline { animation: glowPulseOffline 2s infinite; }
-
-        @keyframes glowPulseOnline { 0%, 100% { box-shadow: 0 0 5px var(--online); } 50% { box-shadow: 0 0 15px var(--online); } }
-        @keyframes glowPulseCritical { 0%, 100% { box-shadow: 0 0 5px var(--critical); } 50% { box-shadow: 0 0 15px var(--critical); } }
-        @keyframes glowPulseOffline { 0%, 100% { box-shadow: 0 0 5px var(--offline); } 50% { box-shadow: 0 0 15px var(--offline); } }
-      `}</style>
+      </div>
     </div>
   )
 }
 
 const s = {
   root: {
-    width: '100%',
-    minHeight: '100vh',
-    background: 'var(--bg-main)',
-    backgroundImage: `linear-gradient(rgba(241, 245, 249, 0.3), rgba(241, 245, 249, 0.3)), url('/at-pelindo-bg.png')`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundAttachment: 'fixed',
-    color: 'var(--text)',
-    fontFamily: '"Rajdhani", "Inter", sans-serif',
-    display: 'flex',
-    flexDirection: 'column',
-    position: 'relative',
-    overflowX: 'hidden'
+    width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative',
+    display: 'flex', flexDirection: 'column', color: '#fff',
+    fontFamily: '"Inter", sans-serif'
   },
-  logoGroup: { display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1 },
-  logoWrapper: {
-    padding: '4px',
-    maxWidth: '200px',
-    display: 'flex',
-    alignItems: 'center'
+  videoOverlay: {
+    position: 'absolute', inset: 0, zIndex: -1, background: '#567ec0cd'
   },
-  logoImg: { height: '80px', maxWidth: '100%', objectFit: 'contain' },
-  navRight: { display: 'flex', alignItems: 'center', gap: '20px', zIndex: 1 },
-  bgGlow2: {
-    display: 'none'
+  videoBg: {
+    width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8
   },
-  gridOverlay: {
-    position: 'absolute',
-    inset: 0,
-    backgroundImage: 'linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px)',
-    backgroundSize: '40px 40px',
-    zIndex: 0,
-    pointerEvents: 'none',
-    opacity: 0.5
+  videoTint: {
+    position: 'absolute', inset: 0,
+    background: 'transparent'
   },
-  nav: {
-    padding: '0 40px',
-    height: '110px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: 'var(--bg-header)',
-    borderBottom: '2px solid var(--border)',
-    backdropFilter: 'blur(15px)',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100,
-    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)'
+  header: {
+    margin: '30px', padding: '0 40px', height: '100px',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    borderRadius: '20px', background: '#6b85a2fd'
   },
-  headerStats: {
-    display: 'flex',
-    gap: '20px',
-    marginLeft: '30px'
+  headerLeft: { display: 'flex', alignItems: 'center' },
+  logoCard: {
+    background: '#e0f2fe', padding: '6px 16px', borderRadius: '12px',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.1)', border: '1px solid #bae6fd',
+    display: 'flex', alignItems: 'center', justifyContent: 'center'
   },
-  clockBox: {
-    background: 'rgba(0,0,0,0.03)',
-    border: '1px solid var(--border)',
-    padding: '6px 16px',
-    borderRadius: '10px',
-    textAlign: 'center',
-    minWidth: '140px'
+  logo: { height: '48px', width: 'auto', objectFit: 'contain' },
+  headerCenter: { display: 'flex', gap: '20px', alignItems: 'center', flexShrink: 0 },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '30px', flexShrink: 0 },
+  loginBtn: {
+    background: 'rgba(181, 208, 4, 0.83)', border: '1px solid rgba(255,255,255,0.3)',
+    color: '#000000ff', padding: '10px 26px', borderRadius: '30px', cursor: 'pointer',
+    fontSize: '11px', fontWeight: 900, letterSpacing: '0.12em',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 15px rgba(8, 29, 190, 0.81)'
   },
-  clockLabel: { fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '1px' },
-  clockTime: { fontSize: '20px', fontWeight: 800, fontFamily: '"Orbitron", monospace', color: 'var(--accent)' },
-  clockDate: { fontSize: '10px', color: 'var(--text-sub)', fontWeight: 600 },
+  timeContainer: { textAlign: 'right' },
+  time: {
+    fontSize: '24px', fontWeight: 800, lineHeight: 1,
+    fontVariantNumeric: 'tabular-nums', width: '135px', display: 'inline-block'
+  },
+  date: { fontSize: '10px', fontWeight: 700, color: 'rgba(243, 238, 238, 1)', marginTop: '4px' },
   main: {
-    flex: 1,
-    padding: '20px 3%',
-    maxWidth: '1800px',
-    margin: '0 auto',
-    width: '100%',
-    boxSizing: 'border-box',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-    position: 'relative',
-    zIndex: 1
-  },
-  dashboardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '24px 40px',
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border)',
-    boxShadow: 'var(--shadow)',
-    backdropFilter: 'blur(8px)',
-    clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))'
-  },
-  hudTitle: {
-    fontSize: '18px',
-    fontWeight: 700,
-    fontFamily: '"Orbitron", sans-serif',
-    color: 'var(--text)',
-    letterSpacing: '3px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '15px'
-  },
-  hudTitleDecor: {
-    width: '4px',
-    height: '24px',
-    background: 'var(--accent)',
-    boxShadow: '0 0 10px var(--accent-light)'
-  },
-  hudStats: {
-    display: 'flex',
-    gap: '50px'
-  },
-  hudStatItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  hudStatLabel: {
-    fontSize: '11px',
-    fontWeight: 600,
-    letterSpacing: '3px',
-    opacity: 0.9,
-    textShadow: '0 0 5px rgba(0,0,0,0.5)'
-  },
-  hudStatValue: {
-    fontSize: '32px',
-    fontWeight: 700,
-    fontFamily: '"Orbitron", monospace'
+    flex: 1, padding: '0 40px 20px 40px',
+    overflowY: 'hidden', display: 'flex', alignItems: 'flex-start', justifyContent: 'center'
   },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(10, 1fr)',
     gap: '12px',
-    padding: '10px 0'
-  },
-  nodeHeader: {
-    padding: '20px 24px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottom: '1px solid rgba(255,255,255,0.05)'
-  },
-  nodeIcon: { width: 45, height: 45, marginBottom: 2, borderRadius: '4px' },
-  nodeLatency: { fontSize: '9px', fontWeight: 700, fontFamily: '"Orbitron", monospace', marginTop: 1 },
-  nodeName: {
-    fontSize: '14px',
-    fontWeight: 800,
-    letterSpacing: '0.2px',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    maxWidth: '90px'
-  },
-  nodeStatusBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    background: 'rgba(0,0,0,0.5)',
-    padding: '4px 12px',
-    borderRadius: '4px',
-    border: '1px solid rgba(255,255,255,0.1)'
-  },
-  statusDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    animation: 'pulseGlow 2s infinite'
-  },
-  nodeBody: {
-    padding: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-    position: 'relative'
-  },
-  nodeDataRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: '10px',
-    borderBottom: '1px dotted rgba(255,255,255,0.1)'
-  },
-  dataLabel: {
-    fontSize: '11px',
-    color: '#64748b',
-    fontWeight: 600,
-    letterSpacing: '2px'
-  },
-  dataValue: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: 'var(--text-sub)',
-    fontFamily: '"Orbitron", monospace',
-    textAlign: 'right'
-  },
-  nodeFooterBar: {
-    height: '4px',
+    padding: '10px',
     width: '100%',
-    position: 'absolute',
-    bottom: 0,
-    left: 0
+    maxWidth: '1800px'
   },
-  skeleton: {
-    height: '180px',
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(0, 163, 255, 0.1)',
-    animation: 'pulseGlow 2s infinite',
-    clipPath: 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))'
-  }
+  card: {
+    position: 'relative', borderRadius: '14px', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', padding: '12px 8px',
+    minHeight: '135px',
+    transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    cursor: 'pointer', background: 'rgba(255, 255, 255, 0.05)',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+  },
+  cardTop: { marginBottom: '10px' },
+  favicon: { width: '42px', height: '42px', objectFit: 'contain' },
+  faviconPlaceholder: { fontSize: '40px' },
+  cardBody: { textAlign: 'center' },
+  websiteName: { fontSize: '12px', fontWeight: 700, marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '110px' },
+  latency: { 
+    fontSize: '11px', 
+    fontWeight: 800, 
+    letterSpacing: '0.12em', 
+    lineHeight: '1.6',
+    marginBottom: '8px' 
+  },
+  extraInfo: {
+    display: 'flex', flexDirection: 'column', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.05)',
+    paddingTop: '4px', gap: '2px'
+  },
+  infoLabel: { fontSize: '7px', fontWeight: 900, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.05em' },
+  infoValue: { fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }
 }
-

@@ -59,9 +59,7 @@ export default function LoginPage({ onLogin, onBack }) {
         }
       `}</style>
 
-      <button onClick={onBack} style={s.backBtn} className="back-btn-animated">
-        <span>← BACK</span>
-      </button>
+      {/* BACK BUTTON REMOVED FROM TOP */}
 
       {/* VIDEO BACKGROUND */}
       <video
@@ -69,6 +67,7 @@ export default function LoginPage({ onLogin, onBack }) {
         muted
         playsInline
         onEnded={handleVideoEnd}
+        className="night-port-video"
         style={s.video}
         src={videos[videoIndex]}
       />
@@ -81,9 +80,9 @@ export default function LoginPage({ onLogin, onBack }) {
         {/* LOGO */}
         <div style={s.logoWrap}>
           <img
-            src="/images/logos/logo spmt fc.png"
+            src="/images/logos/lo.png"
             style={s.logo}
-            alt="SPMT Logo"
+            alt="Pelindo Logo"
           />
         </div>
 
@@ -121,22 +120,19 @@ export default function LoginPage({ onLogin, onBack }) {
 
         </form>
 
-        {/* BRAND LOGOS */}
-        <div style={s.brandRow}>
+        {/* BRAND LOGOS REMOVED - MOVED TO ABOUT SECTION */}
 
-          <div style={s.brandBox}>
-            <img src="/images/logos/danan.png" style={s.brandLogo}/>
-          </div>
-
-          <div style={s.brandBox}>
-            <img src="/images/logos/bumn.png" style={s.brandLogo}/>
-          </div>
-
-          <div style={s.brandBox}>
-            <img src="/images/logos/akhlak.png" style={s.brandLogo}/>
-          </div>
-
-        </div>
+        {/* BACK TO MONITORING LINK */}
+        <button 
+          onClick={onBack} 
+          style={{ 
+            marginTop: '24px', background: 'none', border: 'none', 
+            color: 'var(--primary)', fontSize: '12px', fontWeight: 700, 
+            cursor: 'pointer', textDecoration: 'underline' 
+          }}
+        >
+          Back To Home
+        </button>
 
       </div>
 
@@ -154,17 +150,17 @@ const s = {
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'relative',
-    background: '#ffffff'
+    background: '#efe4e4ff'
   },
   backBtn: {
     position: 'absolute',
-    top: '30px',
-    right: '30px',
+    top: '60px',
+    right: '150px',
     zIndex: 100,
-    padding: '10px 22px',
-    background: 'rgba(255, 255, 255, 0.7)',
+    padding: '15px 30px',
+    background: 'rgba(190, 190, 190, 0.7)',
     backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(37, 99, 235, 0.3)',
+    border: '1px solid rgba(37, 235, 195, 0.77)',
     borderRadius: '30px',
     color: 'var(--text)',
     fontSize: '12px',
@@ -173,7 +169,7 @@ const s = {
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
+    boxShadow: '0 8px 32px rgba(152, 234, 65, 1)'
   },
 
 video:{
@@ -186,24 +182,24 @@ objectFit:'cover',
 zIndex:0
 },
 
-overlay:{
-position:'absolute',
-inset:0,
-background:'rgba(255,255,255,0.3)',
-zIndex:1
-},
+  overlay:{
+    position:'absolute',
+    inset:0,
+    background:'transparent',
+    zIndex:1
+  },
 
 card:{
 position:'relative',
 zIndex:2,
-width:'420px',
-maxWidth:'95%',
+width:'400px',
+maxWidth:'90%',
 padding:'40px',
-borderRadius:'24px',
-background:'rgba(255, 255, 255, 0.65)',
-backdropFilter:'blur(20px)',
-border:'1px solid rgba(255,255,255,0.4)',
-boxShadow:'0 24px 80px rgba(0, 0, 0, 0.15)',
+borderRadius:'14px',
+background:'rgba(255, 255, 255, 0.9)',
+backdropFilter:'blur(10px)',
+border:'1px solid rgba(0,0,0,0.05)',
+boxShadow:'0 20px 60px rgba(0, 0, 0, 0.1)',
 display:'flex',
 flexDirection:'column',
 alignItems:'center'
@@ -214,12 +210,12 @@ marginBottom:'20px'
 },
 
 logo:{
-height:'80px',
-background:'#ffffff',
+height:'90px',
+background:'#fdfefeff',
 padding: '10px 20px',
 borderRadius: '12px',
-border:'1px solid var(--border)',
-boxShadow:'0 8px 30px rgba(0,0,0,0.08)',
+border:'1px solid #d4c4c4ff',
+boxShadow:'0 8px 30px rgba(0,0,0,0.05)',
 objectFit:'contain'
 },
 
@@ -257,15 +253,15 @@ transition: 'all 0.2s'
 btn:{
 marginTop:'14px',
 padding:'14px',
-borderRadius:'12px',
+borderRadius:'8px',
 border:'none',
-background:'linear-gradient(135deg,#2563eb,#3b82f6)',
+background: 'var(--primary)',
 color:'#ffffff',
 fontSize: '14px',
 fontWeight:800,
 letterSpacing: '0.05em',
 cursor:'pointer',
-boxShadow: '0 4px 15px rgba(37, 99, 235, 0.3)'
+boxShadow: '0 4px 15px rgba(0, 31, 63, 0.2)'
 },
 
 error:{
@@ -279,25 +275,8 @@ fontSize:'11px',
 color:'var(--text-muted)'
 },
 
-brandRow:{
-marginTop:'28px',
-display:'flex',
-gap:'5px'
-},
-
-brandBox:{
-background:'#ffffff',
-padding:'6px 12px',
-border: '1px solid var(--border)',
-borderRadius:'20px',
-display:'flex',
-alignItems:'center',
-boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
-},
-
-brandLogo:{
-height:'24px',
-objectFit:'contain'
-}
+  brandRow:{
+    display: 'none'
+  }
 
 }

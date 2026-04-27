@@ -132,6 +132,7 @@ func (h *Handler) GetPublicWebsites(w http.ResponseWriter, r *http.Request) {
 		Name           string          `json:"name"`
 		URL            string          `json:"url"`
 		Status         model.LogStatus `json:"status"`
+		StatusCode     *int            `json:"status_code"`
 		ResponseTimeMs *int            `json:"response_time_ms"`
 		LastChecked    *time.Time      `json:"last_checked"`
 	}
@@ -147,6 +148,7 @@ func (h *Handler) GetPublicWebsites(w http.ResponseWriter, r *http.Request) {
 			Name:           s.Name,
 			URL:            s.URL,
 			Status:         status,
+			StatusCode:     s.StatusCode,
 			ResponseTimeMs: s.ResponseTimeMs,
 			LastChecked:    s.LastChecked,
 		})
