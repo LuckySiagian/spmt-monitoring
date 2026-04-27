@@ -29,7 +29,8 @@ function calcStarLayout(websites) {
   return websites.map((w, i) => {
     const angle = (i / Math.max(websites.length, 1)) * Math.PI * 2 - Math.PI / 2
     // Reduced max radius from 0.44 to 0.38 to provide 12% safe padding on edges
-    const radius = Math.min(0.38, 0.28 + websites.length * 0.004)
+    // Increased base radius from 0.34 to 0.38 to spread nodes further from center
+    const radius = Math.min(0.46, 0.38 + websites.length * 0.002)
     return {
       id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
       x: 0.5 + radius * Math.cos(angle),
@@ -63,7 +64,7 @@ function calcTreeLayout(websites) {
 
   rows.forEach((rowSize, ri) => {
     // y: first row at 0.10, spread to 0.46 max
-    const y = totalRows === 1 ? 0.22 : 0.10 + (ri / (totalRows - 1)) * 0.36
+    const y = totalRows === 1 ? 0.22 : 0.08 + (ri / (totalRows - 1)) * 0.52
 
     for (let ci = 0; ci < rowSize; ci++) {
       const w = websites[idx++]
@@ -75,7 +76,7 @@ function calcTreeLayout(websites) {
       result.push({
         id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
         x: Math.min(0.92, Math.max(0.08, x)),
-        y: Math.min(0.50, Math.max(0.08, y)),
+        y: Math.min(0.65, Math.max(0.08, y)),
         rowIdx: ri,
       })
     }
@@ -278,16 +279,16 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const baseFontSize = 14 * canvasScale
       const hoverFontSize = 18 * canvasScale
       
-      const name = node.name.length > 15 ? node.name.slice(0, 14) + '…' : node.name
-      const labelY = ny + r + 8
+      const name = node.name.length > 18 ? node.name.slice(0, 16) + '…' : node.name
+      const labelY = ny + r + (isHov ? 14 : 12)
       const isDark = themeId && themeId.includes('dark')
 
       // Font weight changes on hover
       ctx.font = `${(isSel || isHov) ? '900' : '700'} ${isHov ? Math.max(14, hoverFontSize + 4) : Math.max(12, baseFontSize + 4)}px system-ui`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
 
-      // Label Box
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
+      // Label Box - Increased opacity and better shadow
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.98)'
       ctx.strokeStyle = isHov ? color : 'rgba(0, 0, 0, 0.08)'
       ctx.lineWidth = isHov ? 2 : 1
       ctx.beginPath()

@@ -22,14 +22,23 @@ const Input = ({ label, ...props }) => (
   </div>
 )
 
-const Select = ({ label, options, ...props }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
-    <label style={mStyles.label}>{label}</label>
-    <select style={mStyles.input} {...props}>
-      {options.map(opt => <option key={opt.val} value={opt.val}>{opt.lbl}</option>)}
-    </select>
-  </div>
-)
+const Select = ({ label, options, value, onChange, ...props }) => {
+  const exists = options.some(opt => opt.val === value)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
+      <label style={mStyles.label}>{label}</label>
+      <select 
+        style={mStyles.input} 
+        value={value} 
+        onChange={e => onChange(parseInt(e.target.value))} 
+        {...props}
+      >
+        {!exists && value && <option value={value}>{value} Seconds (Current)</option>}
+        {options.map(opt => <option key={opt.val} value={opt.val}>{opt.lbl}</option>)}
+      </select>
+    </div>
+  )
+}
 
 const Textarea = ({ label, ...props }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
@@ -45,12 +54,12 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const [showAdd, setShowAdd] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 3 })
+  const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 60 })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const openAdd = () => {
-    setForm({ name: '', url: '', description: '', interval_seconds: 3 })
+    setForm({ name: '', url: '', description: '', interval_seconds: 60 })
     setError('')
     setShowAdd(true)
   }
@@ -97,11 +106,19 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
       <div style={wStyles.header}>
         <div>
           <div style={wStyles.title}>Website Management</div>
-          <div style={wStyles.sub}>{websites.length} websites configured</div>
+          <div style={wStyles.sub}>{websites.length} / 50 websites configured</div>
         </div>
         {isAdmin && (
-          <button style={wStyles.addBtn} onClick={openAdd}>
-            + ADD WEBSITE
+          <button 
+            style={{ 
+              ...wStyles.addBtn, 
+              opacity: websites.length >= 50 ? 0.5 : 1,
+              cursor: websites.length >= 50 ? 'not-allowed' : 'pointer'
+            }} 
+            onClick={websites.length >= 50 ? null : openAdd}
+            title={websites.length >= 50 ? 'Limit 50 websites reached' : 'Add new website'}
+          >
+            {websites.length >= 50 ? 'Limit Reached' : '+ Add Website'}
           </button>
         )}
       </div>
@@ -169,11 +186,11 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
             <Select 
               label="MONITORING INTERVAL" 
               value={form.interval_seconds} 
-              onChange={e => setForm(f => ({ ...f, interval_seconds: parseInt(e.target.value) }))}
+              onChange={val => setForm(f => ({ ...f, interval_seconds: val }))}
               options={[
-                { val: 1, lbl: '1 Second (Ultra Fast)' },
-                { val: 2, lbl: '2 Seconds (Fast)' },
-                { val: 3, lbl: '3 Seconds (Standard NOC)' },
+                { val: 30, lbl: '30 Seconds (Fast)' },
+                { val: 60, lbl: '60 Seconds (Recommended)' },
+                { val: 120, lbl: '120 Seconds (Normal)' },
               ]}
             />
             {error && <div style={mStyles.error}>{error}</div>}
