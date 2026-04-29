@@ -82,7 +82,13 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
               </tr>
             ) : filtered.map((w, i) => {
               const domain = (() => { try { return new URL(w.url).hostname } catch { return w.url } })()
-              const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+              const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) || 
+                                 domain.endsWith('.pelindo.co.id') || 
+                                 domain.endsWith('.pelindomultiterminal.co.id')
+              
+              const faviconUrl = shouldSkip ? null : `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+              const initial = (w.name || 'W')[0].toUpperCase()
+
               return (
                 <tr
                   key={w.id}
@@ -91,12 +97,16 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
                 >
                   <td style={styles.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <img
-                        src={faviconUrl} width={14} height={14}
-                        style={{ borderRadius: 2, flexShrink: 0 }}
-                        onError={e => e.target.style.display = 'none'}
-                        alt=""
-                      />
+                      {faviconUrl ? (
+                        <img
+                          src={faviconUrl} width={14} height={14}
+                          style={{ borderRadius: 2, flexShrink: 0 }}
+                          onError={e => e.target.style.display = 'none'}
+                          alt=""
+                        />
+                      ) : (
+                        <div style={{ width: 14, height: 14, borderRadius: 2, background: 'var(--accent-light)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800 }}>{initial}</div>
+                      )}
                       <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 11 }}>{w.name}</span>
                     </div>
                   </td>

@@ -69,16 +69,23 @@ const BADGE = {
 
 function Favicon({ url, name }) {
   const domain = getDomain(url)
+  // Skip Google Favicon API for internal/private domains to avoid console 404s
+  const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) ||
+    domain.endsWith('.pelindo.co.id') ||
+    domain.endsWith('.pelindomultiterminal.co.id')
+
   const initial = (name || 'W')[0].toUpperCase()
   return (
     <div style={{ width: 32, height: 32, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: 'rgba(99,102,241,0.1)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-      <img
-        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-        width={22} height={22} alt=""
-        style={{ display: 'block' }}
-        onError={e => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex' }}
-      />
-      <span style={{ display: 'none', position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
+      {!shouldSkip ? (
+        <img
+          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+          width={22} height={22} alt=""
+          style={{ display: 'block' }}
+          onError={e => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex' }}
+        />
+      ) : null}
+      <span style={{ display: shouldSkip ? 'flex' : 'none', position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
         {initial}
       </span>
     </div>
@@ -120,7 +127,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            <span style={{ fontSize: 16, fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }} title={w.name}>
+            <span style={{ fontSize: 'clamp(13px, 2vw, 16px)', fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }} title={w.name}>
               {w.name}
             </span>
           </div>
@@ -133,11 +140,11 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'monospace', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>
+          <span style={{ fontSize: 'clamp(10px, 1.5vw, 12px)', fontWeight: 600, fontFamily: 'monospace', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>
             {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif' }}>
+            <span style={{ fontSize: 'clamp(11px, 1.5vw, 14px)', fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif' }}>
               {fmtMs(w.response_time_ms)}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.03)', padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.color}15` }}>
