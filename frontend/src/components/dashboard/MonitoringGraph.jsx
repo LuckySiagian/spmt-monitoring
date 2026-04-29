@@ -153,7 +153,7 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
             <span style={{ fontSize:11 }}>Menunggu data...</span>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <AreaChart data={data} margin={{ top:60, right:12, left:-14, bottom:0 }}>
               <defs>
                 <linearGradient id="gOn" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#059669" stopOpacity={0.3}/><stop offset="95%" stopColor="#059669" stopOpacity={0.02}/></linearGradient>

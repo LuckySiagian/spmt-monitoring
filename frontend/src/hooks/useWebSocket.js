@@ -43,7 +43,13 @@ export function useWebSocket(onMessage) {
   useEffect(() => {
     connect()
     return () => {
-      wsRef.current?.close()
+      if (wsRef.current) {
+        if (wsRef.current.readyState === WebSocket.CONNECTING) {
+          wsRef.current.onopen = () => wsRef.current.close();
+        } else {
+          wsRef.current.close();
+        }
+      }
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
     }
   }, [connect])

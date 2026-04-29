@@ -111,13 +111,19 @@ export default function TopBar({
   }, [])
 
   const alertCount = summary?.active_alerts ?? 0
+  const onlineCount = websites.filter(w => w.status === 'ONLINE').length
+  const criticalCount = websites.filter(w => w.status === 'CRITICAL').length
+  const offlineCount = websites.filter(w => w.status === 'OFFLINE').length
+  const unknownCount = websites.filter(w => !w.status || w.status === 'UNKNOWN').length
+  const totalCount = websites.length
+
   const metrics = [
-    { label: t?.online || 'ONLINE', value: summary?.online_count ?? 0, color: '#10b981' },
-    { label: t?.critical || 'CRITICAL', value: summary?.critical_count ?? 0, color: '#f59e0b' },
-    { label: t?.offline || 'OFFLINE', value: summary?.offline_count ?? 0, color: '#ef4444' },
-    { label: t?.unknown || 'UNKNOWN', value: summary?.unknown_count ?? 0, color: '#94a3b8' },
+    { label: t?.online || 'ONLINE', value: onlineCount, color: '#10b981' },
+    { label: t?.critical || 'CRITICAL', value: criticalCount, color: '#f59e0b' },
+    { label: t?.offline || 'OFFLINE', value: offlineCount, color: '#ef4444' },
+    { label: t?.unknown || 'UNKNOWN', value: unknownCount, color: '#94a3b8' },
     { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#0ea5e9' },
-    { label: t?.total || 'TOTAL', value: summary?.total_websites ?? 0, color: '#64748b' },
+    { label: t?.total || 'TOTAL', value: totalCount, color: '#64748b' },
     { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#8b5cf6' },
     { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? '#ef4444' : '#94a3b8' },
   ]

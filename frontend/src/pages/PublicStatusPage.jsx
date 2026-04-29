@@ -168,7 +168,19 @@ export default function PublicStatusPage({ onLoginClick }) {
   const [showInfo, setShowInfo] = useState(false)
 
   const handleWsMessage = useCallback((msg) => {
-    if (msg.type === 'monitor_update' || msg.type === 'status_change') loadData()
+    if (msg.type === 'monitor_update') {
+      const p = msg.payload
+      setWebsites(prev => {
+        const updated = [...prev]
+        const idx = updated.findIndex(w => w.id === p.website_id)
+        if (idx !== -1) {
+          updated[idx] = { ...updated[idx], status: p.status, status_code: p.status_code, response_time_ms: p.response_time_ms, ssl_valid: p.ssl_valid, last_checked: p.checked_at, ip_address: p.ip_address, root_cause: p.root_cause }
+        }
+        return updated
+      })
+    } else if (msg.type === 'status_change') {
+      loadData()
+    }
   }, [loadData])
 
   useWebSocket(handleWsMessage)

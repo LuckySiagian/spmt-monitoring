@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 *,
 *::before,
@@ -292,7 +292,7 @@ body::before {
 }
 
 .metric-card span:first-child {
-  font-size: 18px !important; 
+  font-size: clamp(14px, 2.5vw, 18px) !important; 
   font-weight: 3000;
   font-family: 'JetBrains Mono', monospace;
   margin-right: 8px;
@@ -300,7 +300,7 @@ body::before {
 }
 
 .metric-card span:last-child {
-  font-size: 10px !important; 
+  font-size: clamp(8px, 1.5vw, 10px) !important; 
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -725,8 +725,9 @@ tr:hover {
 /* TABLET BREAKPOINT (max-width: 1024px) */
 @media (max-width: 1024px) {
   .dashboard-grid {
-    grid-template-columns: 1fr;
-    overflow-y: auto !important;
+    display: flex;
+    flex-direction: column;
+    overflow-y: visible !important;
     height: auto !important;
     gap: 16px;
   }
@@ -769,9 +770,8 @@ tr:hover {
   }
   .topbar-metrics { 
     width: 100%;
-    display: flex !important;
-    justify-content: flex-start !important;
-    flex-wrap: nowrap !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px !important;
     padding-bottom: 8px;
   }

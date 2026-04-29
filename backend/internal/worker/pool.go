@@ -36,6 +36,8 @@ type Pool struct {
 	mu         sync.Mutex
 	ctx        context.Context
 	cancel     context.CancelFunc
+	localNet   bool
+	lastCheck  time.Time
 }
 
 func NewPool(repo *repository.Repository, hub *ws.Hub, workerSize int) *Pool {
@@ -48,6 +50,7 @@ func NewPool(repo *repository.Repository, hub *ws.Hub, workerSize int) *Pool {
 		tickers:    make(map[uuid.UUID]*time.Ticker),
 		ctx:        ctx,
 		cancel:     cancel,
+		localNet:   true,
 	}
 }
 
@@ -227,6 +230,27 @@ func tcpCheck(host string, port int) bool {
 	return true
 }
 
+// ── Local Connectivity Check ─────────────────────────────────
+func (p *Pool) checkLocalConnectivity() bool {
+	p.mu.Lock()
+	if time.Since(p.lastCheck) < 10*time.Second {
+		status := p.localNet
+		p.mu.Unlock()
+		return status
+	}
+	p.mu.Unlock()
+
+	// Try to resolve a highly reliable host
+	_, err := net.LookupHost("google.com")
+	ok := err == nil
+	
+	p.mu.Lock()
+	p.localNet = ok
+	p.lastCheck = time.Now()
+	p.mu.Unlock()
+	return ok
+}
+
 // ── Main check flow: DNS→ICMP→TCP→HTTP→SSL→RESPONSE ──────────
 func (p *Pool) check(w model.Website) {
 	start := time.Now()
@@ -234,7 +258,18 @@ func (p *Pool) check(w model.Website) {
 		WebsiteID: w.ID,
 		CheckedAt: start,
 		Status:    model.StatusUnknown,
-		RootCause: "Monitoring not completed",
+		RootCause: "Initializing check...",
+	}
+
+	// ── PRE-CHECK: Local Network Health ──────────────────────
+	localOK := p.checkLocalConnectivity()
+	if !localOK {
+		errMsg := "Local monitor connectivity issue (Network Down/Unstable)"
+		logEntry.ErrorMessage = &errMsg
+		logEntry.Status = model.StatusUnknown
+		logEntry.RootCause = "MONITOR_OFFLINE: Jaringan lokal/komputer monitoring bermasalah."
+		p.saveAndBroadcast(w, logEntry)
+		return
 	}
 
 	// ── Validate URL ──────────────────────────────────────────
@@ -392,61 +427,61 @@ func diagnoseConnError(errMsg string) string {
 	msg := strings.ToLower(errMsg)
 	switch {
 	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline"):
-		return "Connection timeout"
+		return "Koneksi ke server terlalu lama (Timeout)"
 	case strings.Contains(msg, "connection refused"):
-		return "TCP port closed"
+		return "Port layanan (80/443) tertutup atau diblokir"
 	case strings.Contains(msg, "no such host"):
-		return "DNS lookup failed"
+		return "Domain tidak terdaftar atau DNS bermasalah"
 	case strings.Contains(msg, "too many redirects"):
-		return "Too many redirects"
+		return "Website mengalami perulangan redirect (Loop)"
 	case strings.Contains(msg, "certificate"):
-		return "SSL validation failed"
+		return "Sertifikat SSL tidak valid atau sudah kadaluarsa"
 	default:
-		return "Service unreachable"
+		return "Gagal menghubungi server"
 	}
 }
 
 func diagnoseRootCause(l *model.MonitoringLog) string {
 	switch l.Status {
 	case model.StatusOnline:
-		return "Service healthy - All checks passed"
+		return "SISTEM NORMAL: Seluruh parameter (Layer 7) berjalan optimal."
 	case model.StatusUnknown:
 		if l.ErrorMessage != nil {
 			return *l.ErrorMessage
 		}
-		return "Monitoring task incomplete"
+		return "CEK TERHENTI: Proses pengecekan kondisi tidak selesai."
 	case model.StatusOffline:
 		if !l.DNSResolved {
-			return "DNS resolution failed"
+			return "LEVEL SISTEM: Domain tidak ditemukan (DNS Fail). Periksa registrasi domain."
 		}
 		if !l.ICMPStatus && !l.TCPPortOpen {
-			return "Network routing issue / Host unreachable"
+			return "LEVEL SERVER: Koneksi ke server terputus total (Unreachable). Cek fisik server/jaringan."
 		}
 		if !l.TCPPortOpen {
-			return "Service port (80/443) closed"
+			return "LEVEL SISTEM: Port layanan (80/443) tertutup. Web server (Nginx/Apache) mungkin mati."
 		}
 		if l.ErrorMessage != nil {
-			return diagnoseConnError(*l.ErrorMessage)
+			return "LEVEL APLIKASI: " + diagnoseConnError(*l.ErrorMessage)
 		}
 		if l.StatusCode != nil && *l.StatusCode >= 400 {
-			return fmt.Sprintf("HTTP %d Client Error (Service Active)", *l.StatusCode)
+			return fmt.Sprintf("LEVEL APLIKASI (Layer 7): Akses ditolak oleh sistem (HTTP %d).", *l.StatusCode)
 		}
-		return "Service unreachable"
+		return "KONDISI OFFLINE: Website tidak dapat dijangkau."
 	case model.StatusCritical:
 		if l.StatusCode != nil && *l.StatusCode >= 200 && *l.StatusCode < 400 {
 			if !l.SSLValid {
-				return "Security Alert: Invalid SSL Certificate (Reachable in Browser)"
+				return "LEVEL KEAMANAN: Sertifikat SSL Invalid/Expired. Risiko keamanan tinggi!"
 			}
 			if l.ResponseTimeMs != nil && *l.ResponseTimeMs >= 3000 {
-				return "Performance Alert: High latency detected"
+				return "LEVEL APLIKASI: Performa melambat (Degraded). Aplikasi butuh optimasi."
 			}
 		}
 		if l.StatusCode != nil && *l.StatusCode >= 500 {
-			return fmt.Sprintf("Server Error: HTTP %d response", *l.StatusCode)
+			return fmt.Sprintf("LEVEL APLIKASI: Error pada kode sistem internal (HTTP %d).", *l.StatusCode)
 		}
-		return "Service degraded"
+		return "KONDISI KRITIS: Layanan terganggu namun masih merespons."
 	}
-	return "Indeterminate cause"
+	return "Indikasi tidak diketahui secara pasti."
 }
 
 func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) {

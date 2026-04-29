@@ -90,11 +90,11 @@ function SettingsModal({ onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '18px 20px', maxHeight: '65vh', overflowY: 'auto' }}>
-          
+
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 16 }}>🎨 SCI-FI THEME SELECTION</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 24 }}>
             {THEME_OPTIONS.map(theme => (
-              <div 
+              <div
                 key={theme.id}
                 onClick={() => handleThemeChange(theme.id)}
                 style={{
@@ -292,6 +292,43 @@ function ProfileModal({ user, onClose }) {
   )
 }
 
+// ── Network Status Alert ─────────────────────────────────────────
+function NetworkAlert({ isOffline, isSlow }) {
+  if (!isOffline && !isSlow) return null
+
+  return createPortal(
+    <div style={{
+      position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 1000000, width: 'min(400px, 90vw)',
+      background: isOffline ? 'rgba(239, 68, 68, 0.95)' : 'rgba(245, 158, 11, 0.95)',
+      backdropFilter: 'blur(12px)', color: '#fff', padding: '16px 20px',
+      borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.3), 0 0 20px rgba(239,68,68,0.2)',
+      border: `1px solid ${isOffline ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)'}`,
+      display: 'flex', gap: 16, alignItems: 'center',
+      animation: 'slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+    }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: 12, background: 'rgba(255,255,255,0.2)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+        animation: 'pulse 1.5s infinite'
+      }}>
+        {isOffline ? '📡' : '⏳'}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: '0.02em', marginBottom: 2 }}>
+          {isOffline ? 'KONEKSI TERPUTUS!' : 'KONEKSI LELET / TIDAK STABIL'}
+        </div>
+        <div style={{ fontSize: 11, opacity: 0.9, lineHeight: 1.4, fontWeight: 600 }}>
+          {isOffline 
+            ? 'Silakan cek koneksi WiFi atau data seluler di perangkat Anda segera.' 
+            : 'Jaringan Anda sedang lambat. Monitoring mungkin tidak update secara real-time.'}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 function getInitialNav() {
   const saved = localStorage.getItem('spmt_active_nav')
   return ['dashboard', 'websites', 'activity-log', 'users'].includes(saved) ? saved : 'dashboard'
@@ -316,6 +353,31 @@ function AppInner() {
   const [isTvMode, setTvMode] = useState(false)
   const [wsConnected, setWsConnected] = useState(false)
   const [globalRefreshKey, setGlobalRefreshKey] = useState(0)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [isSlow, setIsSlow] = useState(false)
+
+  // Monitor Browser Connectivity
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    // Check for slow connection (if supported)
+    if (navigator.connection) {
+      const updateConn = () => {
+        const type = navigator.connection.effectiveType
+        setIsSlow(type === 'slow-2g' || type === '2g' || type === '3g')
+      }
+      navigator.connection.addEventListener('change', updateConn)
+      updateConn()
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const websitesRef = useRef(websites)
   useEffect(() => { websitesRef.current = websites }, [websites])
@@ -327,17 +389,6 @@ function AppInner() {
     localStorage.setItem('spmt_auth_mode', show ? 'true' : 'false')
   }
 
-  useEffect(() => {
-    const h = () => { 
-      setLoggedIn(false); 
-      toggleAuthView(false); // Reset to public view on logout
-      setSummary(null); 
-      setWebsites([]); 
-      setNotifications([]);
-    }
-    window.addEventListener('auth:logout', h)
-    return () => window.removeEventListener('auth:logout', h)
-  }, [])
 
   useEffect(() => {
     const fn = () => {
@@ -392,14 +443,14 @@ function AppInner() {
     } catch (e) { }
   }, [])
 
-  const loadSummary = useCallback(async (signal) => { 
-    if (!loggedIn) return; 
-    try { 
-      const r = await dashboardAPI.getSummary({ signal }); 
-      setSummary(r.data) 
+  const loadSummary = useCallback(async (signal) => {
+    if (!loggedIn) return;
+    try {
+      const r = await dashboardAPI.getSummary({ signal });
+      setSummary(r.data)
     } catch (err) {
       if (err.name === 'CanceledError' || err.name === 'AbortError') return;
-    } 
+    }
   }, [loggedIn])
 
   const loadWebsites = useCallback(async (signal) => {
@@ -428,42 +479,39 @@ function AppInner() {
     } catch (e) { }
   }, [loggedIn])
 
-  const triggerGlobalRefresh = useCallback(() => {
+  const triggerGlobalRefresh = useCallback(async () => {
     setGlobalRefreshKey(k => k + 1)
-  }, [])
+    await Promise.all([loadSummary(), loadWebsites(), loadEvents(), loadUsers()])
+  }, [loadSummary, loadWebsites, loadEvents, loadUsers])
 
-  const handleWebsiteUpdate = useCallback(() => { 
-    loadSummary(); 
-    loadWebsites(); 
-    loadEvents();
-    triggerGlobalRefresh();
-    setRefreshTrigger(t => t + 1) 
-  }, [loadSummary, loadWebsites, loadEvents, triggerGlobalRefresh])
+  const handleWebsiteUpdate = useCallback(async () => {
+    await triggerGlobalRefresh();
+    setRefreshTrigger(t => t + 1)
+  }, [triggerGlobalRefresh])
 
   const handleUserUpdate = useCallback(() => {
     loadUsers();
     triggerGlobalRefresh();
   }, [loadUsers, triggerGlobalRefresh])
 
-  useEffect(() => { 
+  useEffect(() => {
     if (!loggedIn) return;
     const controller = new AbortController();
-    loadSummary(controller.signal); 
-    loadWebsites(controller.signal);
-    loadUsers();
-    loadEvents();
     
-    const ivSummary = setInterval(() => loadSummary(controller.signal), 2000); 
-    const ivWebsites = setInterval(() => loadWebsites(controller.signal), 30000); 
-    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, 60000); // 1m fallback
-    
+    // Initial Load - Parallel
+    triggerGlobalRefresh();
+
+    const ivSummary = setInterval(() => loadSummary(controller.signal), 5000);
+    const ivWebsites = setInterval(() => loadWebsites(controller.signal), 15000); // More frequent but stable
+    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, 30000); 
+
     return () => {
       controller.abort();
       clearInterval(ivSummary);
       clearInterval(ivWebsites);
       clearInterval(ivUsersEvents);
     }
-  }, [loggedIn, loadSummary, loadWebsites, loadUsers, loadEvents])
+  }, [loggedIn, triggerGlobalRefresh, loadSummary, loadWebsites, loadUsers, loadEvents])
 
   const navTo = useCallback((nav) => { if (nav === 'users' && !isSuperAdmin) return; setActiveNav(nav); localStorage.setItem('spmt_active_nav', nav) }, [isSuperAdmin])
 
@@ -481,10 +529,35 @@ function AppInner() {
   const handleMarkAllRead = useCallback(() => setNotifications(p => p.map(n => ({ ...n, read: true }))), [])
   const handleDelete = useCallback((idx) => setNotifications(p => p.filter((_, i) => i !== idx)), [])
   const handleClearAll = useCallback(() => setNotifications([]), [])
-  const handleLogout = () => { 
-    setShowLogout(false); 
-    logout(); 
-    setLoggedIn(false); 
+
+  useEffect(() => {
+    const h = () => {
+      setLoggedIn(false);
+      toggleAuthView(false); // Reset to public view on logout
+      setSummary(null);
+      setWebsites([]);
+      setNotifications([]);
+    }
+    window.addEventListener('auth:logout', h)
+
+    // REFRESH ON TAB FOCUS - Ensuring fresh data whenever user returns
+    const handleFocus = () => {
+      if (loggedIn) {
+        loadSummary();
+        loadWebsites();
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      window.removeEventListener('auth:logout', h)
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [loggedIn, loadSummary, loadWebsites])
+  const handleLogout = () => {
+    setShowLogout(false);
+    logout();
+    setLoggedIn(false);
     localStorage.removeItem('spmt_active_nav');
     window.location.reload(); // Force full refresh for clean public state
   }
@@ -492,12 +565,12 @@ function AppInner() {
   if (!loggedIn) {
     if (isAuthView) {
       return (
-        <LoginPage 
+        <LoginPage
           onLogin={() => {
             setLoggedIn(true)
             toggleAuthView(false)
             showToast('Login Successfully')
-          }} 
+          }}
           onBack={() => toggleAuthView(false)}
         />
       )
@@ -516,7 +589,7 @@ function AppInner() {
 
   return (
     <div className={themeId} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)', position: 'relative' }}>
-      
+
       {/* Sci-Fi Ambient Glows (Light Mode) */}
       <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, var(--accent-light) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none', opacity: 0.5 }} />
       <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: '30vw', height: '30vw', background: 'radial-gradient(circle, var(--accent-light) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none', opacity: 0.5 }} />
@@ -545,6 +618,7 @@ function AppInner() {
       {showLogout && <LogoutModal onConfirm={handleLogout} onCancel={() => setShowLogout(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+      <NetworkAlert isOffline={isOffline} isSlow={isSlow} />
     </div>
   )
 }

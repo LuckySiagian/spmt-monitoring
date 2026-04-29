@@ -113,7 +113,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   useEffect(() => {
     websites.forEach(w => {
       const domain = getDomain(w.url)
-      if (!faviconCache.current[domain]) {
+      const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) || 
+                         domain.endsWith('.pelindo.co.id') || 
+                         domain.endsWith('.pelindomultiterminal.co.id')
+
+      if (!shouldSkip && !faviconCache.current[domain]) {
         const img = new Image()
         img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
         img.onload = () => {
@@ -503,18 +507,20 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       </div>
 
       {/* Canvas Layer & Radar */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {/* Radar Animations */}
-        <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', width: '200%', height: '200%', background: 'conic-gradient(from 0deg, transparent 70%, rgba(99,102,241,0.15) 100%)', borderRadius: '50%', pointerEvents: 'none', animation: 'radarSweep 4s linear infinite', zIndex: 0 }} />
-        <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '200%', height: '200%', background: 'radial-gradient(circle, transparent 10%, rgba(99,102,241,0.05) 11%, transparent 12%, transparent 20%, rgba(99,102,241,0.05) 21%, transparent 22%, transparent 30%, rgba(99,102,241,0.05) 31%, transparent 32%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ flex: 1, position: 'relative', overflowX: 'auto', overflowY: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, minWidth: isMobile ? 600 : '100%', minHeight: 300 }}>
+          {/* Radar Animations */}
+          <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', width: '200%', height: '200%', background: 'conic-gradient(from 0deg, transparent 70%, rgba(99,102,241,0.15) 100%)', borderRadius: '50%', pointerEvents: 'none', animation: 'radarSweep 4s linear infinite', zIndex: 0 }} />
+          <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '200%', height: '200%', background: 'radial-gradient(circle, transparent 10%, rgba(99,102,241,0.05) 11%, transparent 12%, transparent 20%, rgba(99,102,241,0.05) 21%, transparent 22%, transparent 30%, rgba(99,102,241,0.05) 31%, transparent 32%)', pointerEvents: 'none', zIndex: 0 }} />
 
-        <canvas
-          ref={canvasRef}
-          style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
-          onClick={handleClick}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoveredId(null)}
-        />
+          <canvas
+            ref={canvasRef}
+            style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
+            onClick={handleClick}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={() => setHoveredId(null)}
+          />
+        </div>
       </div>
 
       {nodes.length === 0 && (

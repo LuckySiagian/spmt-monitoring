@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { websiteAPI, eventsAPI } from '../../services/api'
+import { useWebSocket } from '../../hooks/useWebSocket'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 const STATUS_COLORS = { ONLINE: '#10b981', CRITICAL: '#f59e0b', OFFLINE: '#ef4444' }
@@ -30,14 +31,30 @@ function AvailabilityTimeline({ websiteId }) {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchEvents = useCallback(async (silent = false) => {
     if (!websiteId) return
-    setLoading(true)
-    eventsAPI.getByWebsite(websiteId, 100)
-      .then(r => setEvents(r.data || []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false))
+    const controller = new AbortController()
+    if (!silent) setLoading(true)
+    try {
+      const r = await eventsAPI.getByWebsite(websiteId, 100, { signal: controller.signal })
+      setEvents(r.data || [])
+    } catch (err) {
+      if (err.name !== 'AbortError' && err.name !== 'CanceledError') setEvents([])
+    } finally {
+      if (!silent) setLoading(false)
+    }
+    return () => controller.abort()
   }, [websiteId])
+
+  useEffect(() => {
+    fetchEvents()
+  }, [fetchEvents])
+
+  useWebSocket(useCallback((msg) => {
+    if (msg.type === 'status_change' && (msg.payload.website_id === websiteId || msg.payload.WebsiteID === websiteId)) {
+      fetchEvents(true)
+    }
+  }, [websiteId, fetchEvents]))
 
   const fmtT = (d) => new Date(d).toLocaleString('id-ID', { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const fmtDuration = (fromMs, toMs) => {
@@ -146,9 +163,9 @@ function AvailabilityTimeline({ websiteId }) {
   )
 }
 
-// ── AI Analyst Section ────────────────────────────────────────
+// ── Analisis Kondisi Section ────────────────────────────────────────
 
-function AIAnalyst({ website }) {
+function AnalisisKondisi({ website }) {
   const [analyzing, setAnalyzing] = useState(true)
   const [analysis, setAnalysis] = useState(null)
 
@@ -171,62 +188,62 @@ function AIAnalyst({ website }) {
     // Skenario 1: Redirect Loop
     if (rc.includes('redirect')) {
       return {
-        title: "Redirect Loop Detected / Terdeteksi Pengalihan Berulang",
-        severity: "OFFLINE / INVESTIGATION REQUIRED",
-        summary: "EN: The monitoring agent is caught in an infinite redirect loop.\nID: Sistem monitoring terjebak dalam pengalihan halaman yang berulang-ulang.",
-        explanation: "EN: This usually occurs on corporate portals (SSO) where the agent is repeatedly forced to a login page. Browsers handle this via session cookies, but a probe-based monitor sees it as an unstable path.\nID: Ini biasanya terjadi di portal kantor (SSO). Browser biasa punya 'cookie', tapi sistem monitor kami melihatnya sebagai koneksi yang tidak stabil.",
-        recommendation: "EN: Use a direct URL or whitelist the monitoring server's User-Agent on the SSO gateway.\nID: Gunakan URL langsung atau daftarkan (whitelist) IP monitor ini di sistem keamanan portal."
+        title: "Redirect Loop / Pengalihan Sistem Berulang",
+        severity: "LEVEL APLIKASI (LAYER 7)",
+        summary: "EN: The system is caught in an infinite redirect loop at the application level.\nID: Sistem aplikasi terjebak dalam pengalihan halaman yang berulang-ulang.",
+        explanation: "EN: This usually occurs when the application logic forces a login redirect or the routing system is misconfigured. It is an issue within the website's internal code.\nID: Ini terjadi pada logika aplikasi yang memaksa redirect berulang (misal: error pada sistem login atau routing). Ini adalah masalah internal kode website.",
+        recommendation: "EN: Review the application routing and session handling logic in the backend code.\nID: Periksa kembali logika routing dan penanganan sesi pada kode backend aplikasi."
       }
     }
 
     // Skenario 2: SSL Invalid
     if (!sslValid && isHTTPS) {
       return {
-        title: "Security Certificate Mismatch / Sertifikat Tidak Valid",
-        severity: "CRITICAL (Unsecured Service)",
-        summary: "EN: Service is reachable but SSL certificate validation failed.\nID: Website bisa dibuka namun sertifikat keamanan (gembok) bermasalah.",
-        explanation: "EN: The NOC system enforces strict TLS protocols. While browsers allow a manual bypass, this monitoring agent blocks the request to flag potential security risks or expired certs.\nID: Sistem NOC menjaga standar keamanan tinggi. Browser mungkin membolehkan akses manual, tapi monitor ini wajib memberi peringatan jika sertifikat kadaluwarsa.",
-        recommendation: "EN: Renew the SSL certificate or fix the intermediate certificate chain on the server.\nID: Segera perbaharui sertifikat SSL atau perbaiki susunan sertifikat di server."
+        title: "SSL Security Fault / Kegagalan Enkripsi Sistem",
+        severity: "LEVEL KEAMANAN (SECURITY LAYER)",
+        summary: "EN: Service is reachable but the security layer (SSL) is invalid or expired.\nID: Website aktif namun lapisan keamanan (SSL) bermasalah atau kadaluwarsa.",
+        explanation: "EN: The monitoring system detects that the SSL certificate does not match the domain or has expired. This is a critical security risk for user data.\nID: Sistem mendeteksi sertifikat keamanan tidak cocok atau sudah habis masa berlakunya. Ini adalah risiko keamanan serius bagi data pengguna.",
+        recommendation: "EN: Renew the SSL certificate immediately and ensure the full certificate chain is installed.\nID: Segera perbaharui sertifikat SSL dan pastikan instalasi 'certificate chain' sudah benar."
       }
     }
 
     // Skenario 3: DNS issues
     if (rc.includes('dns') || rc.includes('no such host')) {
       return {
-        title: "DNS Resolution Failure / Nama Domain Tidak Ditemukan",
-        severity: "OFFLINE (Unreachable)",
-        summary: "EN: System could not find the IP address for this domain.\nID: Sistem tidak bisa menemukan alamat IP untuk domain ini.",
-        explanation: "EN: This suggests an internal domain that is only reachable via corporate VPN or Intranet. The monitoring host might be outside this network boundary.\nID: Ini menunjukkan domain internal yang hanya bisa dibuka via VPN atau Intranet kantor. Server monitor mungkin berada di luar jaringan tersebut.",
-        recommendation: "EN: Verify DNS settings or ensure the monitoring host can reach the internal DNS server.\nID: Cek pengaturan DNS atau pastikan server monitor sudah terhubung ke jaringan internal."
+        title: "DNS Resolution Error / Masalah Nama Domain Sistem",
+        severity: "LEVEL SISTEM (NETWORK INFRASTRUCTURE)",
+        summary: "EN: The network system could not translate the domain name to an IP address.\nID: Sistem jaringan tidak dapat menerjemahkan nama domain menjadi alamat IP.",
+        explanation: "EN: This is a system-level issue where the domain is either not registered or the DNS server is unreachable. If it is an internal site, check the Intranet/VPN status.\nID: Ini adalah masalah level sistem di mana domain tidak terdaftar atau server DNS mati. Jika ini situs internal, cek status Intranet/VPN.",
+        recommendation: "EN: Verify domain registration and ensure the system DNS records (A Record) are pointing correctly.\nID: Verifikasi registrasi domain dan pastikan record DNS (A Record) sudah mengarah ke IP yang benar."
       }
     }
 
     // Default Online
     if (status === 'ONLINE') {
       return {
-        title: "Service Health Optimal / Kondisi Sistem Normal",
-        severity: "HEALTHY (Stable)",
-        summary: "EN: All monitoring probes returned successful status codes.\nID: Semua pengecekan berjalan lancar dan memberikan respon sukses.",
-        explanation: "EN: Connectivity, SSL validity, and performance are within the high-standard operational range.\nID: Konektivitas, validitas SSL, dan kecepatan respon berada dalam batas normal yang stabil.",
-        recommendation: "EN: No action required. Service is operating as expected.\nID: Tidak perlu tindakan. Website beroperasi sesuai harapan."
+        title: "Optimal Condition / Kondisi Sistem Normal",
+        severity: "LEVEL APLIKASI (LAYER 7 OK)",
+        summary: "EN: All system parameters and application responses are within normal range.\nID: Seluruh parameter sistem dan respon aplikasi berada dalam batas normal.",
+        explanation: "EN: Connectivity, server ports, and Layer 7 (HTTP) responses are stable. The application is serving requests successfully.\nID: Konektivitas, port server, dan respon Layer 7 (HTTP) terpantau stabil. Aplikasi melayani permintaan dengan baik.",
+        recommendation: "EN: No action required. Continue regular maintenance and monitoring.\nID: Tidak perlu tindakan. Lanjutkan pemeliharaan dan pemantauan rutin."
       }
     }
 
     // Fallback
     return {
-      title: "Service Disruption / Gangguan Layanan",
-      severity: "STATUS: " + status,
-      summary: "EN: Automated check failed to establish a stable connection.\nID: Sistem gagal menjalin koneksi yang stabil dengan website.",
-      explanation: "EN: The connection was dropped by the server or blocked by a firewall. This often happens if the monitoring probe is detected as a robot/threat.\nID: Koneksi diputus oleh server atau diblokir firewall (dinding api). Sering terjadi jika monitor dideteksi sebagai bot/ancaman.",
-      recommendation: "EN: Check server firewall logs and allow traffic from the monitoring server IP.\nID: Cek log keamanan server dan izinkan akses (whitelist) untuk IP server monitor ini."
+      title: "Service Interruption / Gangguan Respon Aplikasi",
+      severity: "LEVEL APLIKASI / SERVER",
+      summary: "EN: The system failed to receive a valid response from the application (Layer 7).\nID: Sistem gagal menerima respon yang valid dari aplikasi (Layer 7).",
+      explanation: "EN: The connection might be blocked by a firewall or the application is crashing (HTTP 5xx). This indicates the server is UP but the SYSTEM is failing.\nID: Koneksi mungkin diblokir firewall atau aplikasi sedang crash (HTTP 5xx). Ini menandakan SERVER aktif tapi SISTEM sedang bermasalah.",
+      recommendation: "EN: Check application logs (Error Logs) and server firewall settings (Whitelist IP Monitor).\nID: Periksa log error aplikasi dan pengaturan firewall server (izinkan akses IP Monitor)."
     }
   }
 
   if (analyzing) return (
     <div style={{ background: 'linear-gradient(90deg, rgba(59,130,246,0.05), rgba(99,102,241,0.05))', borderRadius: 12, padding: '24px', border: '1px dashed rgba(99,102,241,0.3)', textAlign: 'center', marginTop: 16 }}>
-      <div className="ai-thinking" style={{ fontSize: 12, color: '#3b82f6', fontWeight: 800, letterSpacing: '0.05em' }}>
-        <span style={{ marginRight: 10, display: 'inline-block', animation: 'spin 2s linear infinite' }}>🧠</span>
-        AI AGENT ANALYZING... / MENGANALISA...
+      <div className="system-thinking" style={{ fontSize: 12, color: '#3b82f6', fontWeight: 800, letterSpacing: '0.05em' }}>
+        <span style={{ marginRight: 10, display: 'inline-block', animation: 'spin 2s linear infinite' }}>🔍</span>
+        MENGANALISA KONDISI SISTEM...
       </div>
     </div>
   )
@@ -240,9 +257,9 @@ function AIAnalyst({ website }) {
   return (
     <div style={{ marginTop: 20, background: 'var(--bg-card)', border: `2px solid ${theme.color}33`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}>
       <div style={{ background: theme.color, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 18 }}>🤖</span>
-        <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '0.03em' }}>AI AGENT NOC DIAGNOSIS</span>
-        <div style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '2px 10px', borderRadius: 20, color: '#fff', fontSize: 10, fontWeight: 800 }}>BILINGUAL ANALYST</div>
+        <span style={{ fontSize: 18 }}>📊</span>
+        <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '0.03em' }}>ANALISIS KONDISI (LAYER 7)</span>
+        <div style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '2px 10px', borderRadius: 20, color: '#fff', fontSize: 10, fontWeight: 800 }}>SISTEM DIAGNOSIS</div>
       </div>
 
       <div style={{ padding: '20px' }}>
@@ -277,7 +294,7 @@ function AIAnalyst({ website }) {
         {/* BILINQUAL RECOMMENDATION */}
         <div style={{ padding: '16px', background: `${theme.color}11`, borderRadius: 12, border: `1px solid ${theme.color}22` }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: theme.color, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>💡</span> AI RECOMMENDATION / SARAN AI:
+            <span>💡</span> SARAN PENANGANAN:
           </div>
           {analysis.recommendation.split('\n').map((ln, i) => (
             <div key={i} style={{ fontSize: 12, lineHeight: 1.5, color: i === 0 ? 'var(--text)' : 'var(--text-sub)', fontWeight: i === 0 ? 800 : 600, marginBottom: i === 0 ? 4 : 0 }}>{ln}</div>
@@ -330,38 +347,62 @@ export default function ServiceDetailModal({ website, onClose }) {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (!website) return
-    setLoading(true)
-    websiteAPI.getLogs(website.id, 100)
-      .then(r => setLogs(r.data || []))
-      .catch(() => setLogs([]))
-      .finally(() => setLoading(false))
+  const fetchLogs = useCallback(async (silent = false) => {
+    if (!website?.id) return
+    const controller = new AbortController()
+    if (!silent) setLoading(true)
+    try {
+      const r = await websiteAPI.getLogs(website.id, 100, { signal: controller.signal })
+      setLogs(r.data || [])
+    } catch (err) {
+      if (err.name !== 'AbortError' && err.name !== 'CanceledError') setLogs([])
+    } finally {
+      if (!silent) setLoading(false)
+    }
+    return () => controller.abort()
   }, [website?.id])
+
+  useEffect(() => {
+    fetchLogs()
+  }, [fetchLogs])
+
+  // WebSocket Sync for Logs
+  useWebSocket(useCallback((msg) => {
+    if ((msg.type === 'monitor_update' || msg.type === 'status_change') && msg.payload.website_id === website?.id) {
+      fetchLogs(true) // Silent update
+    }
+  }, [website?.id, fetchLogs]))
 
   if (!website) return null
 
   const fmt = (ms) => ms != null ? `${ms}ms` : '—'
   const fmtTime = (d) => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
-  const rtSeries = logs.filter(l => l.response_time_ms != null).map(l => l.response_time_ms)
-  const avgRT = rtSeries.length ? Math.round(rtSeries.reduce((a, b) => a + b, 0) / rtSeries.length) : null
-  const maxRT = rtSeries.length ? Math.max(...rtSeries) : null
-  const minRT = rtSeries.length ? Math.min(...rtSeries) : null
-  const upLogs = logs.filter(l => l.status === 'ONLINE')
-  const uptime = logs.length > 0 ? ((upLogs.length / logs.length) * 100).toFixed(2) : '—'
-  const alerts = logs.filter(l => l.status === 'OFFLINE' || l.status === 'CRITICAL')
+  const { avgRT, maxRT, minRT, uptime, alerts, perfData, upLogsCount } = useMemo(() => {
+    const rtSeries = logs.filter(l => l.response_time_ms != null).map(l => l.response_time_ms)
+    const avg = rtSeries.length ? Math.round(rtSeries.reduce((a, b) => a + b, 0) / rtSeries.length) : null
+    const max = rtSeries.length ? Math.max(...rtSeries) : null
+    const min = rtSeries.length ? Math.min(...rtSeries) : null
+    const upLogs = logs.filter(l => l.status === 'ONLINE')
+    const ut = logs.length > 0 ? ((upLogs.length / logs.length) * 100).toFixed(2) : '—'
+    const al = logs.filter(l => l.status === 'OFFLINE' || l.status === 'CRITICAL')
+    
+    const pd = [...logs].reverse().slice(-60).map((l, i) => ({
+      i,
+      rt: l.response_time_ms,
+      status: l.status,
+      time: fmtTime(l.checked_at),
+    }))
 
-  // Performance chart data
-  const perfData = [...logs].reverse().slice(-60).map((l, i) => ({
-    i,
-    rt: l.response_time_ms,
-    status: l.status,
-    time: fmtTime(l.checked_at),
-  }))
+    return { avgRT: avg, maxRT: max, minRT: min, uptime: ut, alerts: al, perfData: pd, upLogsCount: upLogs.length }
+  }, [logs])
 
   const domain = (() => { try { return new URL(website.url).hostname } catch { return website.url } })()
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+  const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) || 
+                     domain.endsWith('.pelindo.co.id') || 
+                     domain.endsWith('.pelindomultiterminal.co.id')
+  
+  const faviconUrl = shouldSkip ? null : `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
   const initial = (website.name || 'W')[0].toUpperCase()
 
   const TABS = ['OVERVIEW', 'PERFORMANCE', 'TIMELINE', 'HISTORY', 'ALERTS']
@@ -373,9 +414,11 @@ export default function ServiceDetailModal({ website, onClose }) {
         <div style={st.header}>
           <div style={st.headerLeft}>
             <div style={st.favicon}>
-              <img src={faviconUrl} width={24} height={24} alt=""
-                onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
-              <div style={{ ...st.initial, display: 'none' }}>{initial}</div>
+              {faviconUrl ? (
+                <img src={faviconUrl} width={24} height={24} alt=""
+                  onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+              ) : null}
+              <div style={{ ...st.initial, display: shouldSkip ? 'flex' : 'none' }}>{initial}</div>
             </div>
             <div>
               <div style={st.websiteName}>{website.name}</div>
@@ -418,7 +461,7 @@ export default function ServiceDetailModal({ website, onClose }) {
               <InfoRow label="24h Sample Uptime" value={`${uptime}%`} valueColor={parseFloat(uptime) > 99 ? '#10b981' : parseFloat(uptime) > 90 ? '#f59e0b' : '#ef4444'} />
 
               <RootCauseSection website={website} />
-              <AIAnalyst website={website} />
+              <AnalisisKondisi website={website} />
             </div>
           )}
 
@@ -444,7 +487,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                 RESPONSE TIME — LAST {perfData.length} CHECKS
               </div>
               <div style={{ height: 160 }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <LineChart data={perfData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,74,0.8)" />
                     <XAxis dataKey="i" tick={false} axisLine={{ stroke: 'var(--border)' }} />
@@ -466,7 +509,7 @@ export default function ServiceDetailModal({ website, onClose }) {
               <div style={{ marginTop: 14 }}>
                 {[
                   { label: 'Total Checks (sample)', value: logs.length },
-                  { label: 'Successful Checks', value: upLogs.length },
+                  { label: 'Successful Checks', value: upLogsCount },
                   { label: 'Sample Uptime', value: `${uptime}%` },
                   { label: 'Alert Events', value: alerts.length },
                 ].map(item => (
