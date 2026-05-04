@@ -23,8 +23,8 @@ func New(db *pgxpool.Pool) *Repository {
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
 	var u model.User
 	row := r.db.QueryRow(ctx,
-		`SELECT id, username, password_hash, role, created_at FROM users WHERE username = $1`, username)
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt)
+		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, created_at FROM users WHERE username = $1`, username)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -34,22 +34,22 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*m
 func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	var u model.User
 	row := r.db.QueryRow(ctx,
-		`SELECT id, username, password_hash, role, created_at FROM users WHERE id = $1`, id)
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt)
+		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, created_at FROM users WHERE id = $1`, id)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *Repository) CreateUser(ctx context.Context, username, passwordHash string, role model.Role) (*model.User, error) {
+func (r *Repository) CreateUser(ctx context.Context, username, passwordHash, email string, telegramID *string, role model.Role) (*model.User, error) {
 	var u model.User
 	row := r.db.QueryRow(ctx,
-		`INSERT INTO users (id, username, password_hash, role, created_at)
-		 VALUES (uuid_generate_v4(), $1, $2, $3, NOW())
-		 RETURNING id, username, password_hash, role, created_at`,
-		username, passwordHash, role)
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt)
+		`INSERT INTO users (id, username, password_hash, email, telegram_id, role, created_at)
+		 VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, NOW())
+		 RETURNING id, username, password_hash, email, telegram_id, role, created_at`,
+		username, passwordHash, email, telegramID, role)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (r *Repository) CreateUser(ctx context.Context, username, passwordHash stri
 
 func (r *Repository) GetAllUsers(ctx context.Context) ([]*model.User, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, username, password_hash, role, created_at FROM users ORDER BY created_at`)
+		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, created_at FROM users ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (r *Repository) GetAllUsers(ctx context.Context) ([]*model.User, error) {
 	var users []*model.User
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -83,6 +83,16 @@ func (r *Repository) CountAdmins(ctx context.Context) (int, error) {
 
 func (r *Repository) UpdateUserRole(ctx context.Context, userID uuid.UUID, role model.Role) error {
 	_, err := r.db.Exec(ctx, `UPDATE users SET role = $1 WHERE id = $2`, role, userID)
+	return err
+}
+
+func (r *Repository) UpdateUserProfile(ctx context.Context, userID uuid.UUID, email string, telegramID *string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET email = $1, telegram_id = $2 WHERE id = $3`, email, telegramID, userID)
+	return err
+}
+
+func (r *Repository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET password_hash = $1 WHERE id = $2`, passwordHash, userID)
 	return err
 }
 

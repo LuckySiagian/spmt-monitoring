@@ -11,8 +11,8 @@ export function AuthProvider({ children }) {
     } catch { return null }
   })
 
-  const login = useCallback(async (username, password) => {
-    const res = await authAPI.login({ username, password })
+  const login = useCallback(async (username, password, turnstileToken) => {
+    const res = await authAPI.login({ username, password, turnstile_token: turnstileToken })
     const { token, user } = res.data
     localStorage.setItem('token', token)
     localStorage.setItem('user', JSON.stringify(user))
@@ -26,12 +26,18 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  const updateUser = useCallback((updatedUser) => {
+    const newUser = { ...user, ...updatedUser }
+    localStorage.setItem('user', JSON.stringify(newUser))
+    setUser(newUser)
+  }, [user])
+
   const isSuperAdmin = user?.role === 'superadmin'
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
   const isViewer = user?.role === 'viewer'
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isSuperAdmin, isAdmin, isViewer }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isSuperAdmin, isAdmin, isViewer }}>
       {children}
     </AuthContext.Provider>
   )

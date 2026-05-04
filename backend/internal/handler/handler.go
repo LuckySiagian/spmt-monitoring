@@ -2,26 +2,30 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/spmt/monitoring/internal/middleware"
 	"github.com/spmt/monitoring/internal/model"
 	"github.com/spmt/monitoring/internal/service"
 	ws "github.com/spmt/monitoring/internal/websocket"
 	"github.com/spmt/monitoring/internal/worker"
+	"github.com/spmt/monitoring/internal/notification"
 	"time"
 )
 
 type Handler struct {
-	svc  *service.Service
-	pool *worker.Pool
-	hub  *ws.Hub
+	svc   *service.Service
+	pool  *worker.Pool
+	hub   *ws.Hub
+	notif *notification.Service
 }
 
-func New(svc *service.Service, pool *worker.Pool, hub *ws.Hub) *Handler {
-	return &Handler{svc: svc, pool: pool, hub: hub}
+func New(svc *service.Service, pool *worker.Pool, hub *ws.Hub, notif *notification.Service) *Handler {
+	return &Handler{svc: svc, pool: pool, hub: hub, notif: notif}
 }
 
 func respond(w http.ResponseWriter, status int, data interface{}) {
@@ -64,6 +68,64 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, http.StatusCreated, user)
+}
+
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	var req model.UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	userID := middleware.GetUserID(r.Context())
+	if userID == uuid.Nil {
+		respondError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if err := h.svc.UpdateProfile(r.Context(), userID, req); err != nil {
+		log.Printf("[Handler] UpdateProfile Error for User %s: %v", userID, err)
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respond(w, http.StatusOK, map[string]string{"message": "profile updated successfully"})
+}
+
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req model.ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	userID := middleware.GetUserID(r.Context())
+	if userID == uuid.Nil {
+		respondError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if err := h.svc.ChangePassword(r.Context(), userID, req); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	respond(w, http.StatusOK, map[string]string{"message": "password changed successfully"})
+}
+
+func (h *Handler) TestEmail(w http.ResponseWriter, r *http.Request) {
+	log.Println("[Handler] TestEmail triggered")
+	userID := middleware.GetUserID(r.Context())
+	if userID == uuid.Nil {
+		respondError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if err := h.svc.SendTestEmail(r.Context(), userID, h.notif); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respond(w, http.StatusOK, map[string]string{"message": "test email sent"})
 }
 
 // ─── USERS ────────────────────────────────────────────────────
@@ -170,8 +232,8 @@ func (h *Handler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Trigger immediate check for new website
-	go h.pool.TriggerCheck(*site)
+	// Trigger immediate check and start ticker for new website
+	go h.pool.RestartWebsite(*site)
 
 	respond(w, http.StatusCreated, site)
 }

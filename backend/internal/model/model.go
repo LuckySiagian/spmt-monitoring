@@ -11,24 +11,29 @@ import (
 type Role string
 
 const (
-	RoleSuperAdmin Role = "superadmin"
-	RoleAdmin      Role = "admin"
-	RoleViewer     Role = "viewer"
+	RoleSuperAdmin   Role = "superadmin"
+	RoleAdmin        Role = "admin"
+	RoleAdminPelindo Role = "adminpelindo"
+	RoleViewer       Role = "viewer"
 )
 
 type User struct {
 	ID           uuid.UUID `json:"id" db:"id"`
 	Username     string    `json:"username" db:"username"`
 	PasswordHash string    `json:"-" db:"password_hash"`
+	Email        string    `json:"email" db:"email"`
+	TelegramID   *string   `json:"telegram_id" db:"telegram_id"`
 	Role         Role      `json:"role" db:"role"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 type UserResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Username  string    `json:"username"`
-	Role      Role      `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         uuid.UUID `json:"id"`
+	Username   string    `json:"username"`
+	Email      string    `json:"email"`
+	TelegramID *string   `json:"telegram_id,omitempty"`
+	Role       Role      `json:"role"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // ─── Website ─────────────────────────────────────────────────
@@ -129,12 +134,24 @@ type DashboardSummary struct {
 // ─── Auth ─────────────────────────────────────────────────────
 
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	TurnstileToken string `json:"turnstile_token"`
 }
 type RegisterRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username   string  `json:"username"`
+	Password   string  `json:"password"`
+	Email      string  `json:"email"`
+	TelegramID *string `json:"telegram_id"`
+}
+type UpdateProfileRequest struct {
+	Email      string  `json:"email"`
+	TelegramID *string `json:"telegram_id"`
+}
+type ChangePasswordRequest struct {
+	OldPassword     string `json:"old_password"`
+	NewPassword     string `json:"new_password"`
+	ConfirmPassword string `json:"confirm_password"`
 }
 type LoginResponse struct {
 	Token string       `json:"token"`
@@ -147,9 +164,11 @@ type DemoteRequest struct {
 	UserID string `json:"user_id"`
 }
 type CreateUserRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Role     string `json:"role"`
+	Username   string  `json:"username"`
+	Password   string  `json:"password"`
+	Email      string  `json:"email"`
+	TelegramID *string `json:"telegram_id"`
+	Role       string  `json:"role"`
 }
 type DeleteUserRequest struct {
 	UserID string `json:"user_id"`

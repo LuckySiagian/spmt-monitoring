@@ -8,6 +8,7 @@ const RoleBadge = ({ role }) => {
   const map = {
     superadmin: { color: '#8b5cf6', label: 'SUPERADMIN' },
     admin: { color: '#3b82f6', label: 'ADMIN' },
+    adminpelindo: { color: '#10b981', label: 'ADMIN PELINDO' },
     viewer: { color: 'var(--text-muted)', label: 'VIEWER' },
   }
   const c = map[role] || map.viewer
@@ -24,7 +25,7 @@ const RoleBadge = ({ role }) => {
 export default function UsersPage({ users, onUserUpdate }) {
   const { user: currentUser } = useAuth()
   const [showRegister, setShowRegister] = useState(false)
-  const [regForm, setRegForm] = useState({ username: '', password: '', role: 'viewer' })
+  const [regForm, setRegForm] = useState({ username: '', password: '', email: '', telegram_id: '', role: 'viewer' })
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [regError, setRegError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -62,7 +63,7 @@ export default function UsersPage({ users, onUserUpdate }) {
     try {
       await userAdminAPI.create(regForm)
       setShowRegister(false)
-      setRegForm({ username: '', password: '', role: 'viewer' })
+      setRegForm({ username: '', password: '', email: '', telegram_id: '', role: 'viewer' })
       onUserUpdate?.()
       setActionMsg('User created successfully')
       setTimeout(() => setActionMsg(''), 3000)
@@ -230,7 +231,16 @@ export default function UsersPage({ users, onUserUpdate }) {
                 <select style={{ ...mStyles.input, cursor: 'pointer' }} value={regForm.role} onChange={e => setRegForm(f => ({ ...f, role: e.target.value }))}>
                   <option value="viewer">Viewer</option>
                   <option value="admin">Admin</option>
+                  <option value="adminpelindo">Admin Pelindo</option>
                 </select>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={mStyles.label}>EMAIL *</label>
+                <input style={mStyles.input} type="email" value={regForm.email} onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" required />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={mStyles.label}>TELEGRAM ID (Optional)</label>
+                <input style={mStyles.input} type="text" value={regForm.telegram_id} onChange={e => setRegForm(f => ({ ...f, telegram_id: e.target.value }))} placeholder="@username or Chat ID" />
               </div>
               {regError && <div style={mStyles.error}>{regError}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

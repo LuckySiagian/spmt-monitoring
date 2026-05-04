@@ -18,6 +18,7 @@ import (
 	"github.com/spmt/monitoring/internal/handler"
 	"github.com/spmt/monitoring/internal/middleware"
 	"github.com/spmt/monitoring/internal/model"
+	"github.com/spmt/monitoring/internal/notification"
 	"github.com/spmt/monitoring/internal/repository"
 	"github.com/spmt/monitoring/internal/service"
 	ws "github.com/spmt/monitoring/internal/websocket"
@@ -33,7 +34,7 @@ func main() {
 
 	// ─── Database ─────────────────────────────────────────────
 	connStr := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s&pool_max_conns=50&pool_max_conn_idle_time=10m",
 		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBSSLMode,
 	)
 	pool, err := pgxpool.New(context.Background(), connStr)
@@ -49,9 +50,10 @@ func main() {
 
 	// ─── Layers ───────────────────────────────────────────────
 	repo := repository.New(pool)
-	svc := service.New(repo, cfg.JWTSecret, cfg.JWTExpiryHours)
+	svc := service.New(repo, cfg.JWTSecret, cfg.TurnstileSecret, cfg.JWTExpiryHours)
+	notif := notification.NewService(cfg, repo)
 	hub := ws.NewHub()
-	workerPool := worker.NewPool(repo, hub, 10)
+	workerPool := worker.NewPool(repo, hub, notif, 10)
 
 	// ─── Start services ───────────────────────────────────────
 	go hub.Run()
@@ -59,7 +61,7 @@ func main() {
 	log.Println("✅ Worker pool started")
 
 	// ─── Router ───────────────────────────────────────────────
-	h := handler.New(svc, workerPool, hub)
+	h := handler.New(svc, workerPool, hub, notif)
 
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
@@ -103,7 +105,7 @@ func main() {
 
 		// Website management (admin + superadmin)
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequireRole(model.RoleAdmin, model.RoleSuperAdmin))
+			r.Use(middleware.RequireRole(model.RoleAdmin, model.RoleAdminPelindo, model.RoleSuperAdmin))
 			r.Post("/websites", h.CreateWebsite)
 			r.Put("/websites/{id}", h.UpdateWebsite)
 			r.Delete("/websites/{id}", h.DeleteWebsite)
@@ -112,6 +114,9 @@ func main() {
 		// Notifications (all authenticated users)
 		r.Get("/notifications/unread-count", h.GetUnreadNotificationCount)
 		r.Post("/notifications/mark-all-read", h.MarkAllNotificationsRead)
+		r.Put("/auth/profile", h.UpdateProfile)
+		r.Put("/auth/change-password", h.ChangePassword)
+		r.Post("/auth/test-email", h.TestEmail)
 
 		// User management (superadmin only)
 		r.Group(func(r chi.Router) {

@@ -26,63 +26,82 @@ function getDomain(url) {
 // ── Layout functions ──────────────────────────────────────────
 
 function calcStarLayout(websites) {
-  return websites.map((w, i) => {
-    const angle = (i / Math.max(websites.length, 1)) * Math.PI * 2 - Math.PI / 2
-    // Reduced max radius from 0.44 to 0.38 to provide 12% safe padding on edges
-    // Increased base radius from 0.34 to 0.38 to spread nodes further from center
-    const radius = Math.min(0.46, 0.38 + websites.length * 0.002)
+  const displayWebsites = websites.slice(0, 50);
+  const n = displayWebsites.length;
+  
+  return displayWebsites.map((w, i) => {
+    let radius, angle;
+    if (i < 20) {
+      // Inner circle: up to 20 nodes
+      const innerCount = Math.min(20, n);
+      angle = (i / Math.max(innerCount, 1)) * Math.PI * 2 - Math.PI / 2;
+      radius = 0.21; // More central
+    } else {
+      // Outer circle: up to 30 nodes
+      const outerCount = n - 20;
+      const outerIndex = i - 20;
+      const offset = (Math.PI / Math.max(outerCount, 1));
+      angle = (outerIndex / Math.max(outerCount, 1)) * Math.PI * 2 - Math.PI / 2 + offset;
+      radius = 0.36; // More margin for labels
+    }
     return {
       id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
       x: 0.5 + radius * Math.cos(angle),
       y: 0.5 + radius * Math.sin(angle),
+      angle
     }
   })
 }
 
 function calcTreeLayout(websites) {
-  const n = websites.length
-  if (n === 0) return []
+  const displayWebsites = websites.slice(0, 50);
+  const n = displayWebsites.length;
+  if (n === 0) return [];
 
-  // Hierarchical fan-tree layout:
-  // Server = root at bottom-center (y=0.88)
-  // Websites = leaves distributed in rows from top (y≈0.10) downward
-  // Each row fills left-to-right, evenly spaced
+  // Use up to 10 nodes per row to prevent vertical crunch
+  const MAX_PER_ROW = 10;
+  const rows = [];
+  let remaining = n;
 
-  const MAX_PER_ROW = Math.max(3, Math.ceil(Math.sqrt(n * 1.6)))
-  const rows = []
-  let remaining = n
-
-  while (remaining > 0) {
-    const rowSize = Math.min(MAX_PER_ROW, remaining)
-    rows.push(rowSize)
-    remaining -= rowSize
+  const numRows = Math.ceil(n / MAX_PER_ROW);
+  const basePerRow = Math.floor(n / numRows);
+  let remainder = n % numRows;
+  
+  for (let i = 0; i < numRows; i++) {
+     let rowSize = basePerRow;
+     if (remainder > 0) {
+       rowSize += 1;
+       remainder -= 1;
+     }
+     rows.push(rowSize);
   }
-
-  const result = []
-  const totalRows = rows.length
-  let idx = 0
+  
+  const result = [];
+  const totalRows = rows.length;
+  let idx = 0;
 
   rows.forEach((rowSize, ri) => {
-    // y: first row at 0.10, spread to 0.46 max
-    const y = totalRows === 1 ? 0.22 : 0.08 + (ri / (totalRows - 1)) * 0.52
+    // Stack rows from top to bottom with a fixed gap instead of stretching across the screen
+    const yGap = 0.16; // 16% of height per row
+    const y = 0.08 + ri * yGap;
 
     for (let ci = 0; ci < rowSize; ci++) {
-      const w = websites[idx++]
-      // x: evenly distributed with padding
-      const xPad = 0.08
-      const xSpan = 1 - xPad * 2
-      const x = rowSize === 1 ? 0.5 : xPad + (ci / (rowSize - 1)) * xSpan
+      const w = displayWebsites[idx++];
+      // Increase horizontal spread, pad is 0.05
+      const xPad = 0.05;
+      const xSpan = 1 - xPad * 2;
+      const x = rowSize === 1 ? 0.5 : xPad + (ci / (rowSize - 1)) * xSpan;
 
       result.push({
         id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
-        x: Math.min(0.92, Math.max(0.08, x)),
-        y: Math.min(0.65, Math.max(0.08, y)),
+        x: Math.min(0.95, Math.max(0.05, x)),
+        y: Math.min(0.72, Math.max(0.08, y)), // Cap at 0.72 so it doesn't overlap server
         rowIdx: ri,
-      })
+      });
     }
-  })
+  });
 
-  return result
+  return result;
 }
 
 export default function NetworkTopology({ websites, selectedId, onSelect, onOpenDetail, wsConnected }) {
@@ -95,6 +114,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const [topoMode, setMode] = useState('star') // 'star' | 'tree'
   const [hoveredId, setHoveredId] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1100)
+  const [showMoreNodes, setShowMoreNodes] = useState(false)
   const bgImgRef = useRef(null)
 
   useEffect(() => {
@@ -231,8 +251,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const isHov = node.id === hoveredId
       const isCrit = node.status === 'CRITICAL'
 
-      // Node size - expands if selected or hovered
-      const r = isHov ? 42 : (isSel ? 36 : 28)
+      // Node size - expands if selected or hovered (Increased per user request)
+      const r = isHov ? 47 : (isSel ? 46 : 35)
 
       // Critical pulse ring
       if (isCrit) {
@@ -260,10 +280,10 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       ctx.strokeStyle = color; ctx.lineWidth = (isSel || isHov) ? 3 : isCrit ? 2 : 1.5; ctx.stroke()
       ctx.shadowBlur = 0 // reset shadow
 
-      // Favicon / initial inside hexagon
+      // Favicon / initial inside hexagon (Increased scale)
       const domain = getDomain(node.url)
       const favicon = faviconCache.current[domain]
-      const imgSize = r * 1.5 | 0
+      const imgSize = r * 1.65 | 0
       if (favicon) {
         try {
           ctx.save()
@@ -278,37 +298,58 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         drawInitial(ctx, node.name, nx, ny, isHov, color)
       }
 
-      // Label Box
-      const canvasScale = Math.min(1, width / 1400) // Scale factor based on standard desktop width
-      const baseFontSize = 14 * canvasScale
-      const hoverFontSize = 18 * canvasScale
+      // Label Box Positioning Logic
+      const canvasScale = Math.min(width / 1400, height / 900)
+      const baseFontSize = Math.max(15, 13 * canvasScale)
+      const hoverFontSize = Math.max(16, 16 * canvasScale)
       
-      const name = node.name.length > 18 ? node.name.slice(0, 16) + '…' : node.name
-      const labelY = ny + r + (isHov ? 14 : 12)
-      const isDark = themeId && themeId.includes('dark')
-
-      // Font weight changes on hover
-      ctx.font = `${(isSel || isHov) ? '900' : '700'} ${isHov ? Math.max(14, hoverFontSize + 4) : Math.max(12, baseFontSize + 4)}px system-ui`
+      const name = node.name.length > 20 ? node.name.slice(0, 18) + '…' : node.name
+      ctx.font = `${(isSel || isHov) ? '900' : '700'} ${isHov ? hoverFontSize : baseFontSize}px "Inter", sans-serif`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
+      const th = isHov ? 30 : 22
 
-      // Label Box - Increased opacity and better shadow
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.98)'
-      ctx.strokeStyle = isHov ? color : 'rgba(0, 0, 0, 0.08)'
-      ctx.lineWidth = isHov ? 2 : 1
-      ctx.beginPath()
-      if (ctx.roundRect) {
-        ctx.roundRect(nx - tw / 2, labelY - 2, tw, isHov ? 32 : 26, 8)
+      // Dynamic position based on quadrant
+      let lx = nx, ly = ny, txAlign = 'center', txBaseline = 'middle'
+      const ang = Math.atan2(node.y - 0.5, node.x - 0.5) * 180 / Math.PI
+      const offset = r + (isHov ? 14 : 10)
+
+      if (topoMode === 'tree') {
+        ly = ny + offset; txBaseline = 'top'
       } else {
-        ctx.rect(nx - tw / 2, labelY - 2, tw, isHov ? 32 : 26)
+        if (ang > -45 && ang <= 45) { // Right
+          lx = nx + offset; txAlign = 'left'
+        } else if (ang > 45 && ang <= 135) { // Bottom
+          ly = ny + offset; txBaseline = 'top'
+        } else if (ang > -135 && ang <= -45) { // Top
+          ly = ny - offset; txBaseline = 'bottom'
+        } else { // Left
+          lx = nx - offset; txAlign = 'right'
+        }
       }
-      ctx.fill()
-      ctx.stroke()
 
-      // Label Text
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'top'
+      // Draw Label Box
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
+      ctx.strokeStyle = isHov ? color : 'rgba(0,0,0,0.1)'
+      ctx.lineWidth = isHov ? 2 : 1
+      
+      let boxX = lx, boxY = ly
+      if (txAlign === 'left') boxX = lx
+      else if (txAlign === 'right') boxX = lx - tw
+      else boxX = lx - tw / 2
+
+      if (txBaseline === 'top') boxY = ly
+      else if (txBaseline === 'bottom') boxY = ly - th
+      else boxY = ly - th / 2
+
+      ctx.beginPath()
+      if (ctx.roundRect) ctx.roundRect(boxX, boxY, tw, th, 6)
+      else ctx.rect(boxX, boxY, tw, th)
+      ctx.fill(); ctx.stroke()
+
+      // Draw Label Text
+      ctx.textAlign = txAlign; ctx.textBaseline = txBaseline
       ctx.fillStyle = isHov ? color : '#334155'
-      ctx.fillText(name, nx, labelY + (isHov ? 4 : 2))
+      ctx.fillText(name, lx + (txAlign === 'left' ? 8 : (txAlign === 'right' ? -8 : 0)), ly + (txBaseline === 'top' ? 4 : (txBaseline === 'bottom' ? -4 : 0)))
 
       // Status dot
       ctx.beginPath(); ctx.arc(nx + r - 4, ny - r + 4, isHov ? 6 : 4, 0, Math.PI * 2)
@@ -488,7 +529,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
           {/* Node count */}
           <span style={{ fontSize: 10, color: 'var(--text-sub)', background: 'var(--accent-light)', padding: '2px 8px', borderRadius: 10 }}>
-            {nodes.length} nodes
+            {websites.length} nodes
           </span>
 
           {/* LIVE badge */}
@@ -520,8 +561,87 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             onMouseMove={handleMouseMove}
             onMouseLeave={() => setHoveredId(null)}
           />
+
+          {/* Moved + MORE button to bottom right of canvas */}
+          {websites.length > 50 && (
+            <button 
+              onClick={() => setShowMoreNodes(true)}
+              style={{
+                position: 'absolute', bottom: 16, right: 16, zIndex: 10,
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 16px',
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: 'pointer',
+                letterSpacing: '0.05em',
+                boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                transition: 'transform 0.1s'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              + {websites.length - 50} MORE
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Show More Overlay */}
+      {showMoreNodes && (
+        <div style={{
+          position: 'absolute', inset: 0, background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(20px)',
+          zIndex: 200, display: 'flex', flexDirection: 'column', padding: 24,
+          animation: 'fadeIn 0.2s ease-out', border: '1px solid rgba(99,102,241,0.1)'
+        }}>
+          <style>{`@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }`}</style>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <h3 style={{ color: '#1e293b', margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '0.02em' }}>All Monitored Nodes</h3>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Showing all {websites.length} endpoints</div>
+            </div>
+            <button 
+              onClick={() => setShowMoreNodes(false)}
+              style={{ background: 'rgba(0,0,0,0.05)', border: 'none', color: '#1e293b', width: 32, height: 32, borderRadius: 16, cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+            >✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', background: '#fff', borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', color: '#1e293b', fontSize: 13 }}>
+              <thead style={{ background: '#f8fafc', position: 'sticky', top: 0, zIndex: 2, borderBottom: '2px solid #f1f5f9' }}>
+                <tr>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>STATUS</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>ENDPOINT NAME</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>URL</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>LATENCY</th>
+                </tr>
+              </thead>
+              <tbody>
+                {websites.map(w => (
+                  <tr key={w.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 20px' }}>
+                      <span style={{ 
+                        color: STATUS_COLORS[w.status] || STATUS_COLORS.UNKNOWN, 
+                        background: `${STATUS_COLORS[w.status] || STATUS_COLORS.UNKNOWN}15`,
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800
+                      }}>
+                        {w.status || 'UNKNOWN'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 20px', fontWeight: 800 }}>{w.name}</td>
+                    <td style={{ padding: '12px 20px', color: '#475569', fontFamily: 'monospace', fontSize: 12 }}>{w.url}</td>
+                    <td style={{ padding: '12px 20px', fontWeight: 700, color: w.response_time_ms > 1000 ? '#d97706' : '#059669' }}>{w.response_time_ms ? `${w.response_time_ms}ms` : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {nodes.length === 0 && (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
