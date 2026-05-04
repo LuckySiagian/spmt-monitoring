@@ -106,19 +106,19 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
       <div style={wStyles.header}>
         <div>
           <div style={wStyles.title}>Website Management</div>
-          <div style={wStyles.sub}>{websites.length} / 50 websites configured</div>
+          <div style={wStyles.sub}>{websites.length} / 100 websites configured</div>
         </div>
         {isAdmin && (
           <button 
             style={{ 
               ...wStyles.addBtn, 
-              opacity: websites.length >= 50 ? 0.5 : 1,
-              cursor: websites.length >= 50 ? 'not-allowed' : 'pointer'
+              opacity: websites.length >= 100 ? 0.5 : 1,
+              cursor: websites.length >= 100 ? 'not-allowed' : 'pointer'
             }} 
-            onClick={websites.length >= 50 ? null : openAdd}
-            title={websites.length >= 50 ? 'Limit 50 websites reached' : 'Add new website'}
+            onClick={websites.length >= 100 ? null : openAdd}
+            title={websites.length >= 100 ? 'Limit 100 websites reached' : 'Add new website'}
           >
-            {websites.length >= 50 ? 'Limit Reached' : '+ Add Website'}
+            {websites.length >= 100 ? 'Limit Reached' : '+ Add Website'}
           </button>
         )}
       </div>

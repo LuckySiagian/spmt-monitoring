@@ -6,7 +6,11 @@ const getBaseURL = () => {
 }
 const BASE_URL = getBaseURL()
 
-const api = axios.create({ baseURL: BASE_URL, headers: { 'Content-Type': 'application/json' } })
+const api = axios.create({ 
+  baseURL: BASE_URL, 
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 15000 // 15 seconds timeout to prevent infinite "Saving..." state
+})
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
@@ -24,7 +28,7 @@ api.interceptors.response.use(res => res, err => {
   return Promise.reject(err)
 })
 
-export const authAPI    = { login: (d, c)=>api.post('/auth/login', d, c), register: (d, c)=>api.post('/auth/register', d, c), changePassword: (d, c)=>api.put('/auth/change-password', d, c), updateAvatar: (d, c)=>api.put('/auth/avatar', d, c) }
+export const authAPI    = { login: (d, c)=>api.post('/auth/login', d, c), register: (d, c)=>api.post('/auth/register', d, c), updateProfile: (d, c)=>api.put('/auth/profile', d, c), changePassword: (d, c)=>api.put('/auth/change-password', d, c), updateAvatar: (d, c)=>api.put('/auth/avatar', d, c), testEmail: (c)=>api.post('/auth/test-email', {}, c) }
 export const publicAPI  = { getStatus: (c)=>api.get('/public/websites', c) }
 export const websiteAPI = { 
   getAll: (c)=>api.get('/websites', c), 

@@ -2,17 +2,22 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/spmt/monitoring/internal/middleware"
 	"github.com/spmt/monitoring/internal/model"
+	"github.com/spmt/monitoring/internal/notification"
 	"github.com/spmt/monitoring/internal/repository"
 	"golang.org/x/crypto/bcrypt"
-	"regexp"
 )
 
 var (
@@ -25,22 +30,58 @@ func isValidURLStrict(u string) bool {
 }
 
 type Service struct {
-	repo      *repository.Repository
-	jwtSecret string
-	jwtExpiry time.Duration
+	repo            *repository.Repository
+	jwtSecret       string
+	turnstileSecret string
+	jwtExpiry       time.Duration
 }
 
-func New(repo *repository.Repository, jwtSecret string, jwtExpiryHours int) *Service {
+func New(repo *repository.Repository, jwtSecret, turnstileSecret string, jwtExpiryHours int) *Service {
 	return &Service{
-		repo:      repo,
-		jwtSecret: jwtSecret,
-		jwtExpiry: time.Duration(jwtExpiryHours) * time.Hour,
+		repo:            repo,
+		jwtSecret:       jwtSecret,
+		turnstileSecret: turnstileSecret,
+		jwtExpiry:       time.Duration(jwtExpiryHours) * time.Hour,
 	}
+}
+
+func (s *Service) verifyTurnstile(token string) bool {
+	if s.turnstileSecret == "" {
+		return true // Skip if not configured
+	}
+
+	data := url.Values{}
+	data.Set("secret", s.turnstileSecret)
+	data.Set("response", token)
+
+	resp, err := http.PostForm("https://challenges.cloudflare.com/turnstile/v0/siteverify", data)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Success bool `json:"success"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return false
+	}
+	return result.Success
 }
 
 // ─── AUTH ─────────────────────────────────────────────────────
 
 func (s *Service) Login(ctx context.Context, req model.LoginRequest) (*model.LoginResponse, error) {
+	// Verify Turnstile Token if secret is configured
+	if s.turnstileSecret != "" {
+		if req.TurnstileToken == "" {
+			return nil, errors.New("captcha verification required")
+		}
+		if !s.verifyTurnstile(req.TurnstileToken) {
+			return nil, errors.New("captcha verification failed")
+		}
+	}
+
 	user, err := s.repo.GetUserByUsername(ctx, req.Username)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
@@ -58,10 +99,12 @@ func (s *Service) Login(ctx context.Context, req model.LoginRequest) (*model.Log
 	return &model.LoginResponse{
 		Token: token,
 		User: model.UserResponse{
-			ID:        user.ID,
-			Username:  user.Username,
-			Role:      user.Role,
-			CreatedAt: user.CreatedAt,
+			ID:         user.ID,
+			Username:   user.Username,
+			Email:      user.Email,
+			TelegramID: user.TelegramID,
+			Role:       user.Role,
+			CreatedAt:  user.CreatedAt,
 		},
 	}, nil
 }
@@ -73,22 +116,27 @@ func (s *Service) Register(ctx context.Context, req model.RegisterRequest) (*mod
 	if len(req.Password) < 6 {
 		return nil, errors.New("password must be at least 6 characters")
 	}
+	if req.Email == "" {
+		return nil, errors.New("email is required")
+	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), model.RoleViewer)
+	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), req.Email, req.TelegramID, model.RoleViewer)
 	if err != nil {
-		return nil, errors.New("username already exists")
+		return nil, errors.New("username or email already exists")
 	}
 
 	return &model.UserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
+		ID:         user.ID,
+		Username:   user.Username,
+		Email:      user.Email,
+		TelegramID: user.TelegramID,
+		Role:       user.Role,
+		CreatedAt:  user.CreatedAt,
 	}, nil
 }
 
@@ -115,10 +163,12 @@ func (s *Service) GetAllUsers(ctx context.Context) ([]*model.UserResponse, error
 	var result []*model.UserResponse
 	for _, u := range users {
 		result = append(result, &model.UserResponse{
-			ID:        u.ID,
-			Username:  u.Username,
-			Role:      u.Role,
-			CreatedAt: u.CreatedAt,
+			ID:         u.ID,
+			Username:   u.Username,
+			Email:      u.Email,
+			TelegramID: u.TelegramID,
+			Role:       u.Role,
+			CreatedAt:  u.CreatedAt,
 		})
 	}
 	return result, nil
@@ -198,8 +248,8 @@ func (s *Service) GetAllWebsites(ctx context.Context) ([]*model.Website, error) 
 
 func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequest) (*model.Website, error) {
 	existing, err := s.repo.GetAllWebsites(ctx)
-	if err == nil && len(existing) >= 50 {
-		return nil, errors.New("maximum limit of 50 websites reached")
+	if err == nil && len(existing) >= 100 {
+		return nil, errors.New("maximum limit of 100 websites reached")
 	}
 	if req.Name == "" || req.URL == "" {
 		return nil, errors.New("name and url are required")
@@ -277,6 +327,9 @@ func (s *Service) CreateUserByAdmin(ctx context.Context, req model.CreateUserReq
 	if len(req.Password) < 6 {
 		return nil, errors.New("password must be at least 6 characters")
 	}
+	if req.Email == "" {
+		return nil, errors.New("email is required")
+	}
 	role := model.RoleViewer
 	switch req.Role {
 	case "admin":
@@ -293,15 +346,17 @@ func (s *Service) CreateUserByAdmin(ctx context.Context, req model.CreateUserReq
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
-	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), role)
+	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), req.Email, req.TelegramID, role)
 	if err != nil {
-		return nil, errors.New("username already exists")
+		return nil, errors.New("username or email already exists")
 	}
 	return &model.UserResponse{
-		ID:        user.ID,
-		Username:  user.Username,
-		Role:      user.Role,
-		CreatedAt: user.CreatedAt,
+		ID:         user.ID,
+		Username:   user.Username,
+		Email:      user.Email,
+		TelegramID: user.TelegramID,
+		Role:       user.Role,
+		CreatedAt:  user.CreatedAt,
 	}, nil
 }
 
@@ -321,6 +376,40 @@ func (s *Service) DeleteUser(ctx context.Context, userIDStr string) error {
 	return s.repo.DeleteUser(ctx, userID)
 }
 
+func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, req model.UpdateProfileRequest) error {
+	var telegramID *string
+	if req.TelegramID != nil && *req.TelegramID != "" {
+		telegramID = req.TelegramID
+	}
+	err := s.repo.UpdateUserProfile(ctx, userID, req.Email, telegramID)
+	if err != nil {
+		log.Printf("[Service] UpdateUserProfile Database Error: %v", err)
+	}
+	return err
+}
+
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, req model.ChangePasswordRequest) error {
+	if req.NewPassword != req.ConfirmPassword {
+		return errors.New("new password and confirmation do not match")
+	}
+
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword)); err != nil {
+		return errors.New("incorrect old password")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.UpdateUserPassword(ctx, userID, string(hash))
+}
+
 // ─── NOTIFICATIONS ────────────────────────────────────────────
 
 func (s *Service) MarkAllNotificationsRead(ctx context.Context) error {
@@ -329,4 +418,15 @@ func (s *Service) MarkAllNotificationsRead(ctx context.Context) error {
 
 func (s *Service) GetUnreadNotificationCount(ctx context.Context) (int, error) {
 	return s.repo.GetUnreadNotificationCount(ctx)
+}
+func (s *Service) SendTestEmail(ctx context.Context, userID uuid.UUID, notif *notification.Service) error {
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.Email == "" {
+		return errors.New("you must set an email in your profile first")
+	}
+
+	return notif.NotifyTestEmail(user.Email)
 }

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username      VARCHAR(50) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role          VARCHAR(20) NOT NULL CHECK (role IN ('superadmin', 'admin', 'viewer')),
+    role          VARCHAR(20) NOT NULL CHECK (role IN ('superadmin', 'admin', 'adminpelindo', 'viewer')),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

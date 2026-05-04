@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../store/auth'
+import { Turnstile } from '@marsidev/react-turnstile'
+import { authAPI } from '../services/api'
+import { showToast } from '../components/dashboard/Toast'
 
 const videos = [
   "/images/background/bg1.MP4",
@@ -9,9 +12,11 @@ const videos = [
 export default function LoginPage({ onLogin, onBack }) {
   const { login } = useAuth()
 
-  const [form, setForm] = useState({ username: '', password: '' })
+  const [form, setForm] = useState({ username: '', password: '', email: '', telegram_id: '' })
+  const [turnstileToken, setTurnstileToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isRegister, setIsRegister] = useState(false)
 
   // state untuk video background
   const [videoIndex, setVideoIndex] = useState(0)
@@ -22,14 +27,33 @@ export default function LoginPage({ onLogin, onBack }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!turnstileToken) {
+      setError('Please complete the CAPTCHA')
+      return
+    }
     setError('')
     setLoading(true)
 
     try {
-      await login(form.username, form.password)
-      onLogin()
+      if (isRegister) {
+        await authAPI.register({ 
+          username: form.username, 
+          password: form.password, 
+          email: form.email, 
+          telegram_id: form.telegram_id 
+        })
+        // Go back to login and reset form
+        setIsRegister(false)
+        setForm({ username: '', password: '', email: '', telegram_id: '' })
+        setTurnstileToken('')
+        if (window.turnstile) window.turnstile.reset() // Reset turnstile widget
+        showToast('Account created successfully! Please sign in.', 'success')
+      } else {
+        await login(form.username, form.password, turnstileToken)
+        onLogin()
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Check credentials.')
+      setError(err.response?.data?.error || (isRegister ? 'Registration failed.' : 'Login failed. Check credentials.'))
     } finally {
       setLoading(false)
     }
@@ -86,10 +110,10 @@ export default function LoginPage({ onLogin, onBack }) {
           />
         </div>
 
-        <div style={s.welcomeText}>Welcome</div>
+        <div style={s.welcomeText}>{isRegister ? 'Create Account' : 'Welcome'}</div>
 
         <div style={s.welcomeSub}>
-          Sign in to access the monitoring dashboard
+          {isRegister ? 'Sign up to monitor services' : 'Sign in to access the monitoring dashboard'}
         </div>
 
         <form onSubmit={handleSubmit} style={s.form}>
@@ -99,26 +123,63 @@ export default function LoginPage({ onLogin, onBack }) {
             type="text"
             value={form.username}
             onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-            placeholder="Username"
+            placeholder={isRegister ? "Username *" : "Username"}
             required
           />
+
+          {isRegister && (
+            <>
+              <input
+                style={s.input}
+                type="email"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="Email *"
+                required
+              />
+              <input
+                style={s.input}
+                type="text"
+                value={form.telegram_id}
+                onChange={e => setForm(f => ({ ...f, telegram_id: e.target.value }))}
+                placeholder="Telegram ID (optional)"
+              />
+            </>
+          )}
 
           <input
             style={s.input}
             type="password"
             value={form.password}
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-            placeholder="Password"
+            placeholder={isRegister ? "Password *" : "Password"}
             required
           />
+
+          <div style={{ alignSelf: 'center', margin: '10px 0' }}>
+            <Turnstile 
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '3x00000000000000000000FF'} 
+              onSuccess={(token) => setTurnstileToken(token)}
+            />
+          </div>
 
           {error && <div style={s.error}>{error}</div>}
 
           <button type="submit" style={s.btn} disabled={loading}>
-            {loading ? 'Authenticating...' : 'SIGN IN'}
+            {loading ? 'Processing...' : (isRegister ? 'REGISTER' : 'SIGN IN')}
           </button>
 
         </form>
+
+        <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text-sub)' }}>
+          {isRegister ? 'Already have an account? ' : 'Need an account? '}
+          <span 
+            onClick={() => { setIsRegister(!isRegister); setError(''); }} 
+            style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            {isRegister ? 'Sign in' : 'Register here'}
+          </span>
+        </div>
 
         {/* BRAND LOGOS REMOVED - MOVED TO ABOUT SECTION */}
 

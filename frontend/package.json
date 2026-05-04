@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.5.1",
     "@xyflow/react": "^12.3.0",
     "axios": "^1.6.7",
     "canvas-confetti": "^1.9.4",

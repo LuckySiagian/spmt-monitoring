@@ -10,7 +10,7 @@ import UsersPage from './pages/UsersPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
-import { dashboardAPI, websiteAPI, userAPI, eventsAPI } from './services/api'
+import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './services/api'
 import PublicStatusPage from './pages/PublicStatusPage'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
@@ -225,7 +225,27 @@ function LogoutModal({ onConfirm, onCancel }) {
 
 // ── Profile Modal ───────────────────────────────────────────────
 function ProfileModal({ user, onClose }) {
+  const { updateUser } = useAuth()
+  const [activeTab, setActiveTab] = useState('profile') // 'profile' or 'security'
   const [avatar, setAvatar] = useState(() => localStorage.getItem(`spmt_avatar_${user?.username}`) || null)
+  const [email, setEmail] = useState(() => {
+    const currentEmail = user?.email || ''
+    if (!currentEmail && (user?.role === 'superadmin' || user?.role === 'adminpelindo')) {
+      return 'situkko135@gmail.com'
+    }
+    return currentEmail
+  })
+  const [telegramId, setTelegramId] = useState(user?.telegram_id || '')
+  
+  // Email change fields
+  const [showChangeEmail, setShowChangeEmail] = useState(false)
+  const [currentEmailConfirm, setCurrentEmailConfirm] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [confirmNewEmail, setConfirmNewEmail] = useState('')
+
+  // Password fields
+  
+  const [loading, setLoading] = useState(false)
 
   const handleFile = (e) => {
     const file = e.target.files[0]
@@ -245,6 +265,65 @@ function ProfileModal({ user, onClose }) {
     setAvatar(null)
     localStorage.removeItem(`spmt_avatar_${user?.username}`)
     window.dispatchEvent(new Event('AvatarUpdated'))
+  }
+
+  const handleSave = async (type = 'profile') => {
+    setLoading(true)
+    try {
+      if (type === 'profile') {
+        await authAPI.updateProfile({ email, telegram_id: telegramId })
+        updateUser({ email, telegram_id: telegramId })
+        showToast('Profile updated successfully', 'success')
+        onClose()
+      } else if (type === 'email') {
+        const isFirstTime = !user?.email;
+        if (!newEmail || !confirmNewEmail) {
+          showToast('Please fill in both new email fields', 'error')
+          return
+        }
+        if (!isFirstTime && !currentEmailConfirm) {
+          showToast('Please confirm your current email address', 'error')
+          return
+        }
+        if (!isFirstTime && currentEmailConfirm !== user?.email) {
+          showToast('Current email is incorrect', 'error')
+          return
+        }
+        if (newEmail !== confirmNewEmail) {
+          showToast('New emails do not match', 'error')
+          return
+        }
+        await authAPI.updateProfile({ email: newEmail, telegram_id: telegramId })
+        updateUser({ email: newEmail, telegram_id: telegramId })
+        setEmail(newEmail)
+        setShowChangeEmail(false)
+        setCurrentEmailConfirm('')
+        setNewEmail('')
+        setConfirmNewEmail('')
+        showToast('Email updated successfully', 'success')
+        onClose() // Tutup modal setelah sukses agar tidak stuck di processing
+      } else if (type === 'security') {
+        if (!oldPassword || !newPassword || !confirmPassword) {
+          showToast('Please fill all password fields', 'error')
+          return
+        }
+        if (newPassword !== confirmPassword) {
+          showToast('New passwords do not match', 'error')
+          return
+        }
+        await authAPI.changePassword({ old_password: oldPassword, new_password: newPassword, confirm_password: confirmPassword })
+        showToast('Password changed successfully', 'success')
+        onClose()
+      } else if (type === 'test_email') {
+        await authAPI.testEmail()
+        showToast('Test email sent! Please check your inbox.', 'success')
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || 'Operation failed'
+      showToast(errorMsg, 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return createPortal(
@@ -276,13 +355,232 @@ function ProfileModal({ user, onClose }) {
             </div>
           </div>
 
-          <div style={{ background: 'rgba(99,102,241,0.05)', borderRadius: 12, border: '1px solid var(--border)', padding: '16px' }}>
-            <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--text)' }}>Employee Details</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Email</div><div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{user?.username}@pelindo.co.id</div></div>
-              <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Department</div><div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>IT / NOC Operasional</div></div>
-              <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Status</div><div style={{ fontSize: 12, fontWeight: 600, color: 'var(--online)' }}>Active</div></div>
-              <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Location</div><div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Pelabuhan Belawan</div></div>
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 20, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+            <div 
+              onClick={() => setActiveTab('profile')}
+              style={{ padding: '8px 4px', fontSize: 13, fontWeight: 800, color: activeTab === 'profile' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'profile' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              General Settings
+            </div>
+            <div 
+              onClick={() => setActiveTab('security')}
+              style={{ padding: '8px 4px', fontSize: 13, fontWeight: 800, color: activeTab === 'security' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'security' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Security
+            </div>
+          </div>
+
+          <div style={{ background: 'var(--bg-header)', borderRadius: 12, border: '1px solid var(--border)', padding: '16px', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)' }}>
+            {activeTab === 'profile' ? (
+              <>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>PERSONAL NOTIFICATION SETTINGS</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  
+                  {/* Email Section */}
+                  <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>✉️</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.08em' }}>
+                         CURRENT EMAIL ADDRESS
+                      </div>
+                      {!user?.email && <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, padding: '2px 8px', background: 'rgba(239,68,68,0.15)', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)' }}>REQUIRED</span>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ 
+                          width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', 
+                          borderRadius: 8, padding: '10px 14px 10px 38px', fontSize: 13, color: email ? 'var(--text)' : 'var(--text-muted)', 
+                          fontWeight: 600, letterSpacing: '0.02em', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' 
+                        }}>
+                          <span style={{ position: 'absolute', left: 12, fontSize: 16, opacity: 0.7 }}>📧</span>
+                          {email || 'No email registered yet'}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setShowChangeEmail(!showChangeEmail)} 
+                        style={{ 
+                          background: showChangeEmail ? 'rgba(239,68,68,0.15)' : 'var(--accent)', 
+                          border: showChangeEmail ? '1px solid #ef4444' : 'none', 
+                          color: showChangeEmail ? '#ef4444' : '#fff', 
+                          borderRadius: 8, padding: '10px 18px', fontSize: 11, fontWeight: 800, 
+                          cursor: 'pointer', transition: 'all 0.2s', boxShadow: showChangeEmail ? 'none' : '0 4px 12px var(--accent-light)' 
+                        }}
+                      >
+                        {showChangeEmail ? 'CLOSE' : (user?.email ? 'CHANGE' : 'SET EMAIL')}
+                      </button>
+                    </div>
+
+                    {showChangeEmail && (
+                      <div style={{ 
+                        marginTop: 18, padding: '18px', background: 'var(--bg-card)', 
+                        borderRadius: 12, border: '1px solid var(--accent)', 
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.2), 0 0 0 1px var(--accent)',
+                        animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)' 
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                          <div style={{ width: 4, height: 16, background: 'var(--accent)', borderRadius: 2 }} />
+                          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.05em' }}>UPDATE EMAIL IDENTITY</div>
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                            {user?.email && (
+                              <>
+                                <div style={{ position: 'relative' }}>
+                                  <label style={{ display: 'block', fontSize: 9, color: 'var(--accent)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>CONFIRM CURRENT EMAIL</label>
+                                  <input 
+                                    type="email" 
+                                    value={currentEmailConfirm} 
+                                    onChange={e => setCurrentEmailConfirm(e.target.value)}
+                                    placeholder="Type your existing email..."
+                                    style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none', transition: 'border 0.2s' }}
+                                  />
+                                </div>
+                                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0', opacity: 0.5 }} />
+                              </>
+                            )}
+                            <div>
+                              <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>NEW EMAIL ADDRESS</label>
+                              <input 
+                                type="email" 
+                                value={newEmail} 
+                                onChange={e => setNewEmail(e.target.value)}
+                                placeholder="Enter new email..."
+                                style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>RE-TYPE NEW EMAIL</label>
+                              <input 
+                                type="email" 
+                                value={confirmNewEmail} 
+                                onChange={e => setConfirmNewEmail(e.target.value)}
+                                placeholder="Confirm new email..."
+                                style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                              />
+                            </div>
+                          </div>
+                          
+                          <button 
+                            onClick={() => handleSave('email')} 
+                            disabled={loading || !newEmail || !confirmNewEmail}
+                            style={{ 
+                              marginTop: 6, background: 'linear-gradient(135deg, var(--accent), #4f46e5)', 
+                              border: 'none', color: '#fff', borderRadius: 8, padding: '12px', 
+                              fontSize: 12, fontWeight: 800, cursor: 'pointer', 
+                              boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)',
+                              opacity: (loading || !newEmail) ? 0.6 : 1,
+                              transition: 'transform 0.1s active'
+                            }}
+                          >
+                            {loading ? 'PROCESSING...' : 'CONFIRM IDENTITY CHANGE'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Telegram Section */}
+                  <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>📱</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 800, letterSpacing: '0.08em' }}>
+                      TELEGRAM INTEGRATION <span style={{ color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>(OPTIONAL)</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+                        <span style={{ position: 'absolute', left: 12, fontSize: 16, opacity: 0.7 }}>📱</span>
+                        <input 
+                          type="text" 
+                          value={telegramId} 
+                          onChange={e => setTelegramId(e.target.value)}
+                          placeholder="@username or Chat ID..."
+                          style={{ width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px 10px 38px', fontSize: 13, color: 'var(--text)', outline: 'none', fontWeight: 600 }}
+                        />
+                      </div>
+                      <button 
+                        onClick={() => handleSave('profile')} 
+                        disabled={loading}
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '0 20px', fontSize: 11, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', opacity: loading ? 0.6 : 1 }}
+                      >
+                        {user?.telegram_id ? 'UPDATE' : 'LINK'}
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontSize: 12 }}>ℹ️</span> Used for backup alerts if primary email is unreachable.
+                    </div>
+                  </div>
+
+                  {/* Test Notification Section */}
+                  <div style={{ background: 'rgba(79,70,229,0.05)', padding: '16px', borderRadius: 12, border: '1px dashed var(--accent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)' }}>TEST SYSTEM NOTIFICATIONS</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Verify your SMTP & Email settings instantly</div>
+                    </div>
+                    <button 
+                      onClick={() => handleSave('test_email')}
+                      disabled={loading}
+                      style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 10, fontWeight: 800, cursor: 'pointer', opacity: loading ? 0.6 : 1 }}
+                    >
+                      {loading ? 'SENDING...' : 'SEND TEST EMAIL'}
+                    </button>
+                  </div>
+
+                </div>
+              </>
+            ) : (
+              <>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>CHANGE ACCOUNT PASSWORD</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 700 }}>OLD PASSWORD</div>
+                    <input 
+                      type="password" 
+                      value={oldPassword} 
+                      onChange={e => setOldPassword(e.target.value)}
+                      placeholder="Enter current password"
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                    />
+                  </div>
+                  <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 700 }}>NEW PASSWORD</div>
+                    <input 
+                      type="password" 
+                      value={newPassword} 
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="Enter new password"
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                    />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 700 }}>CONFIRM NEW PASSWORD</div>
+                    <input 
+                      type="password" 
+                      value={confirmPassword} 
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            
+            <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button 
+                onClick={onClose} 
+                style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+              >Cancel</button>
+              {activeTab === 'security' && (
+                <button 
+                  onClick={() => handleSave('security')} 
+                  disabled={loading}
+                  style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)', opacity: loading ? 0.7 : 1 }}
+                >
+                  {loading ? 'Processing...' : 'Update Password'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -513,7 +811,13 @@ function AppInner() {
     }
   }, [loggedIn, triggerGlobalRefresh, loadSummary, loadWebsites, loadUsers, loadEvents])
 
-  const navTo = useCallback((nav) => { if (nav === 'users' && !isSuperAdmin) return; setActiveNav(nav); localStorage.setItem('spmt_active_nav', nav) }, [isSuperAdmin])
+  const navTo = useCallback((nav) => { 
+    if (nav === 'users' && !isSuperAdmin) return; 
+    setActiveNav(nav); 
+    localStorage.setItem('spmt_active_nav', nav);
+    // Auto refresh data whenever user switches pages
+    triggerGlobalRefresh();
+  }, [isSuperAdmin, triggerGlobalRefresh])
 
   const handleNewNotification = useCallback((notif) => {
     if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL') return

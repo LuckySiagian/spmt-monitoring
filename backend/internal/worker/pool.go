@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/spmt/monitoring/internal/model"
+	"github.com/spmt/monitoring/internal/notification"
 	"github.com/spmt/monitoring/internal/repository"
 	ws "github.com/spmt/monitoring/internal/websocket"
 )
@@ -38,13 +39,15 @@ type Pool struct {
 	cancel     context.CancelFunc
 	localNet   bool
 	lastCheck  time.Time
+	notif      *notification.Service
 }
 
-func NewPool(repo *repository.Repository, hub *ws.Hub, workerSize int) *Pool {
+func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Service, workerSize int) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pool{
 		repo:       repo,
 		hub:        hub,
+		notif:      notif,
 		jobs:       make(chan MonitorJob, 500),
 		workerSize: workerSize,
 		tickers:    make(map[uuid.UUID]*time.Ticker),
@@ -518,6 +521,11 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) 
 			Timestamp:      logEntry.CheckedAt,
 		})
 		log.Printf("[Worker] STATUS CHANGE %s: %s → %s (%s)", w.Name, prevStatus, logEntry.Status, logEntry.RootCause)
+
+		// Trigger Email & Telegram Notifications
+		if p.notif != nil {
+			go p.notif.NotifyStatusChange(w.Name, prevStatus, string(logEntry.Status), logEntry.RootCause)
+		}
 	}
 
 	p.hub.Broadcast("monitor_update", model.WSMonitorUpdate{

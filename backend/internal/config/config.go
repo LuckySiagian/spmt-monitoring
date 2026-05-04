@@ -16,9 +16,17 @@ type Config struct {
 	DBName        string
 	DBSSLMode     string
 	JWTSecret     string
-	JWTExpiryHours int
-	ServerPort    string
-	FrontendURL   string
+	JWTExpiryHours  int
+	ServerPort      string
+	FrontendURL     string
+	TurnstileSecret string
+	SMTPHost        string
+	SMTPPort        int
+	SMTPUser        string
+	SMTPPass        string
+	SMTPFrom        string
+	TelegramToken   string
+	TelegramChatID  string
 }
 
 func Load() (*Config, error) {
@@ -33,10 +41,18 @@ func Load() (*Config, error) {
 		DBPassword:     getEnv("DB_PASSWORD", ""),
 		DBName:         getEnv("DB_NAME", "spmt_monitoring"),
 		DBSSLMode:      getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:      getEnv("JWT_SECRET", "default-secret-change-me"),
-		JWTExpiryHours: jwtExpiry,
-		ServerPort:     getEnv("SERVER_PORT", "8080"),
-		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:5173"),
+		JWTSecret:       getEnv("JWT_SECRET", "default-secret-change-me"),
+		JWTExpiryHours:  jwtExpiry,
+		ServerPort:      getEnv("SERVER_PORT", "8080"),
+		FrontendURL:     getEnv("FRONTEND_URL", "http://localhost:5173"),
+		TurnstileSecret: getEnv("TURNSTILE_SECRET", ""),
+		SMTPHost:        getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:        getEnvInt("SMTP_PORT", 587),
+		SMTPUser:        getEnv("SMTP_USER", ""),
+		SMTPPass:        getEnv("SMTP_PASS", ""),
+		SMTPFrom:        getEnv("SMTP_FROM", ""),
+		TelegramToken:   getEnv("TELEGRAM_BOT_TOKEN", ""),
+		TelegramChatID:  getEnv("TELEGRAM_CHAT_ID", ""),
 	}
 
 	return cfg, nil
@@ -50,6 +66,14 @@ func (c *Config) DSN() string {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		i, _ := strconv.Atoi(v)
+		return i
 	}
 	return fallback
 }
