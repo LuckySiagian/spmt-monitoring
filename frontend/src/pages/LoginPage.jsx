@@ -9,7 +9,7 @@ const videos = [
   "/images/background/bg2.MP4"
 ]
 
-export default function LoginPage({ onLogin, onBack }) {
+export default function LoginPage({ onLogin }) {
   const { login } = useAuth()
 
   const [form, setForm] = useState({ username: '', password: '', email: '', telegram_id: '' })
@@ -183,17 +183,6 @@ export default function LoginPage({ onLogin, onBack }) {
 
         {/* BRAND LOGOS REMOVED - MOVED TO ABOUT SECTION */}
 
-        {/* BACK TO MONITORING LINK */}
-        <button 
-          onClick={onBack} 
-          style={{ 
-            marginTop: '24px', background: 'none', border: 'none', 
-            color: 'var(--primary)', fontSize: '12px', fontWeight: 700, 
-            cursor: 'pointer', textDecoration: 'underline' 
-          }}
-        >
-          Back To Home
-        </button>
 
       </div>
 

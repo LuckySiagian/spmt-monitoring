@@ -29,8 +29,8 @@ func (s *Service) NotifyStatusChange(websiteName, oldStatus, newStatus, rootCaus
 	// 1. Send to Telegram (Global Group)
 	s.sendTelegram(websiteName, oldStatus, newStatus, rootCause)
 
-	// 2. Send to Emails (All Registered Users)
-	s.sendEmails(websiteName, oldStatus, newStatus, rootCause)
+	// 2. Send to Emails (All Registered Users) - TEMPORARILY DISABLED DUE TO LIMITS
+	// s.sendEmails(websiteName, oldStatus, newStatus, rootCause)
 }
 
 func (s *Service) sendTelegram(websiteName, oldStatus, newStatus, rootCause string) {
