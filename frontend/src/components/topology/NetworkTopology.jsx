@@ -236,11 +236,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
     ctx.beginPath(); ctx.arc(serverX, serverY, 42, 0, Math.PI * 2)
     ctx.fillStyle = '#ffffff'; ctx.fill()
     ctx.strokeStyle = `rgba(0, 209, 178, ${pulse})`; ctx.lineWidth = 3; ctx.stroke()
-    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 18px "Inter", sans-serif'
+    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 24px "Inter", sans-serif'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText('SPMT', serverX, serverY - 6)
-    ctx.font = '12px "Inter", sans-serif'; ctx.fillStyle = 'var(--accent)'
-    ctx.fillText('SERVER', serverX, serverY + 12)
+    ctx.fillText('SPMT', serverX, serverY - 8)
+    ctx.font = '16px "Inter", sans-serif'; ctx.fillStyle = 'var(--accent)'
+    ctx.fillText('SERVER', serverX, serverY + 16)
 
     // Website nodes
     nodes.forEach(node => {
@@ -300,11 +300,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
       // Label Box Positioning Logic
       const canvasScale = Math.min(width / 1400, height / 900)
-      const baseFontSize = Math.max(15, 13 * canvasScale)
-      const hoverFontSize = Math.max(16, 16 * canvasScale)
+      const baseFontSize = Math.max(18, 16 * canvasScale)
+      const hoverFontSize = Math.max(20, 20 * canvasScale)
       
       const name = node.name.length > 20 ? node.name.slice(0, 18) + '…' : node.name
-      ctx.font = `${(isSel || isHov) ? '900' : '700'} ${isHov ? hoverFontSize : baseFontSize}px "Inter", sans-serif`
+      ctx.font = `${(isSel || isHov) ? '1000' : '900'} ${isHov ? hoverFontSize : baseFontSize}px "Inter", sans-serif`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
       const th = isHov ? 30 : 22
 
@@ -452,9 +452,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 14, height: 14, borderRadius: '50%', background: STATUS_COLORS[hoveredNodeData.status], boxShadow: `0 0 10px ${STATUS_COLORS[hoveredNodeData.status]}` }} />
-              <span style={{ fontSize: 18, fontWeight: 1000, color: '#fff', textTransform: 'uppercase' }}>{hoveredNodeData.name}</span>
+              <span style={{ fontSize: 24, fontWeight: 1000, color: '#fff', textTransform: 'uppercase' }}>{hoveredNodeData.name}</span>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 800, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '4px 12px', borderRadius: 6 }}>{hoveredNodeData.status}</span>
+            <span style={{ fontSize: 16, fontWeight: 900, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '6px 16px', borderRadius: 6 }}>{hoveredNodeData.status}</span>
           </div>
 
           {/* Endpoint Info */}
@@ -467,8 +467,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           {/* Metrics Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: 12 }}>
             <div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LATENCY</div>
-              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.response_time_ms ? `${hoveredNodeData.response_time_ms}ms` : '---'}</div>
+              <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LATENCY</div>
+              <div style={{ fontSize: 24, fontWeight: 1000, color: '#fff' }}>{hoveredNodeData.response_time_ms ? `${hoveredNodeData.response_time_ms}ms` : '---'}</div>
             </div>
             <div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>HTTP CODE</div>
@@ -622,7 +622,15 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               </thead>
               <tbody>
                 {websites.map(w => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'} onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}>
+                  <tr 
+                    key={w.id} 
+                    style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s', cursor: 'pointer' }} 
+                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'} 
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                    onClick={() => {
+                      onOpenDetail?.(w)
+                    }}
+                  >
                     <td style={{ padding: '12px 20px' }}>
                       <span style={{ 
                         color: STATUS_COLORS[w.status] || STATUS_COLORS.UNKNOWN, 

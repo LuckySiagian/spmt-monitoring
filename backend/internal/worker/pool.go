@@ -8,14 +8,9 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
 
 	"github.com/google/uuid"
 	"github.com/spmt/monitoring/internal/model"
@@ -58,7 +53,7 @@ func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Servi
 }
 
 func (p *Pool) Start() {
-	log.Printf("[Worker] Starting %d workers", p.workerSize)
+	log.Printf("[Worker] Starting %d lightweight workers", p.workerSize)
 	for i := 0; i < p.workerSize; i++ {
 		go p.worker(i)
 	}
@@ -154,98 +149,40 @@ func (p *Pool) worker(id int) {
 	}
 }
 
-// ── URL Validation ────────────────────────────────────────────
-func isValidURL(rawURL string) bool {
-	u, err := url.ParseRequestURI(rawURL)
-	if err != nil {
-		return false
+// ── TLS Helpers ────────────────────────────────────────────────
+func getTLSVersionName(v uint16) string {
+	switch v {
+	case tls.VersionTLS10: return "TLS 1.0"
+	case tls.VersionTLS11: return "TLS 1.1"
+	case tls.VersionTLS12: return "TLS 1.2"
+	case tls.VersionTLS13: return "TLS 1.3"
+	default: return "Unknown"
 	}
-	return u.Scheme == "http" || u.Scheme == "https"
 }
 
-// ── STEP 1: DNS Resolution with latency ───────────────────────
-func dnsResolve(host string) (resolved bool, ipAddr string, latencyMs int) {
-	start := time.Now()
-	addrs, err := net.LookupHost(host)
-	latencyMs = int(time.Since(start).Milliseconds())
-	if err != nil || len(addrs) == 0 {
-		return false, "", latencyMs
+func getCipherSuiteName(id uint16) string {
+	for _, c := range tls.CipherSuites() {
+		if c.ID == id { return c.Name }
 	}
-	return true, addrs[0], latencyMs
+	for _, c := range tls.InsecureCipherSuites() {
+		if c.ID == id { return c.Name + " (Insecure)" }
+	}
+	return "Unknown"
 }
 
-// ── STEP 2: ICMP Ping ─────────────────────────────────────────
-// Requires root/CAP_NET_RAW. Falls back to alive=true if no permission.
-func icmpPing(host string) (ok bool, latencyMs int) {
-	start := time.Now()
-	addrs, err := net.LookupHost(host)
-	if err != nil || len(addrs) == 0 {
-		return false, 0
-	}
-	ip := addrs[0]
-
-	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-	if err != nil {
-		// No raw socket permission — fallback: assume reachable if DNS resolves
-		return true, int(time.Since(start).Milliseconds())
-	}
-	defer conn.Close()
-
-	msg := icmp.Message{
-		Type: ipv4.ICMPTypeEcho, Code: 0,
-		Body: &icmp.Echo{ID: os.Getpid() & 0xffff, Seq: 1, Data: []byte("spmt")},
-	}
-	b, err := msg.Marshal(nil)
-	if err != nil {
-		return false, 0
-	}
-	dst, err := net.ResolveIPAddr("ip4", ip)
-	if err != nil {
-		return false, 0
-	}
-	conn.SetDeadline(time.Now().Add(3 * time.Second))
-	if _, err := conn.WriteTo(b, dst); err != nil {
-		return false, 0
-	}
-	rb := make([]byte, 1500)
-	n, _, err := conn.ReadFrom(rb)
-	latencyMs = int(time.Since(start).Milliseconds())
-	if err != nil {
-		return false, 0
-	}
-	rm, err := icmp.ParseMessage(1, rb[:n])
-	if err != nil {
-		return false, 0
-	}
-	if rm.Type == ipv4.ICMPTypeEchoReply {
-		return true, latencyMs
-	}
-	return false, 0
-}
-
-// ── STEP 3: TCP Port Check ────────────────────────────────────
-func tcpCheck(host string, port int) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), 5*time.Second)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
-
-// ── Local Connectivity Check ─────────────────────────────────
-func (p *Pool) checkLocalConnectivity() bool {
+func (p *Pool) isLocalNetworkOK() bool {
 	p.mu.Lock()
-	if time.Since(p.lastCheck) < 10*time.Second {
+	if time.Since(p.lastCheck) < 15*time.Second {
 		status := p.localNet
 		p.mu.Unlock()
 		return status
 	}
 	p.mu.Unlock()
 
-	// Try to resolve a highly reliable host
-	_, err := net.LookupHost("google.com")
+	dialer := &net.Dialer{Timeout: 3 * time.Second}
+	conn, err := dialer.Dial("tcp", "8.8.8.8:53")
 	ok := err == nil
+	if ok { conn.Close() }
 	
 	p.mu.Lock()
 	p.localNet = ok
@@ -254,237 +191,156 @@ func (p *Pool) checkLocalConnectivity() bool {
 	return ok
 }
 
-// ── Main check flow: DNS→ICMP→TCP→HTTP→SSL→RESPONSE ──────────
 func (p *Pool) check(w model.Website) {
 	start := time.Now()
-	logEntry := &model.MonitoringLog{
+	l := &model.MonitoringLog{
 		WebsiteID: w.ID,
 		CheckedAt: start,
 		Status:    model.StatusUnknown,
-		RootCause: "Initializing check...",
 	}
 
-	// ── PRE-CHECK: Local Network Health ──────────────────────
-	localOK := p.checkLocalConnectivity()
-	if !localOK {
-		errMsg := "Local monitor connectivity issue (Network Down/Unstable)"
-		logEntry.ErrorMessage = &errMsg
-		logEntry.Status = model.StatusUnknown
-		logEntry.RootCause = "MONITOR_OFFLINE: Jaringan lokal/komputer monitoring bermasalah."
-		p.saveAndBroadcast(w, logEntry)
-		return
-	}
-
-	// ── Validate URL ──────────────────────────────────────────
-	if !isValidURL(w.URL) {
-		errMsg := "Invalid URL format: " + w.URL
-		logEntry.ErrorMessage = &errMsg
-		logEntry.Status = model.StatusUnknown
-		logEntry.RootCause = "Invalid URL format"
-		p.saveAndBroadcast(w, logEntry)
+	if !p.isLocalNetworkOK() {
+		l.Status = model.StatusUnknown
+		l.RootCause = "MONITOR_NETWORK_UNSTABLE: Local network issue detected."
+		p.saveAndBroadcast(w, l)
 		return
 	}
 
 	host := extractHost(w.URL)
 	isHTTPS := strings.HasPrefix(w.URL, "https://")
 	port := 80
-	if isHTTPS {
-		port = 443
-	}
+	if isHTTPS { port = 443 }
 
-	// ── STEP 1: DNS ───────────────────────────────────────────
-	dnsOK, ipAddr, dnsLatency := dnsResolve(host)
-	logEntry.DNSResolved = dnsOK
-	logEntry.DNSLatencyMs = &dnsLatency
-	logEntry.IPAddress = ipAddr
-
-	if !dnsOK {
-		errMsg := "DNS resolution failed for: " + host
-		logEntry.ErrorMessage = &errMsg
-		logEntry.Status = model.StatusOffline
-		logEntry.RootCause = "DNS lookup failed"
-		p.saveAndBroadcast(w, logEntry)
+	// 1. DNS
+	addrs, err := net.LookupHost(host)
+	if err != nil || len(addrs) == 0 {
+		l.Status = model.StatusOffline
+		l.RootCause = "DOWN (DNS FAILURE): Domain could not be resolved."
+		p.saveAndBroadcast(w, l)
 		return
 	}
+	l.DNSResolved = true
+	l.IPAddress = addrs[0]
 
-	// ── STEP 2: ICMP ─────────────────────────────────────────
-	icmpOK, icmpLatency := icmpPing(host)
-	logEntry.ICMPStatus = icmpOK
-	if icmpOK {
-		logEntry.ICMPLatencyMs = &icmpLatency
+	// 2. TCP
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), 5*time.Second)
+	if err != nil {
+		l.Status = model.StatusOffline
+		l.RootCause = "DOWN (HOST UNREACHABLE): Port " + fmt.Sprint(port) + " closed."
+		p.saveAndBroadcast(w, l)
+		return
+	}
+	l.TCPPortOpen = true
+	conn.Close()
+
+	// 3. SSL/TLS
+	var tlsInfo string
+	if isHTTPS {
+		tlsConfig := &tls.Config{ServerName: host, InsecureSkipVerify: false}
+		dialer := &net.Dialer{Timeout: 5 * time.Second}
+		tlsConn, tlsErr := tls.DialWithDialer(dialer, "tcp", fmt.Sprintf("%s:%d", host, port), tlsConfig)
+		
+		if tlsErr != nil {
+			l.SSLValid = false
+			errStr := strings.ToLower(tlsErr.Error())
+			if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "reset") || strings.Contains(errStr, "refused") {
+				l.RootCause = "DOWN (TLS RESET): Connection aborted during handshake. Likely blocked by WAF/Bot Protection."
+			} else {
+				l.RootCause = "SECURITY_FAULT: SSL Handshake failed. " + tlsErr.Error()
+			}
+			
+			// Try insecure fallback to at least get expiry if possible
+			tlsConfig.InsecureSkipVerify = true
+			if insConn, insErr := tls.DialWithDialer(dialer, "tcp", fmt.Sprintf("%s:%d", host, port), tlsConfig); insErr == nil {
+				if len(insConn.ConnectionState().PeerCertificates) > 0 {
+					exp := insConn.ConnectionState().PeerCertificates[0].NotAfter
+					l.SSLExpiryDate = &exp
+				}
+				insConn.Close()
+			}
+		} else {
+			l.SSLValid = true
+			state := tlsConn.ConnectionState()
+			tlsInfo = fmt.Sprintf("[%s | %s]", getTLSVersionName(state.Version), getCipherSuiteName(state.CipherSuite))
+			if len(state.PeerCertificates) > 0 {
+				exp := state.PeerCertificates[0].NotAfter
+				l.SSLExpiryDate = &exp
+			}
+			tlsConn.Close()
+		}
+	} else {
+		l.SSLValid = true
 	}
 
-	// ── STEP 3: TCP ───────────────────────────────────────────
-	logEntry.TCPPortOpen = tcpCheck(host, port)
-
-	// ── STEP 4: HTTP ──────────────────────────────────────────
+	// 4. HTTP LAYER
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{
-		Timeout: 15 * time.Second,
-		Jar:     jar, // Enable cookie support to handle auth/redirect loops (e.g., ASP.NET Cookie Support detection)
+		Timeout: 35 * time.Second,
+		Jar:     jar,
 		Transport: &http.Transport{
-			// Allow connection even if SSL is invalid/expired (fixes the "Offline in monitoring but OK in browser" issue)
-			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, 
-			DisableKeepAlives:   true,
-			MaxIdleConnsPerHost: 1,
-		},
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 15 {
-				return fmt.Errorf("too many redirects (%d)", len(via))
-			}
-			// Important: Maintain headers during redirects (useful for headers we set manually)
-			if len(via) > 0 {
-				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-			}
-			return nil
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true, ServerName: host},
 		},
 	}
-
-	httpStart := time.Now()
-	// Create a new request to add browser-like headers
 	req, _ := http.NewRequest("GET", w.URL, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9,id;q=0.8")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Cache-Control", "max-age=0")
+	req.Header.Set("Sec-Ch-Ua", "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"122\"")
 
+	httpStart := time.Now()
 	resp, httpErr := client.Do(req)
-	elapsed := int(time.Since(httpStart).Milliseconds())
-	logEntry.ResponseTimeMs = &elapsed
+	rt := int(time.Since(httpStart).Milliseconds())
+	l.ResponseTimeMs = &rt
 
 	if httpErr != nil {
-		errMsg := httpErr.Error()
-		logEntry.ErrorMessage = &errMsg
-		logEntry.Status = model.StatusOffline
-		logEntry.RootCause = diagnoseConnError(errMsg)
-		p.saveAndBroadcast(w, logEntry)
+		if l.RootCause == "" {
+			l.RootCause = "DOWN (CONN ERROR): " + httpErr.Error()
+		}
+		l.Status = model.StatusOffline
+	} else {
+		defer resp.Body.Close()
+		code := resp.StatusCode
+		l.StatusCode = &code
+		p.evaluateStatusV5(l, tlsInfo)
+	}
+
+	p.saveAndBroadcast(w, l)
+}
+
+func (p *Pool) evaluateStatusV5(l *model.MonitoringLog, tlsInfo string) {
+	code := *l.StatusCode
+	rt := *l.ResponseTimeMs
+
+	if code >= 200 && code <= 399 {
+		if rt > 30000 {
+			l.Status = model.StatusOffline
+			l.RootCause = fmt.Sprintf("DOWN (TOO SLOW): Response took %dms (Max 30s).", rt)
+			return
+		}
+
+		l.Status = model.StatusOnline
+		l.RootCause = "UP: Service is healthy " + tlsInfo
+		
+		if !l.SSLValid && !strings.Contains(l.RootCause, "TLS RESET") {
+			l.Status = model.StatusCritical
+			l.RootCause = "UP (INSECURE): SSL validation failed."
+		} else if rt > 15000 {
+			l.Status = model.StatusCritical
+			l.RootCause = "UP (DEGRADED): Response is slow (15s - 30s)."
+		}
 		return
 	}
-	defer resp.Body.Close()
 
-	code := resp.StatusCode
-	logEntry.StatusCode = &code
-
-	// ── STEP 5: SSL Certificate Analysis (Manual Check because SkipVerify is true) ──
-	if isHTTPS && resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
-		cert := resp.TLS.PeerCertificates[0]
-		expiry := cert.NotAfter
-		logEntry.SSLExpiryDate = &expiry
-		
-		// Use the hostname of the FINAL URL after redirects for validation
-		finalHost := extractHost(resp.Request.URL.String())
-		
-		// Re-verify SSL validity manually for reporting
-		now := time.Now()
-		isExpired := now.After(expiry)
-		isDNSMatch := cert.VerifyHostname(finalHost) == nil
-		
-		logEntry.SSLValid = !isExpired && isDNSMatch
-	} else if !isHTTPS {
-		logEntry.SSLValid = true
+	if code == 403 || code == 401 || code == 429 {
+		l.Status = model.StatusOnline
+		l.RootCause = fmt.Sprintf("UP (RESTRICTED): Server returned %d. %s", code, tlsInfo)
+		return
 	}
 
-	// ── STEP 6 + Status Decision ─────────────────────────────
-	logEntry.Status = determineStatus(code, elapsed, logEntry.SSLValid, isHTTPS)
-	logEntry.RootCause = diagnoseRootCause(logEntry)
-
-	p.saveAndBroadcast(w, logEntry)
-}
-
-// determineStatus maps results → ONLINE / CRITICAL / OFFLINE / UNKNOWN
-func determineStatus(code, responseTimeMs int, sslValid, isHTTPS bool) model.LogStatus {
-	// ── SECURITY COMPLIANCE CHECK ──
-	// If the service is reachable but SSL is invalid, it's CRITICAL (Security Risk)
-	if isHTTPS && !sslValid {
-		return model.StatusCritical
-	}
-
-	// ── PERFORMANCE & SERVER HEALTH ──
-	// 5xx server errors = CRITICAL
-	if code >= 500 && code <= 599 {
-		return model.StatusCritical
-	}
-	// Extreme latentcy (8s+) = CRITICAL
-	if responseTimeMs > 8000 {
-		return model.StatusCritical
-	}
-
-	// ── SUCCESSFUL RESPONSES ──
-	if code >= 200 && code <= 399 {
-		// Degraded Performance (3s - 8s) = CRITICAL
-		if responseTimeMs >= 3000 {
-			return model.StatusCritical
-		}
-		return model.StatusOnline
-	}
-
-	// ── CLIENT ERRORS / REJECTIONS ──
-	// 4xx = OFFLINE (The server is up but refusing the request/resource not found)
-	if code >= 400 && code <= 499 {
-		return model.StatusOffline
-	}
-
-	return model.StatusOffline
-}
-
-func diagnoseConnError(errMsg string) string {
-	msg := strings.ToLower(errMsg)
-	switch {
-	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline"):
-		return "Koneksi ke server terlalu lama (Timeout)"
-	case strings.Contains(msg, "connection refused"):
-		return "Port layanan (80/443) tertutup atau diblokir"
-	case strings.Contains(msg, "no such host"):
-		return "Domain tidak terdaftar atau DNS bermasalah"
-	case strings.Contains(msg, "too many redirects"):
-		return "Website mengalami perulangan redirect (Loop)"
-	case strings.Contains(msg, "certificate"):
-		return "Sertifikat SSL tidak valid atau sudah kadaluarsa"
-	default:
-		return "Gagal menghubungi server"
-	}
-}
-
-func diagnoseRootCause(l *model.MonitoringLog) string {
-	switch l.Status {
-	case model.StatusOnline:
-		return "SISTEM NORMAL: Seluruh parameter (Layer 7) berjalan optimal."
-	case model.StatusUnknown:
-		if l.ErrorMessage != nil {
-			return *l.ErrorMessage
-		}
-		return "CEK TERHENTI: Proses pengecekan kondisi tidak selesai."
-	case model.StatusOffline:
-		if !l.DNSResolved {
-			return "LEVEL SISTEM: Domain tidak ditemukan (DNS Fail). Periksa registrasi domain."
-		}
-		if !l.ICMPStatus && !l.TCPPortOpen {
-			return "LEVEL SERVER: Koneksi ke server terputus total (Unreachable). Cek fisik server/jaringan."
-		}
-		if !l.TCPPortOpen {
-			return "LEVEL SISTEM: Port layanan (80/443) tertutup. Web server (Nginx/Apache) mungkin mati."
-		}
-		if l.ErrorMessage != nil {
-			return "LEVEL APLIKASI: " + diagnoseConnError(*l.ErrorMessage)
-		}
-		if l.StatusCode != nil && *l.StatusCode >= 400 {
-			return fmt.Sprintf("LEVEL APLIKASI (Layer 7): Akses ditolak oleh sistem (HTTP %d).", *l.StatusCode)
-		}
-		return "KONDISI OFFLINE: Website tidak dapat dijangkau."
-	case model.StatusCritical:
-		if l.StatusCode != nil && *l.StatusCode >= 200 && *l.StatusCode < 400 {
-			if !l.SSLValid {
-				return "LEVEL KEAMANAN: Sertifikat SSL Invalid/Expired. Risiko keamanan tinggi!"
-			}
-			if l.ResponseTimeMs != nil && *l.ResponseTimeMs >= 3000 {
-				return "LEVEL APLIKASI: Performa melambat (Degraded). Aplikasi butuh optimasi."
-			}
-		}
-		if l.StatusCode != nil && *l.StatusCode >= 500 {
-			return fmt.Sprintf("LEVEL APLIKASI: Error pada kode sistem internal (HTTP %d).", *l.StatusCode)
-		}
-		return "KONDISI KRITIS: Layanan terganggu namun masih merespons."
-	}
-	return "Indikasi tidak diketahui secara pasti."
+	l.Status = model.StatusOffline
+	l.RootCause = fmt.Sprintf("DOWN (ERROR %d): Server returned error status.", code)
 }
 
 func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) {
@@ -492,6 +348,11 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) 
 
 	prevStatus, err := p.repo.GetLatestStatus(ctx, w.ID)
 	statusChanged := err == nil && prevStatus != "" && prevStatus != string(logEntry.Status)
+
+	// Truncate RootCause to fit DB column (VARCHAR 200)
+	if len(logEntry.RootCause) > 200 {
+		logEntry.RootCause = logEntry.RootCause[:197] + "..."
+	}
 
 	if err := p.repo.InsertLogEnhanced(ctx, logEntry); err != nil {
 		log.Printf("[Worker] Failed to insert log for %s: %v", w.Name, err)
@@ -522,7 +383,6 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) 
 		})
 		log.Printf("[Worker] STATUS CHANGE %s: %s → %s (%s)", w.Name, prevStatus, logEntry.Status, logEntry.RootCause)
 
-		// Trigger Email & Telegram Notifications
 		if p.notif != nil {
 			go p.notif.NotifyStatusChange(w.Name, prevStatus, string(logEntry.Status), logEntry.RootCause)
 		}
@@ -553,9 +413,9 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) 
 		rtVal = *logEntry.ResponseTimeMs
 	}
 
-	log.Printf("[Worker] %s → %s | rt=%vms dns=%v icmp=%v tcp=%v ip=%s | %s",
+	log.Printf("[Worker] %s → %s | rt=%vms dns=%v tcp=%v ip=%s | %s",
 		w.Name, logEntry.Status, rtVal,
-		logEntry.DNSResolved, logEntry.ICMPStatus, logEntry.TCPPortOpen,
+		logEntry.DNSResolved, logEntry.TCPPortOpen,
 		logEntry.IPAddress, logEntry.RootCause)
 }
 

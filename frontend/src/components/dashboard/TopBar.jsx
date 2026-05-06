@@ -230,8 +230,8 @@ export default function TopBar({
 
                 {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#ff4d4f', animation: 'pulse 1s infinite' }} />}
 
-                <span style={{ fontSize: '16px', fontWeight: 800, lineHeight: 1 }}>{m.value}</span>
-                <span style={{ fontSize: '15px', fontWeight: 600, lineHeight: 1.1 }}>{m.label}</span>
+                <span style={{ fontSize: '32px', fontWeight: 900, lineHeight: 1 }}>{m.value}</span>
+                <span style={{ fontSize: '14px', fontWeight: 800, lineHeight: 1.1, textTransform: 'uppercase', opacity: 0.8 }}>{m.label}</span>
               </div>
             )
           })}
@@ -307,7 +307,7 @@ export default function TopBar({
             onMouseLeave={() => setIsClockHovered(false)}
             className="hover-float"
             style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: '160px', transition: 'all 0.3s ease' }}>
-            <div className={isClockHovered ? 'rainbow-text' : ''} style={{ color: 'var(--primary)', fontSize: '22px', fontWeight: 800, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
+            <div className={isClockHovered ? 'rainbow-text' : ''} style={{ color: 'var(--primary)', fontSize: '32px', fontWeight: 900, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>
