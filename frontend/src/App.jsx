@@ -11,7 +11,6 @@ import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
 import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './services/api'
-import PublicStatusPage from './pages/PublicStatusPage'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
@@ -680,12 +679,6 @@ function AppInner() {
   const websitesRef = useRef(websites)
   useEffect(() => { websitesRef.current = websites }, [websites])
 
-  const [isAuthView, setIsAuthView] = useState(() => localStorage.getItem('spmt_auth_mode') === 'true')
-
-  const toggleAuthView = (show) => {
-    setIsAuthView(show)
-    localStorage.setItem('spmt_auth_mode', show ? 'true' : 'false')
-  }
 
 
   useEffect(() => {
@@ -837,7 +830,6 @@ function AppInner() {
   useEffect(() => {
     const h = () => {
       setLoggedIn(false);
-      toggleAuthView(false); // Reset to public view on logout
       setSummary(null);
       setWebsites([]);
       setNotifications([]);
@@ -867,19 +859,14 @@ function AppInner() {
   }
 
   if (!loggedIn) {
-    if (isAuthView) {
-      return (
-        <LoginPage
-          onLogin={() => {
-            setLoggedIn(true)
-            toggleAuthView(false)
-            showToast('Login Successfully')
-          }}
-          onBack={() => toggleAuthView(false)}
-        />
-      )
-    }
-    return <PublicStatusPage onLoginClick={() => toggleAuthView(true)} />
+    return (
+      <LoginPage
+        onLogin={() => {
+          setLoggedIn(true)
+          showToast('Login Successfully')
+        }}
+      />
+    )
   }
 
   const navItems = ['dashboard', 'websites', 'activity-log', ...(isSuperAdmin ? ['users'] : [])]

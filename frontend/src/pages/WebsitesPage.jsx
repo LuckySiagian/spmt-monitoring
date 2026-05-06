@@ -58,6 +58,10 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Search & Recommendations State
+  const [searchTerm, setSearchTerm] = useState('')
+  const [showRecs, setShowRecs] = useState(false)
+
   const openAdd = () => {
     setForm({ name: '', url: '', description: '', interval_seconds: 60 })
     setError('')
@@ -101,19 +105,82 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
     }
   }
 
+  // Filtering Logic
+  const filteredWebsites = websites.filter(w => 
+    w.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    w.url.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  // Recommendation Logic (Unique matches from name and url)
+  const recs = searchTerm.length > 0 
+    ? websites.filter(w => 
+        w.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        w.url.toLowerCase().includes(searchTerm.toLowerCase())
+      ).slice(0, 5)
+    : []
+
   return (
     <div style={wStyles.page}>
       <div style={wStyles.header}>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={wStyles.title}>Website Management</div>
           <div style={wStyles.sub}>{websites.length} / 100 websites configured</div>
         </div>
+
+        {/* --- SEARCH BAR --- */}
+        <div style={sStyles.searchWrapper}>
+          <div style={sStyles.searchContainer}>
+            <span style={sStyles.searchIcon}>🔍</span>
+            <input 
+              style={sStyles.searchInput} 
+              placeholder="Search website name or URL..." 
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setShowRecs(true)
+              }}
+              onFocus={() => setShowRecs(true)}
+              onBlur={() => setTimeout(() => setShowRecs(false), 200)}
+            />
+            {searchTerm && <button onClick={() => setSearchTerm('')} style={sStyles.clearBtn}>✕</button>}
+            
+            {/* Recommendations Dropdown */}
+            {showRecs && recs.length > 0 && (
+              <div style={sStyles.recsDropdown}>
+                <div style={sStyles.recsHeader}>RECOMMENDATIONS</div>
+                {recs.map(r => (
+                  <div 
+                    key={r.id} 
+                    style={sStyles.recItem}
+                    onClick={() => {
+                      setSearchTerm(r.name)
+                      setShowRecs(false)
+                    }}
+                  >
+                    <div style={sStyles.recName}>
+                      {r.name.toLowerCase().includes(searchTerm.toLowerCase()) ? (
+                        <>
+                          {r.name.substring(0, r.name.toLowerCase().indexOf(searchTerm.toLowerCase()))}
+                          <mark style={sStyles.mark}>{r.name.substring(r.name.toLowerCase().indexOf(searchTerm.toLowerCase()), r.name.toLowerCase().indexOf(searchTerm.toLowerCase()) + searchTerm.length)}</mark>
+                          {r.name.substring(r.name.toLowerCase().indexOf(searchTerm.toLowerCase()) + searchTerm.length)}
+                        </>
+                      ) : r.name}
+                    </div>
+                    <div style={sStyles.recUrl}>{r.url}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {isAdmin && (
           <button 
             style={{ 
               ...wStyles.addBtn, 
               opacity: websites.length >= 100 ? 0.5 : 1,
-              cursor: websites.length >= 100 ? 'not-allowed' : 'pointer'
+              cursor: websites.length >= 100 ? 'not-allowed' : 'pointer',
+              marginLeft: 16
             }} 
             onClick={websites.length >= 100 ? null : openAdd}
             title={websites.length >= 100 ? 'Limit 100 websites reached' : 'Add new website'}
@@ -126,6 +193,12 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
       <div className="website-table-container" style={wStyles.tableContainer}>
         {websites.length === 0 ? (
           <div style={wStyles.empty}>No websites configured. {isAdmin && 'Click "Add Website" to begin.'}</div>
+        ) : filteredWebsites.length === 0 ? (
+          <div style={wStyles.empty}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+            No websites match "<strong>{searchTerm}</strong>"
+            <button onClick={() => setSearchTerm('')} style={{ display: 'block', margin: '12px auto', background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>Clear Search</button>
+          </div>
         ) : (
           <table className="website-table" style={wStyles.table}>
             <thead>
@@ -142,7 +215,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
               </tr>
             </thead>
             <tbody>
-              {websites.map(w => (
+              {filteredWebsites.map(w => (
                 <tr key={w.id} style={wStyles.tr}>
                   <td style={wStyles.td}>
                     <div style={{ fontWeight: 600, color: 'var(--text)' }}>{w.name}</div>
@@ -253,4 +326,28 @@ const mStyles = {
   error: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '8px 12px', color: '#ef4444', fontSize: 12, marginBottom: 12 },
   cancelBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-sub)', borderRadius: 8, padding: '8px 18px', fontSize: 12, cursor: 'pointer' },
   saveBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+}
+
+const sStyles = {
+  searchWrapper: { flex: 1, maxWidth: 500, margin: '0 20px' },
+  searchContainer: { position: 'relative', width: '100%' },
+  searchIcon: { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 14, opacity: 0.5 },
+  searchInput: { 
+    width: '100%', padding: '10px 40px 10px 38px', borderRadius: 20, 
+    border: '1px solid var(--border)', background: 'var(--bg-card)', 
+    color: 'var(--text)', fontSize: 13, outline: 'none', transition: 'all 0.2s',
+    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+  },
+  clearBtn: { position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: 4 },
+  recsDropdown: { 
+    position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, 
+    background: 'var(--bg-card)', border: '1px solid var(--border)', 
+    borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.2)', 
+    zIndex: 1000, overflow: 'hidden', animation: 'fadeIn 0.2s ease' 
+  },
+  recsHeader: { padding: '10px 14px', fontSize: 9, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', background: 'rgba(99,102,241,0.03)', borderBottom: '1px solid var(--border)' },
+  recItem: { padding: '10px 14px', cursor: 'pointer', transition: 'all 0.15s', borderBottom: '1px solid rgba(99,102,241,0.05)' },
+  recName: { fontSize: 13, fontWeight: 700, color: 'var(--text)' },
+  recUrl: { fontSize: 10, color: 'var(--text-muted)', marginTop: 2 },
+  mark: { background: 'var(--accent-light)', color: 'var(--accent)', padding: '0 1px', borderRadius: 2 },
 }
