@@ -15,7 +15,7 @@ const RoleBadge = ({ role }) => {
   return (
     <span style={{ 
       background: `${c.color}15`, color: c.color, border: `1px solid ${c.color}33`, 
-      borderRadius: 6, padding: '4px 10px', fontSize: 10, fontWeight: 800, letterSpacing: '0.05em' 
+      borderRadius: 6, padding: '6px 12px', fontSize: 13, fontWeight: 900, letterSpacing: '0.05em' 
     }}>
       {c.label}
     </span>
@@ -148,8 +148,8 @@ export default function UsersPage({ users, onUserUpdate }) {
                         {u.username[0].toUpperCase()}
                       </div>
                       <div>
-                        <div style={{ color: 'var(--text)', fontWeight: 600 }}>{u.username}</div>
-                        {u.id === currentUser?.id && <div style={{ fontSize: 10, color: '#6366f1' }}>You</div>}
+                        <div style={{ color: 'var(--text)', fontWeight: 800, fontSize: 17 }}>{u.username}</div>
+                        {u.id === currentUser?.id && <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 700 }}>You</div>}
                       </div>
                     </div>
                   </td>
@@ -258,23 +258,23 @@ export default function UsersPage({ users, onUserUpdate }) {
 const styles = {
   page: { display: 'flex', flexDirection: 'column', height: '100%', padding: '8px 10px', gap: 8, overflow: 'hidden', background: 'var(--bg-main)' },
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0, paddingBottom: '10px' },
-  title: { fontSize: 24, fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' },
-  sub: { fontSize: 11, color: 'var(--text-muted)', marginTop: 2 },
-  addBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: 'var(--text)', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', cursor: 'pointer' },
-  actionMsg: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 6, padding: '8px 14px', fontSize: 12, flexShrink: 0 },
+  title: { fontSize: 26, fontWeight: 1000, color: 'var(--primary)', letterSpacing: '-0.02em' },
+  sub: { fontSize: 14, color: 'var(--text-muted)', marginTop: 4, fontWeight: 600 },
+  addBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: 'var(--text)', border: 'none', borderRadius: 8, padding: '12px 24px', fontSize: 16, fontWeight: 900, letterSpacing: '0.05em', cursor: 'pointer', boxShadow: '0 4px 12px rgba(59,130,246,0.3)' },
+  actionMsg: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 6, padding: '10px 18px', fontSize: 15, flexShrink: 0, fontWeight: 700 },
   limitBar: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   limitLabel: { fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em' },
   limitTrack: { display: 'flex', gap: 4 },
   limitSlot: { width: 40, height: 8, borderRadius: 2, transition: 'background 0.3s' },
   tableContainer: { flex: 1, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow)' },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { padding: '10px 14px', textAlign: 'left', fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', borderBottom: '2px solid var(--border)', background: 'var(--bg-header)', position: 'sticky', top: 0 },
+  th: { padding: '14px 18px', textAlign: 'left', fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.1em', borderBottom: '2px solid var(--border)', background: 'var(--bg-header)', position: 'sticky', top: 0 },
   tr: { borderBottom: '1px solid rgba(99,102,241,0.07)' },
-  td: { padding: '12px 14px', fontSize: 13, color: 'var(--text-sub)' },
-  avatar: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontWeight: 700, fontSize: 13, flexShrink: 0 },
-  promoteBtn: { background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer' },
-  demoteBtn: { background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer' },
-  deleteBtn: { background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' },
+  td: { padding: '16px 18px', fontSize: 17, color: 'var(--text-sub)' },
+  avatar: { width: 44, height: 44, borderRadius: '50%', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', fontWeight: 900, fontSize: 18, flexShrink: 0 },
+  promoteBtn: { background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6', borderRadius: 4, padding: '6px 14px', fontSize: 14, cursor: 'pointer', fontWeight: 800 },
+  demoteBtn: { background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', borderRadius: 4, padding: '6px 14px', fontSize: 14, cursor: 'pointer', fontWeight: 800 },
+  deleteBtn: { background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 4, padding: '6px 10px', fontSize: 14, cursor: 'pointer' },
   empty: { textAlign: 'center', color: 'var(--text-muted)', padding: '48px', fontSize: 13 },
 }
 
@@ -282,9 +282,9 @@ const mStyles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' },
   modal: { background: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 12, width: 400, boxShadow: 'var(--shadow)' },
   mHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border)' },
-  label: { display: 'block', fontSize: 9, fontWeight: 600, color: 'var(--accent)', letterSpacing: '0.1em', marginBottom: 4 },
-  input: { background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%' },
-  error: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '8px 12px', color: '#ef4444', fontSize: 12, marginBottom: 12 },
-  cancelBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-sub)', borderRadius: 8, padding: '8px 18px', fontSize: 12, cursor: 'pointer' },
-  saveBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  label: { display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', marginBottom: 6 },
+  input: { background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', color: 'var(--text)', fontSize: 17, outline: 'none', width: '100%' },
+  error: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 6, padding: '12px 16px', color: '#ef4444', fontSize: 15, marginBottom: 12 },
+  cancelBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-sub)', borderRadius: 8, padding: '12px 24px', fontSize: 16, cursor: 'pointer' },
+  saveBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', borderRadius: 8, padding: '12px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer' },
 }

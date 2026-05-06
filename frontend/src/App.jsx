@@ -236,6 +236,10 @@ function ProfileModal({ user, onClose }) {
   })
   const [telegramId, setTelegramId] = useState(user?.telegram_id || '')
   
+  useEffect(() => {
+    setOldPassword(''); setNewPassword(''); setConfirmPassword('')
+  }, [activeTab])
+  
   // Email change fields
   const [showChangeEmail, setShowChangeEmail] = useState(false)
   const [currentEmailConfirm, setCurrentEmailConfirm] = useState('')
@@ -243,7 +247,9 @@ function ProfileModal({ user, onClose }) {
   const [confirmNewEmail, setConfirmNewEmail] = useState('')
 
   // Password fields
-  
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleFile = (e) => {
@@ -330,7 +336,7 @@ function ProfileModal({ user, onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 14, width: 440, maxWidth: '94vw', boxShadow: 'var(--shadow)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>👤 Customization & Profile</span>
+          <span style={{ fontSize: 20, fontWeight: 900, color: 'var(--text)' }}>👤 Customization & Profile</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '20px' }}>
@@ -358,13 +364,13 @@ function ProfileModal({ user, onClose }) {
           <div style={{ display: 'flex', gap: 20, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
             <div 
               onClick={() => setActiveTab('profile')}
-              style={{ padding: '8px 4px', fontSize: 13, fontWeight: 800, color: activeTab === 'profile' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'profile' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ padding: '10px 4px', fontSize: 15, fontWeight: 900, color: activeTab === 'profile' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'profile' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
             >
               General Settings
             </div>
             <div 
               onClick={() => setActiveTab('security')}
-              style={{ padding: '8px 4px', fontSize: 13, fontWeight: 800, color: activeTab === 'security' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'security' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
+              style={{ padding: '10px 4px', fontSize: 15, fontWeight: 900, color: activeTab === 'security' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'security' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
             >
               Security
             </div>
@@ -377,7 +383,7 @@ function ProfileModal({ user, onClose }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                   
                   {/* Email Section */}
-                  <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ background: 'rgba(38, 74, 236, 0.15)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>✉️</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.08em' }}>
@@ -389,10 +395,10 @@ function ProfileModal({ user, onClose }) {
                       <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
                         <div style={{ 
                           width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', 
-                          borderRadius: 8, padding: '10px 14px 10px 38px', fontSize: 13, color: email ? 'var(--text)' : 'var(--text-muted)', 
-                          fontWeight: 600, letterSpacing: '0.02em', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' 
+                          borderRadius: 8, padding: '12px 14px 12px 38px', fontSize: 16, color: email ? 'var(--text)' : 'var(--text-muted)', 
+                          fontWeight: 800, letterSpacing: '0.02em', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' 
                         }}>
-                          <span style={{ position: 'absolute', left: 12, fontSize: 16, opacity: 0.7 }}>📧</span>
+                          <span style={{ position: 'absolute', left: 12, fontSize: 20, opacity: 0.7 }}>📧</span>
                           {email || 'No email registered yet'}
                         </div>
                       </div>
@@ -402,7 +408,7 @@ function ProfileModal({ user, onClose }) {
                           background: showChangeEmail ? 'rgba(239,68,68,0.15)' : 'var(--accent)', 
                           border: showChangeEmail ? '1px solid #ef4444' : 'none', 
                           color: showChangeEmail ? '#ef4444' : '#fff', 
-                          borderRadius: 8, padding: '10px 18px', fontSize: 11, fontWeight: 800, 
+                          borderRadius: 8, padding: '12px 24px', fontSize: 13, fontWeight: 900, 
                           cursor: 'pointer', transition: 'all 0.2s', boxShadow: showChangeEmail ? 'none' : '0 4px 12px var(--accent-light)' 
                         }}
                       >
@@ -481,7 +487,7 @@ function ProfileModal({ user, onClose }) {
                   </div>
 
                   {/* Telegram Section */}
-                  <div style={{ background: 'rgba(0,0,0,0.15)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ background: 'rgba(70, 90, 217, 0.23)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>📱</div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 800, letterSpacing: '0.08em' }}>
                       TELEGRAM INTEGRATION <span style={{ color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>(OPTIONAL)</span>
@@ -532,34 +538,34 @@ function ProfileModal({ user, onClose }) {
                 <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>CHANGE ACCOUNT PASSWORD</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 700 }}>OLD PASSWORD</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>OLD PASSWORD</div>
                     <input 
                       type="password" 
                       value={oldPassword} 
                       onChange={e => setOldPassword(e.target.value)}
                       placeholder="Enter current password"
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
                     />
                   </div>
                   <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 700 }}>NEW PASSWORD</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>NEW PASSWORD</div>
                     <input 
                       type="password" 
                       value={newPassword} 
                       onChange={e => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
                     />
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 700 }}>CONFIRM NEW PASSWORD</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>CONFIRM NEW PASSWORD</div>
                     <input 
                       type="password" 
                       value={confirmPassword} 
                       onChange={e => setConfirmPassword(e.target.value)}
                       placeholder="Repeat new password"
-                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
                     />
                   </div>
                 </div>

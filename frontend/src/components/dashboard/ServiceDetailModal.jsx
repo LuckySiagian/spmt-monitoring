@@ -188,54 +188,65 @@ function AnalisisKondisi({ website }) {
     // Skenario 1: Redirect Loop
     if (rc.includes('redirect')) {
       return {
-        title: "Redirect Loop / Pengalihan Sistem Berulang",
-        severity: "LEVEL APLIKASI (LAYER 7)",
-        summary: "EN: The system is caught in an infinite redirect loop at the application level.\nID: Sistem aplikasi terjebak dalam pengalihan halaman yang berulang-ulang.",
-        explanation: "EN: This usually occurs when the application logic forces a login redirect or the routing system is misconfigured. It is an issue within the website's internal code.\nID: Ini terjadi pada logika aplikasi yang memaksa redirect berulang (misal: error pada sistem login atau routing). Ini adalah masalah internal kode website.",
-        recommendation: "EN: Review the application routing and session handling logic in the backend code.\nID: Periksa kembali logika routing dan penanganan sesi pada kode backend aplikasi."
+        title: "Redirect Loop",
+        severity: "MASALAH APLIKASI",
+        summary: "Sistem terjebak pengalihan (redirect) berulang.",
+        explanation: "Kesalahan pada logika routing atau sistem login internal website.",
+        recommendation: "Periksa konfigurasi routing/auth di backend aplikasi."
       }
     }
 
     // Skenario 2: SSL Invalid
     if (!sslValid && isHTTPS) {
       return {
-        title: "SSL Security Fault / Kegagalan Enkripsi Sistem",
-        severity: "LEVEL KEAMANAN (SECURITY LAYER)",
-        summary: "EN: Service is reachable but the security layer (SSL) is invalid or expired.\nID: Website aktif namun lapisan keamanan (SSL) bermasalah atau kadaluwarsa.",
-        explanation: "EN: The monitoring system detects that the SSL certificate does not match the domain or has expired. This is a critical security risk for user data.\nID: Sistem mendeteksi sertifikat keamanan tidak cocok atau sudah habis masa berlakunya. Ini adalah risiko keamanan serius bagi data pengguna.",
-        recommendation: "EN: Renew the SSL certificate immediately and ensure the full certificate chain is installed.\nID: Segera perbaharui sertifikat SSL dan pastikan instalasi 'certificate chain' sudah benar."
+        title: "SSL Security Fault",
+        severity: "MASALAH KEAMANAN",
+        summary: "Sertifikat SSL tidak valid atau kadaluwarsa.",
+        explanation: "Enkripsi tidak aktif. Risiko keamanan bagi data pengguna.",
+        recommendation: "Segera perbaharui atau perbaiki instalasi sertifikat SSL."
       }
     }
 
     // Skenario 3: DNS issues
     if (rc.includes('dns') || rc.includes('no such host')) {
       return {
-        title: "DNS Resolution Error / Masalah Nama Domain Sistem",
-        severity: "LEVEL SISTEM (NETWORK INFRASTRUCTURE)",
-        summary: "EN: The network system could not translate the domain name to an IP address.\nID: Sistem jaringan tidak dapat menerjemahkan nama domain menjadi alamat IP.",
-        explanation: "EN: This is a system-level issue where the domain is either not registered or the DNS server is unreachable. If it is an internal site, check the Intranet/VPN status.\nID: Ini adalah masalah level sistem di mana domain tidak terdaftar atau server DNS mati. Jika ini situs internal, cek status Intranet/VPN.",
-        recommendation: "EN: Verify domain registration and ensure the system DNS records (A Record) are pointing correctly.\nID: Verifikasi registrasi domain dan pastikan record DNS (A Record) sudah mengarah ke IP yang benar."
+        title: "DNS Resolution Error",
+        severity: "MASALAH INFRASTRUKTUR",
+        summary: "Domain tidak ditemukan oleh sistem jaringan.",
+        explanation: "Domain tidak terdaftar atau server DNS tidak merespons.",
+        recommendation: "Verifikasi registrasi domain dan A-Record pada DNS."
+      }
+    }
+
+    // Skenario 4: Performance issues (Slow but OK)
+    if (status === 'CRITICAL' && log.status_code >= 200 && log.status_code < 400) {
+      return {
+        title: "Performance Issue",
+        severity: "PERFORMA MENURUN",
+        summary: "Aplikasi merespons, namun sangat lambat.",
+        explanation: "Waktu muat browser melebihi ambang batas (6s). Hal ini bisa disebabkan beban server atau jaringan monitor tidak stabil.",
+        recommendation: "Optimasi aset website atau periksa kestabilan jaringan lokal Anda."
       }
     }
 
     // Default Online
     if (status === 'ONLINE') {
       return {
-        title: "Optimal Condition / Kondisi Sistem Normal",
-        severity: "LEVEL APLIKASI (LAYER 7 OK)",
-        summary: "EN: All system parameters and application responses are within normal range.\nID: Seluruh parameter sistem dan respon aplikasi berada dalam batas normal.",
-        explanation: "EN: Connectivity, server ports, and Layer 7 (HTTP) responses are stable. The application is serving requests successfully.\nID: Konektivitas, port server, dan respon Layer 7 (HTTP) terpantau stabil. Aplikasi melayani permintaan dengan baik.",
-        recommendation: "EN: No action required. Continue regular maintenance and monitoring.\nID: Tidak perlu tindakan. Lanjutkan pemeliharaan dan pemantauan rutin."
+        title: "Kondisi Optimal",
+        severity: "SISTEM NORMAL",
+        summary: "Seluruh parameter aplikasi berjalan normal.",
+        explanation: "Konektivitas, port, dan respon HTTP terpantau stabil.",
+        recommendation: "Tidak ada tindakan. Lanjutkan pemantauan rutin."
       }
     }
 
     // Fallback
     return {
-      title: "Service Interruption / Gangguan Respon Aplikasi",
-      severity: "LEVEL APLIKASI / SERVER",
-      summary: "EN: The system failed to receive a valid response from the application (Layer 7).\nID: Sistem gagal menerima respon yang valid dari aplikasi (Layer 7).",
-      explanation: "EN: The connection might be blocked by a firewall or the application is crashing (HTTP 5xx). This indicates the server is UP but the SYSTEM is failing.\nID: Koneksi mungkin diblokir firewall atau aplikasi sedang crash (HTTP 5xx). Ini menandakan SERVER aktif tapi SISTEM sedang bermasalah.",
-      recommendation: "EN: Check application logs (Error Logs) and server firewall settings (Whitelist IP Monitor).\nID: Periksa log error aplikasi dan pengaturan firewall server (izinkan akses IP Monitor)."
+      title: "Service Interruption",
+      severity: "GANGGUAN LAYANAN",
+      summary: "Gagal menerima respon valid dari aplikasi.",
+      explanation: "Koneksi terhambat firewall atau aplikasi sedang crash (5xx).",
+      recommendation: "Cek error log server dan whitelist IP monitoring."
     }
   }
 
@@ -422,7 +433,13 @@ export default function ServiceDetailModal({ website, onClose }) {
             </div>
             <div>
               <div style={st.websiteName}>{website.name}</div>
-              <div style={st.websiteUrl}>{website.url}</div>
+              <a href={website.url} target="_blank" rel="noopener noreferrer" 
+                style={{ ...st.websiteUrl, color: 'var(--accent)', textDecoration: 'none', cursor: 'pointer', display: 'block' }}
+                onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+              >
+                {website.url} ↗
+              </a>
             </div>
             <StatusBadge status={website.status} />
           </div>
@@ -462,6 +479,21 @@ export default function ServiceDetailModal({ website, onClose }) {
 
               <RootCauseSection website={website} />
               <AnalisisKondisi website={website} />
+              
+              <div style={{ marginTop: 20 }}>
+                <a href={website.url} target="_blank" rel="noopener noreferrer" 
+                  style={{ 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                    width: '100%', padding: '16px', background: 'var(--primary)', color: '#fff',
+                    borderRadius: 12, fontSize: 16, fontWeight: 900, textDecoration: 'none',
+                    boxShadow: '0 4px 12px var(--primary-glow)', transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px var(--primary-glow)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px var(--primary-glow)' }}
+                >
+                  🌐 VISIT WEBSITE ↗
+                </a>
+              </div>
             </div>
           )}
 

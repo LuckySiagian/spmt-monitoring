@@ -59,10 +59,10 @@ const getDomain = u => { try { return new URL(u).hostname } catch { return u } }
 
 // ── Status colors ─────────────────────────────────────────────
 const BADGE = {
-  ONLINE: { color: 'var(--online)', glow: 'rgba(0,184,148,0.1)' },
-  CRITICAL: { color: 'var(--critical)', glow: 'rgba(255,165,2,0.1)' },
-  OFFLINE: { color: 'var(--offline)', glow: 'rgba(255,71,87,0.1)' },
-  UNKNOWN: { color: 'var(--text-muted)', glow: 'none' },
+  ONLINE: { color: '#10b981', glow: 'rgba(16,185,129,0.15)' },
+  CRITICAL: { color: '#fbbf24', glow: 'rgba(251,191,36,0.15)' },
+  OFFLINE: { color: '#ef4444', glow: 'rgba(239,68,68,0.15)' },
+  UNKNOWN: { color: '#94a3b8', glow: 'none' },
 }
 
 // ── Sub-components ────────────────────────────────────────────
@@ -127,13 +127,22 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            <span style={{ fontSize: 'clamp(13px, 2vw, 16px)', fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }} title={w.name}>
+            <span style={{ fontSize: '20px', fontWeight: 1000, fontFamily: '"Inter", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }} title={w.name}>
               {w.name}
             </span>
           </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: isOnline ? '#00d4ff' : c.color, fontFamily: '"Inter", sans-serif', background: 'rgba(0,0,0,0.03)', border: `1px solid ${c.color}33`, padding: '2px 8px', borderRadius: 4 }}>
+            <span style={{ 
+              fontSize: 16, 
+              fontWeight: 900, 
+              color: !w.status_code ? '#000000' : (isOnline ? '#10b981' : c.color), 
+              fontFamily: '"Inter", sans-serif', 
+              background: !w.status_code ? '#ffffff' : 'rgba(0,0,0,0.03)', 
+              border: `1px solid ${!w.status_code ? '#000000' : c.color + '33'}`, 
+              padding: '4px 12px', 
+              borderRadius: 6 
+            }}>
               {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
             </span>
           </div>
@@ -144,12 +153,12 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
             {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 'clamp(11px, 1.5vw, 14px)', fontWeight: 800, color: w.response_time_ms > 2000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif' }}>
+            <span style={{ fontSize: '18px', fontWeight: 1000, color: w.response_time_ms > 15000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif' }}>
               {fmtMs(w.response_time_ms)}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.03)', padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.color}15` }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, boxShadow: `0 0 5px ${c.color}`, animation: 'pulse 1.5s infinite' }} />
-              <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.1em', color: c.color }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: `${c.color}15`, padding: '4px 12px', borderRadius: 6, border: `1px solid ${c.color}44` }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, boxShadow: `0 0 10px ${c.color}`, animation: 'pulse 1.5s infinite' }} />
+              <span style={{ fontSize: 14, fontWeight: 1000, letterSpacing: '0.1em', color: c.color }}>
                 {w.status}
               </span>
             </div>

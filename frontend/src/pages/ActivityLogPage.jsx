@@ -22,13 +22,13 @@ export default function ActivityLogPage({ events }) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 20, fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' }}>📋 Activity Log</span>
-            <span style={{ fontSize: 11, color: '#64748b' }}>Complete history · {events.length} events</span>
+            <span style={{ fontSize: 24, fontWeight: 900, color: 'var(--primary)', letterSpacing: '-0.02em' }}>📋 Activity Log</span>
+            <span style={{ fontSize: 14, color: '#64748b', fontWeight: 600 }}>Complete history · {events.length} events</span>
           </div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {FILTERS.map(f => (
               <button key={f} onClick={() => { setFilter(f); setPage(1) }}
-                style={{ background: filter === f ? 'rgba(79,70,229,0.12)' : 'rgba(99,102,241,0.05)', border: filter === f ? '1px solid rgba(79,70,229,0.4)' : '1px solid rgba(99,102,241,0.15)', color: filter === f ? '#4f46e5' : '#64748b', fontSize: 9, fontWeight: 700, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', letterSpacing: '0.06em' }}>{f}</button>
+                style={{ background: filter === f ? 'rgba(79,70,229,0.12)' : 'rgba(99,102,241,0.05)', border: filter === f ? '1px solid rgba(79,70,229,0.4)' : '1px solid rgba(99,102,241,0.15)', color: filter === f ? '#4f46e5' : '#64748b', fontSize: 13, fontWeight: 800, padding: '6px 14px', borderRadius: 4, cursor: 'pointer', letterSpacing: '0.06em' }}>{f}</button>
             ))}
           </div>
         </div>
@@ -37,22 +37,22 @@ export default function ActivityLogPage({ events }) {
             <>
               <div style={{ flex: 1, overflowY: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                  <thead><tr>{['Service', 'Transition', 'New Status', 'Time'].map(h => <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 9, color: 'var(--text-sub)', letterSpacing: '0.1em', borderBottom: '1px solid rgba(99,102,241,0.1)', fontWeight: 700, background: 'var(--bg-card)', position: 'sticky', top: 0 }}>{h}</th>)}</tr></thead>
+                  <thead><tr>{['Service', 'Transition', 'New Status', 'Time'].map(h => <th key={h} style={{ textAlign: 'left', padding: '14px 18px', fontSize: 13, color: 'var(--text-sub)', letterSpacing: '0.1em', borderBottom: '1px solid rgba(99,102,241,0.1)', fontWeight: 800, background: 'var(--bg-card)', position: 'sticky', top: 0 }}>{h}</th>)}</tr></thead>
                   <tbody>
                     {paged.map((ev, i) => (
                       <tr key={ev.id} style={{ borderBottom: '1px solid rgba(99,102,241,0.06)', background: i % 2 === 0 ? 'transparent' : 'rgba(99,102,241,0.02)' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,70,229,0.05)'}
                         onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(99,102,241,0.02)'}>
-                        <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text)' }}>{ev.website_name}</td>
-                        <td style={{ padding: '10px 14px' }}>
+                        <td style={{ padding: '16px 18px', fontWeight: 800, color: 'var(--text)', fontSize: 16 }}>{ev.website_name}</td>
+                        <td style={{ padding: '16px 18px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ color: SC[ev.old_status] || '#64748b', fontSize: 11, opacity: 0.6 }}>{ev.old_status || '—'}</span>
+                            <span style={{ color: SC[ev.old_status] || '#64748b', fontSize: 14, opacity: 0.6, fontWeight: 600 }}>{ev.old_status || '—'}</span>
                             <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
-                            <span style={{ color: SC[ev.new_status] || '#64748b', fontWeight: 800, fontSize: 12 }}>{ev.new_status}</span>
+                            <span style={{ color: SC[ev.new_status] || '#64748b', fontWeight: 900, fontSize: 16 }}>{ev.new_status}</span>
                           </div>
                         </td>
-                        <td style={{ padding: '10px 14px' }}><Badge status={ev.new_status} /></td>
-                        <td style={{ padding: '10px 14px', color: '#64748b', fontSize: 11 }}>{fmt(ev.created_at)}</td>
+                        <td style={{ padding: '16px 18px' }}><Badge status={ev.new_status} /></td>
+                        <td style={{ padding: '16px 18px', color: '#64748b', fontSize: 14, fontWeight: 600 }}>{fmt(ev.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
