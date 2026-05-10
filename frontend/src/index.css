@@ -237,7 +237,7 @@ body::before {
   justify-content: space-between;
   gap: 12px;
   padding: 0 16px;
-  height: 90px !important; 
+  height: 72px !important; 
   background: var(--bg-header);
   backdrop-filter: blur(28px);
   -webkit-backdrop-filter: blur(28px);
@@ -274,10 +274,10 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
   min-width: 0; 
-  height: 70px !important;
+  height: 56px !important;
   background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--border);
   border-left: 4px solid var(--accent); 
@@ -292,7 +292,7 @@ body::before {
 }
 
 .metric-card span:first-child {
-  font-size: clamp(14px, 2.5vw, 18px) !important; 
+  font-size: clamp(14px, 2.2vw, 16px) !important; 
   font-weight: 3000;
   font-family: 'JetBrains Mono', monospace;
   margin-right: 8px;
@@ -713,7 +713,7 @@ tr:hover {
 /* â”€â”€ Responsive Dashboard Grid â”€â”€ */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.72fr) minmax(300px, 0.28fr);
+  grid-template-columns: minmax(0, 0.82fr) minmax(250px, 0.18fr);
   gap: 12px;
   flex: 1;
   overflow: hidden;

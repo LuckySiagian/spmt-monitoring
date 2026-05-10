@@ -6,7 +6,7 @@ const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { color: '#10b981', border: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.1)' },
     CRITICAL: { color: '#f59e0b', border: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.1)' },
-    OFFLINE: { color: '#ef4444', border: 'rgba(239,68,68,0.3)', bg: 'rgba(239,68,68,0.1)' },
+    OFFLINE: { color: '#f43f5e', border: 'rgba(244,63,94,0.3)', bg: 'rgba(244,63,94,0.1)' },
   }[status] || { color: '#4a5568', border: 'rgba(74,85,104,0.3)', bg: 'rgba(74,85,104,0.1)' }
   return (
     <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 3, padding: '1px 7px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
@@ -34,7 +34,7 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
     ALL: '#4a6fa5',
     ONLINE: '#10b981',
     CRITICAL: '#f59e0b',
-    OFFLINE: '#ef4444',
+    OFFLINE: '#f43f5e',
   }
 
   return (
@@ -54,7 +54,7 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
               key={f}
               style={{
                 ...styles.filterBtn,
-                ...(filter === f ? { background: `rgba(${f === 'ALL' ? '74,111,165' : f === 'ONLINE' ? '16,185,129' : f === 'CRITICAL' ? '245,158,11' : '239,68,68'},0.15)`, color: filterColors[f], borderColor: filterColors[f] + '66' } : {}),
+                ...(filter === f ? { background: `rgba(${f === 'ALL' ? '74,111,165' : f === 'ONLINE' ? '16,185,129' : f === 'CRITICAL' ? '245,158,11' : '244,63,94'},0.15)`, color: filterColors[f], borderColor: filterColors[f] + '66' } : {}),
               }}
               onClick={() => setFilter(f)}
             >
@@ -117,8 +117,31 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
                   </td>
                   <td style={styles.td}><StatusBadge status={w.status} /></td>
                   <td style={styles.td}>{w.status_code ?? '—'}</td>
-                  <td style={{ ...styles.td, color: w.response_time_ms > 3000 ? '#ef4444' : w.response_time_ms > 1000 ? '#f59e0b' : '#10b981', fontWeight: 600 }}>
-                    {fmt(w.response_time_ms)}
+                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ color: w.response_time_ms > 3000 ? '#ef4444' : w.response_time_ms > 1000 ? '#f59e0b' : '#10b981', fontWeight: 600, width: 45 }}>
+                        {fmt(w.response_time_ms)}
+                      </span>
+                      {w.rt_history && w.rt_history.length > 1 && (
+                        <div style={{ width: 40, height: 16 }}>
+                          <svg width="100%" height="100%" viewBox="0 0 40 16" preserveAspectRatio="none">
+                            <polyline
+                              fill="none"
+                              stroke={w.response_time_ms > 3000 ? '#ef4444' : w.response_time_ms > 1000 ? '#f59e0b' : '#10b981'}
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              points={w.rt_history.map((val, idx) => {
+                                const x = (idx / (w.rt_history.length - 1)) * 40;
+                                const max = Math.max(...w.rt_history, 1);
+                                const y = 16 - (val / max) * 14 - 1;
+                                return `${x},${y}`;
+                              }).join(' ')}
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td style={{ ...styles.td, color: w.ssl_valid == null ? '#4a5568' : w.ssl_valid ? '#10b981' : '#ef4444' }}>
                     {w.ssl_valid == null ? '—' : w.ssl_valid ? '✓ Valid' : '✗ Invalid'}

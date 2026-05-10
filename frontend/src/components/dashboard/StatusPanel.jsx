@@ -21,9 +21,9 @@ function InfoModal({ onClose }) {
             <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 15, textTransform: 'uppercase' }}>Status Legend & Conditions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { s: 'ONLINE', c: '#10b981', t: 'HTTP 200-399 + RT < 3000ms', d: 'Website sehat, responsif, dan seluruh parameter (DNS/SSL) valid.' },
-                { s: 'CRITICAL', c: '#f59e0b', t: 'HTTP 5xx / RT > 5000ms / SSL Invalid', d: 'Website terdeteksi lambat atau mengalami gangguan fungsional.' },
-                { s: 'OFFLINE', c: '#ef4444', t: 'DNS Fail / Connection Refused / Timeout', d: 'Website tidak dapat diakses sama sekali dari jaringan monitoring.' }
+                { s: 'ONLINE', c: '#10b981', t: 'HTTP 200-399 + RT ≤ 3.000ms', d: 'Website sehat, responsif, dan seluruh parameter valid.' },
+                { s: 'CRITICAL', c: '#f59e0b', t: 'Slow / Degraded / Issues', d: 'Website terdeteksi lambat, mengalami gangguan akses, atau masalah SSL/DNS.' },
+                { s: 'OFFLINE', c: '#f43f5e', t: 'Down / Timeout / HTTP 5xx', d: 'Website tidak dapat diakses sama sekali atau mengalami kegagalan fatal.' }
               ].map(item => (
                 <div key={item.s} style={{ display: 'flex', gap: 16, padding: 14, background: 'var(--bg-main)', borderRadius: 12, border: '1px solid var(--border)' }}>
                   <div style={{ width: 12, height: 12, borderRadius: '50%', background: item.c, marginTop: 4, flexShrink: 0, boxShadow: `0 0 10px ${item.c}44` }} />
@@ -60,8 +60,10 @@ const getDomain = u => { try { return new URL(u).hostname } catch { return u } }
 // ── Status colors ─────────────────────────────────────────────
 const BADGE = {
   ONLINE: { color: '#10b981', glow: 'rgba(16,185,129,0.15)' },
-  CRITICAL: { color: '#fbbf24', glow: 'rgba(251,191,36,0.15)' },
-  OFFLINE: { color: '#ef4444', glow: 'rgba(239,68,68,0.15)' },
+  DEGRADED: { color: '#8b5cf6', glow: 'rgba(139,92,246,0.15)' },
+  WARNING: { color: '#f59e0b', glow: 'rgba(245,158,11,0.15)' },
+  CRITICAL: { color: '#d97706', glow: 'rgba(217,119,6,0.15)' },
+  OFFLINE: { color: '#f43f5e', glow: 'rgba(244,63,94,0.15)' },
   UNKNOWN: { color: '#94a3b8', glow: 'none' },
 }
 
@@ -102,14 +104,14 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
     <div
       className={`glass-card hover-glow ${w.status === 'OFFLINE' ? 'glitch-offline' : ''}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 16, padding: '14px 18px',
+        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
         cursor: 'pointer', transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease',
         border: '1px solid',
         borderColor: isSelected ? c.color : 'var(--border)',
         background: isSelected ? 'rgba(0,0,0,0.02)' : 'var(--bg-card)',
-        marginBottom: 12, borderRadius: 0,
+        marginBottom: 10, borderRadius: 0,
         boxShadow: isSelected ? `0 0 10px ${c.color}15 inset` : 'var(--shadow)',
-        clipPath: 'polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 15px 100%, 0 calc(100% - 15px))',
+        clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
         position: 'relative'
       }}
       onClick={() => {
@@ -120,49 +122,47 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
       {/* Dynamic Status Vertical Line */}
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: c.color, boxShadow: `0 0 8px ${c.color}` }} />
 
-      <div style={{ transform: 'scale(1.2)', marginRight: 6, marginLeft: 6 }}>
+      <div style={{ transform: 'scale(1.1)', flexShrink: 0 }}>
         <Favicon url={w.url} name={w.name} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
-            <span style={{ fontSize: '20px', fontWeight: 1000, fontFamily: '"Inter", sans-serif', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '-0.01em' }} title={w.name}>
-              {w.name}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ 
-              fontSize: 16, 
-              fontWeight: 900, 
-              color: !w.status_code ? '#000000' : (isOnline ? '#10b981' : c.color), 
-              fontFamily: '"Inter", sans-serif', 
-              background: !w.status_code ? '#ffffff' : 'rgba(0,0,0,0.03)', 
-              border: `1px solid ${!w.status_code ? '#000000' : c.color + '33'}`, 
-              padding: '4px 12px', 
-              borderRadius: 6 
-            }}>
-              {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
-            </span>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span 
+            style={{ 
+              fontSize: '15px', fontWeight: 1000, fontFamily: '"Inter", sans-serif', color: 'var(--text)', 
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+              overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, lineHeight: 1.1 
+            }} 
+            title={w.name}
+          >
+            {w.name}
+          </span>
+          <span style={{ 
+            fontSize: 14, 
+            fontWeight: 900, 
+            color: !w.status_code ? '#ef4444' : (isOnline ? '#10b981' : c.color), 
+            fontFamily: '"Inter", sans-serif', 
+            background: 'rgba(0,0,0,0.03)', 
+            border: `1px solid ${!w.status_code ? '#ef444433' : c.color + '33'}`, 
+            padding: '2px 8px', 
+            borderRadius: 4,
+            flexShrink: 0
+          }}>
+            {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 'clamp(10px, 1.5vw, 12px)', fontWeight: 600, fontFamily: 'monospace', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>
-            {w.root_cause && w.status !== 'ONLINE' ? `⚠️ ${w.root_cause.toUpperCase()}` : w.url}
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: '18px', fontWeight: 1000, color: w.response_time_ms > 15000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif' }}>
-              {fmtMs(w.response_time_ms)}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: `${c.color}15`, padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.color}33`, flexShrink: 0 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, boxShadow: `0 0 6px ${c.color}`, animation: 'pulse 1.5s infinite' }} />
+            <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.05em', color: c.color }}>
+              {w.status}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: `${c.color}15`, padding: '4px 12px', borderRadius: 6, border: `1px solid ${c.color}44` }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.color, boxShadow: `0 0 10px ${c.color}`, animation: 'pulse 1.5s infinite' }} />
-              <span style={{ fontSize: 14, fontWeight: 1000, letterSpacing: '0.1em', color: c.color }}>
-                {w.status}
-              </span>
-            </div>
           </div>
+          <span style={{ fontSize: '14px', fontWeight: 1000, color: w.response_time_ms > 15000 ? 'var(--status-critical)' : 'var(--text-sub)', fontFamily: '"Inter", sans-serif', flexShrink: 0 }}>
+            {fmtMs(w.response_time_ms)}
+          </span>
         </div>
       </div>
     </div>
@@ -173,9 +173,16 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
 
 export default function StatusPanel({ websites, selectedId, onSelect, onOpenDetail, realtimeSnapshot }) {
   const [showInfo, setShowInfo] = useState(false)
-  const sorted = [...websites].sort((a, b) => {
-    const order = { OFFLINE: 0, CRITICAL: 1, ONLINE: 2, UNKNOWN: 3 }
-    return (order[a.status] ?? 4) - (order[b.status] ?? 4)
+  const [search, setSearch] = useState('')
+
+  const filtered = websites.filter(w => 
+    w.name.toLowerCase().includes(search.toLowerCase()) || 
+    w.url.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const sorted = [...filtered].sort((a, b) => {
+    const order = { OFFLINE: 0, CRITICAL: 1, WARNING: 2, DEGRADED: 3, ONLINE: 4, UNKNOWN: 5 }
+    return (order[a.status] ?? 6) - (order[b.status] ?? 6)
   })
 
   return (
@@ -186,17 +193,36 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
 
         {/* LIVE FEED SECTION (Top 60%) */}
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column', borderBottom: '2px solid var(--border)' }}>
-          <div style={{ padding: '10px 20px', background: 'var(--bg-header)', fontSize: 12, fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--primary)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-header)', fontSize: 11, fontWeight: 900, fontFamily: '"Inter", sans-serif', color: 'var(--primary)', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               <div style={{ width: 4, height: 16, background: 'var(--accent)', boxShadow: '0 0 8px var(--accent)' }} />
-              ACTIVE MONITORING FEED
-              <span style={{ marginLeft: 10, padding: '2px 8px', background: 'var(--accent-light)', color: 'var(--accent)', borderRadius: 10, fontSize: 10, border: '1px solid var(--border)' }}>
-                {websites.length} WEBSITES
+              NODES FEED
+              <span style={{ marginLeft: 4, padding: '2px 8px', background: 'var(--accent-light)', color: 'var(--accent)', borderRadius: 10, fontSize: 10, border: '1px solid var(--border)' }}>
+                {filtered.length} / {websites.length}
               </span>
             </div>
+
+            {/* --- SEARCH BAR --- */}
+            <div style={{ width: 140, margin: '0 8px', position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, opacity: 0.5 }}>🔍</span>
+              <input 
+                style={{ 
+                  width: '100%', padding: '6px 30px 6px 28px', borderRadius: 15, 
+                  border: '1px solid var(--border)', background: 'var(--bg-card)', 
+                  color: 'var(--text)', fontSize: 11, outline: 'none', transition: 'all 0.2s'
+                }} 
+                placeholder="Search..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10 }}>✕</button>
+              )}
+            </div>
+
             <button
               onClick={() => setShowInfo(true)}
-              style={{ background: 'var(--accent-light)', border: '1px solid var(--border)', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--accent)' }}
+              style={{ background: 'var(--accent-light)', border: '1px solid var(--border)', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--accent)', flexShrink: 0 }}
               title="Learn about status meanings"
             >
               <Info size={14} />
@@ -204,7 +230,9 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
             {sorted.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: '40px 0' }}>// NO SERVICES CONFIGURED</div>
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, padding: '40px 0' }}>
+                {search ? `// NO MATCHING NODES FOUND FOR "${search.toUpperCase()}"` : '// NO SERVICES CONFIGURED'}
+              </div>
             )}
             {sorted.map(w => (
               <ServiceRow

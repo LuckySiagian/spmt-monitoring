@@ -1,15 +1,24 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { websiteAPI, eventsAPI } from '../../services/api'
-import { useWebSocket } from '../../hooks/useWebSocket'
+import { useGlobalWebSocket } from '../../store/WebSocketContext'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
-const STATUS_COLORS = { ONLINE: '#10b981', CRITICAL: '#f59e0b', OFFLINE: '#ef4444' }
+const STATUS_COLORS = { 
+  ONLINE: '#10b981', 
+  DEGRADED: '#8b5cf6', 
+  WARNING: '#f59e0b', 
+  CRITICAL: '#d97706', 
+  OFFLINE: '#f43f5e',
+  UNKNOWN: '#64748b'
+}
 
 const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    CRITICAL: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-    OFFLINE: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+    DEGRADED: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: 'rgba(139,92,246,0.3)' },
+    WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+    CRITICAL: { bg: 'rgba(217,119,6,0.15)', color: '#d97706', border: 'rgba(217,119,6,0.3)' },
+    OFFLINE: { bg: 'rgba(244,63,94,0.15)', color: '#f43f5e', border: 'rgba(244,63,94,0.3)' },
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
   return (
     <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>
@@ -47,10 +56,11 @@ function AvailabilityTimeline({ websiteId }) {
   }, [websiteId])
 
   useEffect(() => {
-    fetchEvents()
+    const cleanup = fetchEvents()
+    return () => { if (typeof cleanup === 'function') cleanup() }
   }, [fetchEvents])
 
-  useWebSocket(useCallback((msg) => {
+  useGlobalWebSocket(useCallback((msg) => {
     if (msg.type === 'status_change' && (msg.payload.website_id === websiteId || msg.payload.WebsiteID === websiteId)) {
       fetchEvents(true)
     }
@@ -152,7 +162,7 @@ function AvailabilityTimeline({ websiteId }) {
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-        {['ONLINE', 'CRITICAL', 'OFFLINE'].map(s => (
+        {['ONLINE', 'DEGRADED', 'WARNING', 'CRITICAL', 'OFFLINE'].map(s => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: STATUS_COLORS[s] }} />
             <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s}</span>
@@ -161,6 +171,31 @@ function AvailabilityTimeline({ websiteId }) {
       </div>
     </div>
   )
+}
+
+// ── Translation & Helpers ─────────────────────────────────────
+const getHttpDesc = (code) => {
+  if (!code) return 'Koneksi Terputus (Timeout/Refused)';
+  if (code === 403) return 'Akses Ditolak (Locked). Server memblokir permintaan monitor.';
+  if (code === 401) return 'Perlu Login (Unauthorized). Monitor tidak memiliki izin akses.';
+  if (code === 404) return 'Halaman Tidak Ditemukan. Alamat URL salah atau sudah dihapus.';
+  if (code >= 500) return 'Server Error. Aplikasi di server sedang mengalami gangguan internal.';
+  if (code >= 400) return 'Masalah Akses. Ada kendala pada sisi permintaan ke server.';
+  return `Sukses (HTTP ${code})`;
+}
+
+const getSslDesc = (valid) => {
+  if (valid === true) return 'Aman & Terenkripsi (Sertifikat Valid)';
+  if (valid === false) return 'Tidak Aman (Sertifikat Rusak/Kadaluarsa)';
+  return 'Tidak Dicek / Non-HTTPS';
+}
+
+const getLatencyDesc = (ms) => {
+  if (!ms) return 'Tidak Terdeteksi';
+  if (ms < 500) return 'Sangat Cepat (Lancar)';
+  if (ms < 1500) return 'Normal (Standar)';
+  if (ms < 5000) return 'Lambat (Perlu Diperhatikan)';
+  return 'Sangat Lambat (Berisiko Down)';
 }
 
 // ── Analisis Kondisi Section ────────────────────────────────────────
@@ -180,73 +215,77 @@ function AnalisisKondisi({ website }) {
   }, [website.status, website.root_cause, website.url])
 
   const performAIAnalysis = (w) => {
-    const rc = w.root_cause?.toLowerCase() || ''
+    const rc = w.root_cause?.toUpperCase() || ''
     const status = w.status
-    const isHTTPS = w.url?.startsWith('https')
+    const code = w.status_code
     const sslValid = w.ssl_valid
+    const rt = w.response_time_ms || 0
 
-    // Skenario 1: Redirect Loop
-    if (rc.includes('redirect')) {
+    if (status === 'OFFLINE' || rc.includes('DNS') || rc.includes('TIMEOUT')) {
+      if (rc.includes('DNS')) {
+        return {
+          title: "GANGGUAN TOTAL: Alamat Tidak Ditemukan",
+          icon: "📍", color: "#f43f5e",
+          summary: "Kesalahan pada Buku Alamat (DNS)",
+          explanation: "Sistem monitor tidak bisa menemukan 'alamat rumah' dari aplikasi ini. Hal ini biasanya terjadi karena nama domain sudah mati, salah ketik, atau ada gangguan di penyedia domain.",
+          recommendation: "Periksa pengaturan DNS atau hubungi penyedia domain Anda."
+        }
+      }
       return {
-        title: "Redirect Loop",
-        severity: "MASALAH APLIKASI",
-        summary: "Sistem terjebak pengalihan (redirect) berulang.",
-        explanation: "Kesalahan pada logika routing atau sistem login internal website.",
-        recommendation: "Periksa konfigurasi routing/auth di backend aplikasi."
+        title: "GANGGUAN TOTAL: Koneksi Terputus",
+        icon: "🔌", color: "#f43f5e",
+        summary: "Server Tidak Menjawab",
+        explanation: `Sistem mencoba menghubungi server selama ${rt}ms tapi tidak ada balasan. Ini seperti menelepon tapi tidak diangkat. Server mungkin sedang mati atau jaringan internet ke sana terputus.`,
+        recommendation: "Pastikan server sedang menyala dan tidak ada firewall yang memblokir akses."
       }
     }
 
-    // Skenario 2: SSL Invalid
-    if (!sslValid && isHTTPS) {
+    if (sslValid === false) {
       return {
-        title: "SSL Security Fault",
-        severity: "MASALAH KEAMANAN",
-        summary: "Sertifikat SSL tidak valid atau kadaluwarsa.",
-        explanation: "Enkripsi tidak aktif. Risiko keamanan bagi data pengguna.",
-        recommendation: "Segera perbaharui atau perbaiki instalasi sertifikat SSL."
+        title: "BERISIKO: Masalah Keamanan",
+        icon: "🔒", color: "#f59e0b",
+        summary: "Sertifikat Keamanan Bermasalah (SSL)",
+        explanation: "Website ini menggunakan HTTPS tapi 'surat ijin'-nya (Sertifikat SSL) sudah kadaluarsa atau tidak cocok. Ini akan membuat browser memunculkan peringatan 'TIDAK AMAN' kepada pengguna.",
+        recommendation: "Perbarui sertifikat SSL website Anda segera."
       }
     }
 
-    // Skenario 3: DNS issues
-    if (rc.includes('dns') || rc.includes('no such host')) {
+    if (code === 403 || code === 401) {
       return {
-        title: "DNS Resolution Error",
-        severity: "MASALAH INFRASTRUKTUR",
-        summary: "Domain tidak ditemukan oleh sistem jaringan.",
-        explanation: "Domain tidak terdaftar atau server DNS tidak merespons.",
-        recommendation: "Verifikasi registrasi domain dan A-Record pada DNS."
+        title: "GANGGUAN AKSES: Pintu Terkunci",
+        icon: "🚫", color: "#d97706",
+        summary: "Akses Ditolak oleh Server",
+        explanation: "Server website aktif dan sehat, namun dia sengaja menolak memberikan akses ke sistem monitor kami. Ini sering terjadi jika server memiliki sistem keamanan (WAF) yang sangat ketat.",
+        recommendation: "Masukkan alamat IP monitor ke daftar putih (Whitelist) di server Anda."
       }
     }
 
-    // Skenario 4: Performance issues (Slow but OK)
-    if (status === 'CRITICAL' && log.status_code >= 200 && log.status_code < 400) {
+    if (code >= 500) {
       return {
-        title: "Performance Issue",
-        severity: "PERFORMA MENURUN",
-        summary: "Aplikasi merespons, namun sangat lambat.",
-        explanation: "Waktu muat browser melebihi ambang batas (6s). Hal ini bisa disebabkan beban server atau jaringan monitor tidak stabil.",
-        recommendation: "Optimasi aset website atau periksa kestabilan jaringan lokal Anda."
+        title: "GANGGUAN APLIKASI: Server Error",
+        icon: "💥", color: "#f43f5e",
+        summary: "Aplikasi di Server Mengalami Crash",
+        explanation: `Server membalas dengan kode kesalahan ${code}. Ini berarti koneksi internet aman, tapi aplikasi/website di dalam server tersebut gagal dijalankan karena ada error internal.`,
+        recommendation: "Periksa log error aplikasi di dalam server untuk melihat bagian yang rusak."
       }
     }
 
-    // Default Online
     if (status === 'ONLINE') {
       return {
-        title: "Kondisi Optimal",
-        severity: "SISTEM NORMAL",
-        summary: "Seluruh parameter aplikasi berjalan normal.",
-        explanation: "Konektivitas, port, dan respon HTTP terpantau stabil.",
-        recommendation: "Tidak ada tindakan. Lanjutkan pemantauan rutin."
+        title: "SISTEM SEHAT: Kondisi Optimal",
+        icon: "✨", color: "#10b981",
+        summary: "Aplikasi Berjalan Normal",
+        explanation: `Semua parameter hijau. Aplikasi merespon dalam waktu ${rt}ms (${getLatencyDesc(rt)}), sertifikat keamanan valid, dan server memberikan akses penuh.`,
+        recommendation: "Teruskan pemantauan rutin untuk menjaga stabilitas."
       }
     }
 
-    // Fallback
     return {
-      title: "Service Interruption",
-      severity: "GANGGUAN LAYANAN",
-      summary: "Gagal menerima respon valid dari aplikasi.",
-      explanation: "Koneksi terhambat firewall atau aplikasi sedang crash (5xx).",
-      recommendation: "Cek error log server dan whitelist IP monitoring."
+      title: "KONDISI TIDAK DIKETAHUI",
+      icon: "❓", color: "#64748b",
+      summary: "Menunggu Data Terkumpul",
+      explanation: "Sistem belum memiliki cukup data untuk memberikan analisa narasi yang akurat.",
+      recommendation: "Tunggu beberapa saat selagi sistem mengumpulkan data."
     }
   }
 
@@ -259,57 +298,34 @@ function AnalisisKondisi({ website }) {
     </div>
   )
 
-  const theme = {
-    'ONLINE': { color: '#10b981', bg: 'rgba(16,185,129,0.05)', icon: '✅' },
-    'OFFLINE': { color: '#ef4444', bg: 'rgba(239,68,68,0.05)', icon: '❌' },
-    'CRITICAL': { color: '#f59e0b', bg: 'rgba(245,158,11,0.05)', icon: '⚠️' },
-  }[analysis.severity.split(' ')[0]] || { color: '#3b82f6', bg: 'rgba(59,130,246,0.05)', icon: '🤖' }
 
   return (
-    <div style={{ marginTop: 20, background: 'var(--bg-card)', border: `2px solid ${theme.color}33`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.08)' }}>
-      <div style={{ background: theme.color, padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 18 }}>📊</span>
-        <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '0.03em' }}>ANALISIS KONDISI (LAYER 7)</span>
-        <div style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.2)', padding: '2px 10px', borderRadius: 20, color: '#fff', fontSize: 10, fontWeight: 800 }}>SISTEM DIAGNOSIS</div>
+    <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 2 }}>
+        <div style={{ width: 4, height: 18, background: analysis.color, borderRadius: 2, boxShadow: `0 0 8px ${analysis.color}` }} />
+        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.05em' }}>RINGKASAN NARASI KONDISI</span>
+        <div style={{ marginLeft: 'auto', background: `${analysis.color}22`, color: analysis.color, fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 4, border: `1px solid ${analysis.color}44` }}>KECERDASAN SISTEM</div>
       </div>
 
-      <div style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: theme.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
-            {theme.icon}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ background: 'var(--bg-main)', border: `1px solid ${analysis.color}33`, borderRadius: 16, padding: '20px', boxShadow: '0 8px 24px rgba(0,0,0,0.02)', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <span style={{ fontSize: 32 }}>{analysis.icon}</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 900, color: analysis.color }}>{analysis.title}</div>
+              <div style={{ fontSize: 18, fontWeight: 1000, color: 'var(--text)' }}>{analysis.summary}</div>
+            </div>
           </div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>{analysis.title}</div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: theme.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{analysis.severity}</div>
+          
+          <div style={{ height: 1, background: 'var(--border)', margin: '15px 0' }} />
+          
+          <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.05em' }}>PENJELASAN KONDISI:</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-sub)', lineHeight: 1.6, marginBottom: 15 }}>{analysis.explanation}</div>
+          
+          <div style={{ background: `${analysis.color}08`, border: `1px dashed ${analysis.color}44`, borderRadius: 10, padding: '12px 16px' }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: analysis.color, marginBottom: 4, letterSpacing: '0.05em' }}>💡 SARAN TINDAKAN:</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{analysis.recommendation}</div>
           </div>
-        </div>
-
-        {/* BILINQUAL SUMMARY */}
-        <div style={{ background: 'rgba(0,0,0,0.02)', padding: '14px 16px', borderRadius: 10, borderLeft: `5px solid ${theme.color}`, marginBottom: 20 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6, opacity: 0.7 }}>SUMMARY / RINGKASAN</div>
-          {analysis.summary.split('\n').map((ln, i) => (
-            <div key={i} style={{ fontSize: i === 0 ? 13 : 12, color: i === 0 ? 'var(--text)' : 'var(--text-sub)', fontWeight: i === 0 ? 700 : 500, fontStyle: i === 1 ? 'italic' : 'normal', marginBottom: i === 0 ? 4 : 0 }}>{ln}</div>
-          ))}
-        </div>
-
-        {/* BILINQUAL EXPLANATION */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 10, fontWeight: 900, color: '#4a6fa5', marginBottom: 8, letterSpacing: '0.05em', opacity: 0.7 }}>ANALYSIS / ANALISA</div>
-          <div style={{ background: 'rgba(99,102,241,0.03)', padding: '14px', borderRadius: 8 }}>
-            {analysis.explanation.split('\n').map((ln, i) => (
-              <div key={i} style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--text-sub)', marginBottom: i === 0 ? 10 : 0, fontWeight: i === 0 ? 500 : 400, fontStyle: i === 1 ? 'italic' : 'normal' }}>{ln}</div>
-            ))}
-          </div>
-        </div>
-
-        {/* BILINQUAL RECOMMENDATION */}
-        <div style={{ padding: '16px', background: `${theme.color}11`, borderRadius: 12, border: `1px solid ${theme.color}22` }}>
-          <div style={{ fontSize: 11, fontWeight: 900, color: theme.color, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>💡</span> SARAN PENANGANAN:
-          </div>
-          {analysis.recommendation.split('\n').map((ln, i) => (
-            <div key={i} style={{ fontSize: 12, lineHeight: 1.5, color: i === 0 ? 'var(--text)' : 'var(--text-sub)', fontWeight: i === 0 ? 800 : 600, marginBottom: i === 0 ? 4 : 0 }}>{ln}</div>
-          ))}
         </div>
       </div>
     </div>
@@ -378,7 +394,7 @@ export default function ServiceDetailModal({ website, onClose }) {
   }, [fetchLogs])
 
   // WebSocket Sync for Logs
-  useWebSocket(useCallback((msg) => {
+  useGlobalWebSocket(useCallback((msg) => {
     if ((msg.type === 'monitor_update' || msg.type === 'status_change') && msg.payload.website_id === website?.id) {
       fetchLogs(true) // Silent update
     }
@@ -386,7 +402,11 @@ export default function ServiceDetailModal({ website, onClose }) {
 
   if (!website) return null
 
-  const fmt = (ms) => ms != null ? `${ms}ms` : '—'
+  const fmt = (ms) => {
+    if (ms === null || ms === undefined) return '—'
+    if (ms === 0) return '< 1ms'
+    return `${ms}ms`
+  }
   const fmtTime = (d) => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
   const { avgRT, maxRT, minRT, uptime, alerts, perfData, upLogsCount } = useMemo(() => {
@@ -465,20 +485,25 @@ export default function ServiceDetailModal({ website, onClose }) {
           {/* ── OVERVIEW ── */}
           {tab === 'overview' && (
             <div>
-              <InfoRow label="Service Name" value={website.name} />
-              <InfoRow label="URL" value={website.url} />
-              <InfoRow label="IP Address" value={website.ip_address || '—'} />
-              <InfoRow label="Status" value={<StatusBadge status={website.status} />} />
-              <InfoRow label="HTTP Code" value={website.status_code} />
-              <InfoRow label="DNS Status" value={website.dns_resolved === false ? '✗ Failed' : '✓ Resolved'} valueColor={website.dns_resolved === false ? '#ef4444' : '#10b981'} />
-              <InfoRow label="SSL Status" value={website.ssl_valid == null ? '—' : website.ssl_valid ? '✓ Valid' : '✗ Invalid'} valueColor={website.ssl_valid ? '#10b981' : '#ef4444'} />
-              <InfoRow label="Response Time" value={fmt(website.response_time_ms)} valueColor={website.response_time_ms > 3000 ? '#f59e0b' : '#10b981'} />
-              <InfoRow label="Monitoring Interval" value={website.interval_seconds ? `${website.interval_seconds}s` : '—'} />
-              <InfoRow label="Last Check" value={fmtTime(website.last_checked)} />
-              <InfoRow label="24h Sample Uptime" value={`${uptime}%`} valueColor={parseFloat(uptime) > 99 ? '#10b981' : parseFloat(uptime) > 90 ? '#f59e0b' : '#ef4444'} />
-
-              <RootCauseSection website={website} />
               <AnalisisKondisi website={website} />
+
+              <div style={{ marginTop: 24, padding: '20px', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 16 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 15, fontWeight: 900, letterSpacing: '0.05em' }}>DETAIL PARAMETER TEKNIS</div>
+                <InfoRow label="Status Saat Ini" value={<StatusBadge status={website.status} />} />
+                <InfoRow label="Kode Respon" value={getHttpDesc(website.status_code)} valueColor={!website.status_code ? '#ef4444' : undefined} />
+                <InfoRow label="Keamanan (SSL)" value={getSslDesc(website.ssl_valid)} valueColor={website.ssl_valid ? '#10b981' : (website.ssl_valid === false ? '#ef4444' : undefined)} />
+                <InfoRow label="Kecepatan Respon" value={`${fmt(website.response_time_ms)} — ${getLatencyDesc(website.response_time_ms)}`} />
+                <InfoRow label="Kesehatan Website" value={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 60, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${website.health_score || 0}%`, height: '100%', background: website.health_score > 80 ? '#10b981' : website.health_score > 50 ? '#f59e0b' : '#ef4444' }} />
+                    </div>
+                    <span style={{ color: website.health_score > 80 ? '#10b981' : website.health_score > 50 ? '#f59e0b' : '#ef4444' }}>{website.health_score || 0}%</span>
+                  </div>
+                } />
+                <InfoRow label="Alamat IP" value={website.ip_address || '—'} />
+                <InfoRow label="Pengecekan Terakhir" value={fmtTime(website.last_checked)} />
+              </div>
               
               <div style={{ marginTop: 20 }}>
                 <a href={website.url} target="_blank" rel="noopener noreferrer" 
@@ -565,7 +590,7 @@ export default function ServiceDetailModal({ website, onClose }) {
             ) : (
               <table style={st.table}>
                 <thead>
-                  <tr>{['Time', 'Status', 'HTTP', 'Response', 'SSL', 'DNS'].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                  <tr>{['Time', 'Status', 'HTTP', 'Latency', 'Health', 'SSL'].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {logs.map((log, i) => (
@@ -574,8 +599,8 @@ export default function ServiceDetailModal({ website, onClose }) {
                       <td style={st.td}><span style={{ color: STATUS_COLORS[log.status] || '#4a5568', fontWeight: 600, fontSize: 10 }}>{log.status || '—'}</span></td>
                       <td style={st.td}>{log.status_code ?? '—'}</td>
                       <td style={st.td}>{fmt(log.response_time_ms)}</td>
+                      <td style={st.td}><span style={{ color: log.health_score > 80 ? '#10b981' : '#f59e0b' }}>{log.health_score}%</span></td>
                       <td style={st.td}>{log.ssl_valid == null ? '—' : log.ssl_valid ? '✓' : '✗'}</td>
-                      <td style={st.td}>{log.dns_resolved == null ? '—' : log.dns_resolved ? '✓' : '✗'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -615,7 +640,18 @@ export default function ServiceDetailModal({ website, onClose }) {
 
 const st = {
   overlay: { position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(30,41,59,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(2px)' },
-  modal: { width: 'min(700px, 95%)', maxHeight: '90vh', background: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 16, display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.15)', overflow: 'hidden', animation: 'fadeIn 0.2s ease-out' },
+  modal: { 
+    width: 'min(800px, 95%)', 
+    height: 'min(720px, 85vh)', 
+    background: 'var(--bg-header)', 
+    border: '1px solid var(--border)', 
+    borderRadius: 16, 
+    display: 'flex', 
+    flexDirection: 'column', 
+    boxShadow: '0 24px 64px rgba(0,0,0,0.15)', 
+    overflow: 'hidden', 
+    animation: 'fadeIn 0.2s ease-out' 
+  },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 12 },
   favicon: { width: 36, height: 36, background: 'var(--accent-light)', border: '1px solid var(--border)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },

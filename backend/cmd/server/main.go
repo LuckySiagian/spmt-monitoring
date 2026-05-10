@@ -126,7 +126,9 @@ func main() {
 			r.Post("/users/demote", h.DemoteUser)
 			r.Post("/users/create", h.CreateUser)
 			r.Delete("/users/{id}", h.DeleteUser)
+			r.Post("/chaos/toggle", h.ToggleChaos)
 		})
+		r.Get("/dashboard/distribution", h.GetStatusDistribution)
 	})
 
 	// ─── Server ───────────────────────────────────────────────

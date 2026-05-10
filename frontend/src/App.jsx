@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useWebSocket } from './hooks/useWebSocket'
 import { AuthProvider, useAuth } from './store/auth'
 import { ThemeProvider, useTheme } from './store/theme'
+import { WebSocketProvider } from './store/WebSocketContext'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import WebsitesPage from './pages/WebsitesPage'
 import UsersPage from './pages/UsersPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
+import ServiceDetailModal from './components/dashboard/ServiceDetailModal'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
 import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './services/api'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
-  const SC = { ONLINE: '#059669', CRITICAL: '#d97706', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
+  const SC = { ONLINE: '#059669', DEGRADED: '#8b5cf6', WARNING: '#f59e0b', CRITICAL: '#d97706', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
   const fmtTime = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
   return createPortal(
@@ -235,11 +236,11 @@ function ProfileModal({ user, onClose }) {
     return currentEmail
   })
   const [telegramId, setTelegramId] = useState(user?.telegram_id || '')
-  
+
   useEffect(() => {
     setOldPassword(''); setNewPassword(''); setConfirmPassword('')
   }, [activeTab])
-  
+
   // Email change fields
   const [showChangeEmail, setShowChangeEmail] = useState(false)
   const [currentEmailConfirm, setCurrentEmailConfirm] = useState('')
@@ -362,13 +363,13 @@ function ProfileModal({ user, onClose }) {
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 20, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
-            <div 
+            <div
               onClick={() => setActiveTab('profile')}
               style={{ padding: '10px 4px', fontSize: 15, fontWeight: 900, color: activeTab === 'profile' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'profile' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
             >
               General Settings
             </div>
-            <div 
+            <div
               onClick={() => setActiveTab('security')}
               style={{ padding: '10px 4px', fontSize: 15, fontWeight: 900, color: activeTab === 'security' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'security' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
             >
@@ -381,35 +382,35 @@ function ProfileModal({ user, onClose }) {
               <>
                 <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>PERSONAL NOTIFICATION SETTINGS</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  
+
                   {/* Email Section */}
                   <div style={{ background: 'rgba(38, 74, 236, 0.15)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>✉️</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.08em' }}>
-                         CURRENT EMAIL ADDRESS
+                        CURRENT EMAIL ADDRESS
                       </div>
                       {!user?.email && <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, padding: '2px 8px', background: 'rgba(239,68,68,0.15)', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)' }}>REQUIRED</span>}
                     </div>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
-                        <div style={{ 
-                          width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', 
-                          borderRadius: 8, padding: '12px 14px 12px 38px', fontSize: 16, color: email ? 'var(--text)' : 'var(--text-muted)', 
-                          fontWeight: 800, letterSpacing: '0.02em', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)' 
+                        <div style={{
+                          width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)',
+                          borderRadius: 8, padding: '12px 14px 12px 38px', fontSize: 16, color: email ? 'var(--text)' : 'var(--text-muted)',
+                          fontWeight: 800, letterSpacing: '0.02em', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
                         }}>
                           <span style={{ position: 'absolute', left: 12, fontSize: 20, opacity: 0.7 }}>📧</span>
                           {email || 'No email registered yet'}
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setShowChangeEmail(!showChangeEmail)} 
-                        style={{ 
-                          background: showChangeEmail ? 'rgba(239,68,68,0.15)' : 'var(--accent)', 
-                          border: showChangeEmail ? '1px solid #ef4444' : 'none', 
-                          color: showChangeEmail ? '#ef4444' : '#fff', 
-                          borderRadius: 8, padding: '12px 24px', fontSize: 13, fontWeight: 900, 
-                          cursor: 'pointer', transition: 'all 0.2s', boxShadow: showChangeEmail ? 'none' : '0 4px 12px var(--accent-light)' 
+                      <button
+                        onClick={() => setShowChangeEmail(!showChangeEmail)}
+                        style={{
+                          background: showChangeEmail ? 'rgba(239,68,68,0.15)' : 'var(--accent)',
+                          border: showChangeEmail ? '1px solid #ef4444' : 'none',
+                          color: showChangeEmail ? '#ef4444' : '#fff',
+                          borderRadius: 8, padding: '12px 24px', fontSize: 13, fontWeight: 900,
+                          cursor: 'pointer', transition: 'all 0.2s', boxShadow: showChangeEmail ? 'none' : '0 4px 12px var(--accent-light)'
                         }}
                       >
                         {showChangeEmail ? 'CLOSE' : (user?.email ? 'CHANGE' : 'SET EMAIL')}
@@ -417,26 +418,26 @@ function ProfileModal({ user, onClose }) {
                     </div>
 
                     {showChangeEmail && (
-                      <div style={{ 
-                        marginTop: 18, padding: '18px', background: 'var(--bg-card)', 
-                        borderRadius: 12, border: '1px solid var(--accent)', 
+                      <div style={{
+                        marginTop: 18, padding: '18px', background: 'var(--bg-card)',
+                        borderRadius: 12, border: '1px solid var(--accent)',
                         boxShadow: '0 8px 24px rgba(0,0,0,0.2), 0 0 0 1px var(--accent)',
-                        animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)' 
+                        animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                           <div style={{ width: 4, height: 16, background: 'var(--accent)', borderRadius: 2 }} />
                           <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.05em' }}>UPDATE EMAIL IDENTITY</div>
                         </div>
-                        
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
                             {user?.email && (
                               <>
                                 <div style={{ position: 'relative' }}>
                                   <label style={{ display: 'block', fontSize: 9, color: 'var(--accent)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>CONFIRM CURRENT EMAIL</label>
-                                  <input 
-                                    type="email" 
-                                    value={currentEmailConfirm} 
+                                  <input
+                                    type="email"
+                                    value={currentEmailConfirm}
                                     onChange={e => setCurrentEmailConfirm(e.target.value)}
                                     placeholder="Type your existing email..."
                                     style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none', transition: 'border 0.2s' }}
@@ -447,9 +448,9 @@ function ProfileModal({ user, onClose }) {
                             )}
                             <div>
                               <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>NEW EMAIL ADDRESS</label>
-                              <input 
-                                type="email" 
-                                value={newEmail} 
+                              <input
+                                type="email"
+                                value={newEmail}
                                 onChange={e => setNewEmail(e.target.value)}
                                 placeholder="Enter new email..."
                                 style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
@@ -457,23 +458,23 @@ function ProfileModal({ user, onClose }) {
                             </div>
                             <div>
                               <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>RE-TYPE NEW EMAIL</label>
-                              <input 
-                                type="email" 
-                                value={confirmNewEmail} 
+                              <input
+                                type="email"
+                                value={confirmNewEmail}
                                 onChange={e => setConfirmNewEmail(e.target.value)}
                                 placeholder="Confirm new email..."
                                 style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
                               />
                             </div>
                           </div>
-                          
-                          <button 
-                            onClick={() => handleSave('email')} 
+
+                          <button
+                            onClick={() => handleSave('email')}
                             disabled={loading || !newEmail || !confirmNewEmail}
-                            style={{ 
-                              marginTop: 6, background: 'linear-gradient(135deg, var(--accent), #4f46e5)', 
-                              border: 'none', color: '#fff', borderRadius: 8, padding: '12px', 
-                              fontSize: 12, fontWeight: 800, cursor: 'pointer', 
+                            style={{
+                              marginTop: 6, background: 'linear-gradient(135deg, var(--accent), #4f46e5)',
+                              border: 'none', color: '#fff', borderRadius: 8, padding: '12px',
+                              fontSize: 12, fontWeight: 800, cursor: 'pointer',
                               boxShadow: '0 4px 15px rgba(79, 70, 229, 0.3)',
                               opacity: (loading || !newEmail) ? 0.6 : 1,
                               transition: 'transform 0.1s active'
@@ -495,16 +496,16 @@ function ProfileModal({ user, onClose }) {
                     <div style={{ display: 'flex', gap: 10 }}>
                       <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
                         <span style={{ position: 'absolute', left: 12, fontSize: 16, opacity: 0.7 }}>📱</span>
-                        <input 
-                          type="text" 
-                          value={telegramId} 
+                        <input
+                          type="text"
+                          value={telegramId}
                           onChange={e => setTelegramId(e.target.value)}
                           placeholder="@username or Chat ID..."
                           style={{ width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px 10px 38px', fontSize: 13, color: 'var(--text)', outline: 'none', fontWeight: 600 }}
                         />
                       </div>
-                      <button 
-                        onClick={() => handleSave('profile')} 
+                      <button
+                        onClick={() => handleSave('profile')}
                         disabled={loading}
                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '0 20px', fontSize: 11, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', opacity: loading ? 0.6 : 1 }}
                       >
@@ -522,7 +523,7 @@ function ProfileModal({ user, onClose }) {
                       <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)' }}>TEST SYSTEM NOTIFICATIONS</div>
                       <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Verify your SMTP & Email settings instantly</div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => handleSave('test_email')}
                       disabled={loading}
                       style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 10, fontWeight: 800, cursor: 'pointer', opacity: loading ? 0.6 : 1 }}
@@ -539,9 +540,9 @@ function ProfileModal({ user, onClose }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>OLD PASSWORD</div>
-                    <input 
-                      type="password" 
-                      value={oldPassword} 
+                    <input
+                      type="password"
+                      value={oldPassword}
                       onChange={e => setOldPassword(e.target.value)}
                       placeholder="Enter current password"
                       style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
@@ -550,9 +551,9 @@ function ProfileModal({ user, onClose }) {
                   <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                   <div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>NEW PASSWORD</div>
-                    <input 
-                      type="password" 
-                      value={newPassword} 
+                    <input
+                      type="password"
+                      value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
                       style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
@@ -560,9 +561,9 @@ function ProfileModal({ user, onClose }) {
                   </div>
                   <div>
                     <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>CONFIRM NEW PASSWORD</div>
-                    <input 
-                      type="password" 
-                      value={confirmPassword} 
+                    <input
+                      type="password"
+                      value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
                       placeholder="Repeat new password"
                       style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
@@ -571,15 +572,15 @@ function ProfileModal({ user, onClose }) {
                 </div>
               </>
             )}
-            
+
             <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
               >Cancel</button>
               {activeTab === 'security' && (
-                <button 
-                  onClick={() => handleSave('security')} 
+                <button
+                  onClick={() => handleSave('security')}
                   disabled={loading}
                   style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)', opacity: loading ? 0.7 : 1 }}
                 >
@@ -622,8 +623,8 @@ function NetworkAlert({ isOffline, isSlow }) {
           {isOffline ? 'KONEKSI TERPUTUS!' : 'KONEKSI LELET / TIDAK STABIL'}
         </div>
         <div style={{ fontSize: 11, opacity: 0.9, lineHeight: 1.4, fontWeight: 600 }}>
-          {isOffline 
-            ? 'Silakan cek koneksi WiFi atau data seluler di perangkat Anda segera.' 
+          {isOffline
+            ? 'Silakan cek koneksi WiFi atau data seluler di perangkat Anda segera.'
             : 'Jaringan Anda sedang lambat. Monitoring mungkin tidak update secara real-time.'}
         </div>
       </div>
@@ -634,7 +635,7 @@ function NetworkAlert({ isOffline, isSlow }) {
 
 function getInitialNav() {
   const saved = localStorage.getItem('spmt_active_nav')
-  return ['dashboard', 'websites', 'activity-log', 'users'].includes(saved) ? saved : 'dashboard'
+  return ['dashboard', 'websites', 'activity-log', 'users', 'admin-tools'].includes(saved) ? saved : 'dashboard'
 }
 
 function AppInner() {
@@ -656,6 +657,7 @@ function AppInner() {
   const [isTvMode, setTvMode] = useState(false)
   const [wsConnected, setWsConnected] = useState(false)
   const [globalRefreshKey, setGlobalRefreshKey] = useState(0)
+  const [detailWebsiteId, setDetailWebsiteId] = useState(null)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [isSlow, setIsSlow] = useState(false)
 
@@ -794,13 +796,13 @@ function AppInner() {
   useEffect(() => {
     if (!loggedIn) return;
     const controller = new AbortController();
-    
+
     // Initial Load - Parallel
     triggerGlobalRefresh();
 
     const ivSummary = setInterval(() => loadSummary(controller.signal), 5000);
     const ivWebsites = setInterval(() => loadWebsites(controller.signal), 15000); // More frequent but stable
-    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, 30000); 
+    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, 30000);
 
     return () => {
       controller.abort();
@@ -810,9 +812,9 @@ function AppInner() {
     }
   }, [loggedIn, triggerGlobalRefresh, loadSummary, loadWebsites, loadUsers, loadEvents])
 
-  const navTo = useCallback((nav) => { 
-    if (nav === 'users' && !isSuperAdmin) return; 
-    setActiveNav(nav); 
+  const navTo = useCallback((nav) => {
+    if (nav === 'users' && !isSuperAdmin) return;
+    setActiveNav(nav);
     localStorage.setItem('spmt_active_nav', nav);
     // Auto refresh data whenever user switches pages
     triggerGlobalRefresh();
@@ -896,6 +898,7 @@ function AppInner() {
         websites={websites} notifications={notifications}
         onMarkRead={handleMarkRead} onMarkAllRead={handleMarkAllRead}
         onNavigate={(nav) => { if (nav === 'notifications') setShowAllNotifs(true); else navTo(nav) }}
+        onOpenDetail={(w) => setDetailWebsiteId(w.id)}
         navItems={navItems}
         isTvMode={isTvMode} onToggleTvMode={toggleTvMode}
         onProfile={() => setShowProfile(true)}
@@ -904,12 +907,18 @@ function AppInner() {
         onAbout={() => setShowAbout(true)}
       />
       <div className="page-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, zIndex: 1, position: 'relative' }}>
-        {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} websites={websites} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} realtimeSnapshot={realtimeSnapshot} wsConnected={wsConnected} setWsConnected={setWsConnected} />}
+        {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} websites={websites} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} realtimeSnapshot={realtimeSnapshot} wsConnected={wsConnected} setWsConnected={setWsConnected} onOpenDetail={(w) => setDetailWebsiteId(w.id)} />}
         {activeNav === 'websites' && <WebsitesPage websites={websites} onWebsiteUpdate={handleWebsiteUpdate} />}
         {activeNav === 'activity-log' && <ActivityLogPage events={allEvents} />}
         {activeNav === 'users' && isSuperAdmin && <UsersPage users={users} onUserUpdate={handleUserUpdate} />}
       </div>
 
+      {detailWebsiteId && (
+        <ServiceDetailModal 
+          website={websites.find(w => w.id === detailWebsiteId)} 
+          onClose={() => setDetailWebsiteId(null)} 
+        />
+      )}
       {showAllNotifs && <AllNotificationsPanel notifications={notifications} onDelete={handleDelete} onClearAll={handleClearAll} onClose={() => setShowAllNotifs(false)} />}
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
       {showLogout && <LogoutModal onConfirm={handleLogout} onCancel={() => setShowLogout(false)} />}
@@ -920,4 +929,4 @@ function AppInner() {
   )
 }
 
-export default function App() { return <ThemeProvider><AuthProvider><AppInner /><ToastContainer /></AuthProvider></ThemeProvider> }
+export default function App() { return <ThemeProvider><AuthProvider><WebSocketProvider><AppInner /><ToastContainer /></WebSocketProvider></AuthProvider></ThemeProvider> }

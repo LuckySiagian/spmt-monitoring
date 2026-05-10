@@ -5,8 +5,6 @@ import { historyAPI } from '../../services/api'
 // ── Ranges: LIVE (1min), 1H (1min buckets), 3H (2min buckets)
 const RANGES = [
   { label:'LIVE', value:'live', bucket:60,  desc:'Real-time per menit' },
-  { label:'1H',   value:'1h',   bucket:60,  desc:'1 Jam — data per menit' },
-  { label:'3H',   value:'3h',   bucket:120, desc:'3 Jam — data per 2 menit' },
 ]
 
 // ── Safe date formatter — TIDAK PERNAH return Invalid Date / tahun 2000
@@ -29,7 +27,7 @@ function safeLabel(timeVal, bucket) {
 function buildLiveFrame(slots=100) {
   const now = new Date()
   return Array.from({length:slots},(_,i)=>{
-    const d = new Date(now.getTime() - (slots-1-i)*120000)
+    const d = new Date(now.getTime() - (slots-1-i)*60000)
     return { label:d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false}), online:null, critical:null, offline:null, unknown:null }
   })
 }
@@ -136,13 +134,15 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
           {loading && <span style={{ color:'var(--accent)', fontSize:11, fontWeight: 800, animation: 'pulse 1.5s infinite' }}>LOADING...</span>}
           {range==='live' && !loading && <span style={{ fontSize:10, fontWeight: 900, color:'#10b981', background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.3)', borderRadius:6, padding:'2px 10px' }}>LIVE</span>}
         </div>
-        <div style={{ display:'flex', gap:4 }}>
-          {RANGES.map(r=>(
-            <button key={r.value} title={r.desc}
-              style={{ background:range===r.value?'var(--accent)':'transparent', border:range===r.value?'1px solid var(--accent)':'1px solid var(--border)', color:range===r.value?'#ffffff':'var(--text-sub)', fontSize:10, fontWeight:800, padding:'4px 10px', borderRadius:4, cursor:'pointer', transition:'all 0.2s ease' }}
-              onClick={()=>setRange(r.value)}>{r.label}</button>
-          ))}
-        </div>
+        {RANGES.length > 1 && (
+          <div style={{ display:'flex', gap:4 }}>
+            {RANGES.map(r=>(
+              <button key={r.value} title={r.desc}
+                style={{ background:range===r.value?'var(--accent)':'transparent', border:range===r.value?'1px solid var(--accent)':'1px solid var(--border)', color:range===r.value?'#ffffff':'var(--text-sub)', fontSize:10, fontWeight:800, padding:'4px 10px', borderRadius:4, cursor:'pointer', transition:'all 0.2s ease' }}
+                onClick={()=>setRange(r.value)}>{r.label}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Chart */}
