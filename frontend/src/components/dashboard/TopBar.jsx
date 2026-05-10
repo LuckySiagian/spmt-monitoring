@@ -77,7 +77,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
 export default function TopBar({
   summary, activeNav, onNavChange, onLogout,
   websites, notifications, onMarkRead, onMarkAllRead, navItems = ['dashboard', 'websites', 'activity-log'], onNavigate,
-  isTvMode, onToggleTvMode, onProfile, onSettings, onAbout
+  isTvMode, onToggleTvMode, onProfile, onSettings, onAbout, onOpenDetail
 }) {
   const { user } = useAuth()
   const { themeId, setTheme, t } = useTheme()
@@ -112,6 +112,8 @@ export default function TopBar({
 
   const alertCount = summary?.active_alerts ?? 0
   const onlineCount = websites.filter(w => w.status === 'ONLINE').length
+  const degradedCount = websites.filter(w => w.status === 'DEGRADED').length
+  const warningCount = websites.filter(w => w.status === 'WARNING').length
   const criticalCount = websites.filter(w => w.status === 'CRITICAL').length
   const offlineCount = websites.filter(w => w.status === 'OFFLINE').length
   const unknownCount = websites.filter(w => !w.status || w.status === 'UNKNOWN').length
@@ -119,13 +121,11 @@ export default function TopBar({
 
   const metrics = [
     { label: t?.online || 'ONLINE', value: onlineCount, color: '#10b981' },
-    { label: t?.critical || 'CRITICAL', value: criticalCount, color: '#f59e0b' },
+    { label: t?.critical || 'CRITICAL', value: criticalCount + degradedCount + warningCount, color: '#d97706' },
     { label: t?.offline || 'OFFLINE', value: offlineCount, color: '#ef4444' },
-    { label: t?.unknown || 'UNKNOWN', value: unknownCount, color: '#94a3b8' },
     { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#0ea5e9' },
     { label: t?.total || 'TOTAL', value: totalCount, color: '#64748b' },
     { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#8b5cf6' },
-    { label: t?.alerts || 'ALERTS', value: alertCount, color: alertCount > 0 ? '#ef4444' : '#94a3b8' },
   ]
 
   const slaPct = Number(summary?.sla_percent || 100);
@@ -152,19 +152,21 @@ export default function TopBar({
   return (
     <>
       <div className="topbar" style={{
-        display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
-        padding: '0 22px', minHeight: '80px', position: 'relative', zIndex: 100
+        display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+        padding: '0 24px', height: '72px !important', minHeight: '72px', position: 'relative', zIndex: 100,
+        borderBottom: '1px solid var(--border)', background: 'var(--bg-header)'
       }}>
 
         {/* ── BRANDING SECTION (Logo Only) ── */}
         <div className="topbar-branding" style={{ display: 'flex', alignItems: 'center', height: '100%', flexShrink: 0 }}>
           <div style={{
             display: 'flex', alignItems: 'center',
-            background: '#e0f2fe', padding: '6px 14px', borderRadius: '12px',
-            border: '1px solid #bae6fd', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.87)'
+            background: 'rgba(255, 255, 255, 0.6)', backdropFilter: 'blur(10px)',
+            padding: '6px 14px', borderRadius: '12px',
+            border: '1px solid var(--border)', boxShadow: 'var(--shadow)'
           }}>
             <img src="/images/logos/lo.png" alt="Logo"
-              style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
+              style={{ height: 48, width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 0 8px rgba(0, 31, 63, 0.1))' }} />
           </div>
         </div>
 
@@ -173,7 +175,7 @@ export default function TopBar({
           visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
           display: 'flex',
           flexWrap: 'nowrap',
-          gap: '6px'
+          gap: '8px'
         }}>
           {metrics.map(m => {
             const active = activeMetric === m.label
@@ -207,7 +209,7 @@ export default function TopBar({
                   minWidth: 0,
                   width: '100%',
                   color: m.color,
-                  borderRadius: 10,
+                  borderRadius: 8,
                   transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                   position: 'relative',
                   zIndex: hoveredMetric === m.label ? 100 : 1
@@ -230,8 +232,8 @@ export default function TopBar({
 
                 {isAlert && <span style={{ position: 'absolute', top: 1, right: 2, width: 4, height: 4, borderRadius: '50%', background: '#ff4d4f', animation: 'pulse 1s infinite' }} />}
 
-                <span style={{ fontSize: '32px', fontWeight: 900, lineHeight: 1 }}>{m.value}</span>
-                <span style={{ fontSize: '14px', fontWeight: 800, lineHeight: 1.1, textTransform: 'uppercase', opacity: 0.8 }}>{m.label}</span>
+                <span style={{ fontSize: '28px', fontWeight: 900, lineHeight: 1, marginBottom: 2 }}>{m.value}</span>
+                <span style={{ fontSize: '11px', fontWeight: 800, lineHeight: 1, textTransform: 'uppercase', opacity: 0.9 }}>{m.label}</span>
               </div>
             )
           })}
@@ -310,8 +312,8 @@ export default function TopBar({
             <div className={isClockHovered ? 'rainbow-text' : ''} style={{ color: 'var(--primary)', fontSize: '32px', fontWeight: 900, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
               {clock.toLocaleTimeString('id-ID', { hour12: false })}
             </div>
-            <div style={{ color: 'var(--text-muted)', fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>
-              {clock.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })}
+            <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>
+              {clock.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })}
             </div>
           </div>
 
@@ -333,7 +335,7 @@ export default function TopBar({
         </div>
       </div>
 
-      {activeMetric && <MetricDetailModal type={activeMetric} websites={websites} summary={summary} onClose={() => setActiveMetric(null)} />}
+      {activeMetric && <MetricDetailModal type={activeMetric} websites={websites} summary={summary} onOpenDetail={onOpenDetail} onClose={() => setActiveMetric(null)} />}
     </>
   )
 }

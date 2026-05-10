@@ -26,43 +26,52 @@ function getDomain(url) {
 // ── Layout functions ──────────────────────────────────────────
 
 function calcStarLayout(websites) {
-  const displayWebsites = websites.slice(0, 50);
+  const displayWebsites = websites.slice(0, 80);
   const n = displayWebsites.length;
   
   return displayWebsites.map((w, i) => {
-    let radius, angle;
+    let radius, angle, ring;
     if (i < 20) {
-      // Inner circle: up to 20 nodes
+      // Inner circle: 20 nodes
       const innerCount = Math.min(20, n);
       angle = (i / Math.max(innerCount, 1)) * Math.PI * 2 - Math.PI / 2;
-      radius = 0.21; // More central
+      radius = 0.15;
+      ring = 0;
+    } else if (i < 45) {
+      // Middle circle: 25 nodes
+      const midCount = Math.min(25, n - 20);
+      const midIndex = i - 20;
+      const offset = (Math.PI / Math.max(midCount, 1));
+      angle = (midIndex / Math.max(midCount, 1)) * Math.PI * 2 - Math.PI / 2 + offset;
+      radius = 0.28;
+      ring = 1;
     } else {
-      // Outer circle: up to 30 nodes
-      const outerCount = n - 20;
-      const outerIndex = i - 20;
-      const offset = (Math.PI / Math.max(outerCount, 1));
+      // Outer circle: 35 nodes (Total max 80)
+      const outerCount = Math.min(35, n - 45);
+      const outerIndex = i - 45;
+      const offset = (Math.PI / Math.max(outerCount, 1)) * 0.5;
       angle = (outerIndex / Math.max(outerCount, 1)) * Math.PI * 2 - Math.PI / 2 + offset;
-      radius = 0.36; // More margin for labels
+      radius = 0.39;
+      ring = 2;
     }
     return {
       id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
       x: 0.5 + radius * Math.cos(angle),
       y: 0.5 + radius * Math.sin(angle),
-      angle
+      angle, ring
     }
   })
 }
 
 function calcTreeLayout(websites) {
-  const displayWebsites = websites.slice(0, 50);
+  const displayWebsites = websites.slice(0, 80);
   const n = displayWebsites.length;
   if (n === 0) return [];
 
-  // Use up to 10 nodes per row to prevent vertical crunch
-  const MAX_PER_ROW = 10;
+  // Adjust row density based on count
+  const MAX_PER_ROW = n > 60 ? 14 : (n > 40 ? 12 : 10);
   const rows = [];
-  let remaining = n;
-
+  
   const numRows = Math.ceil(n / MAX_PER_ROW);
   const basePerRow = Math.floor(n / numRows);
   let remainder = n % numRows;
@@ -77,25 +86,22 @@ function calcTreeLayout(websites) {
   }
   
   const result = [];
-  const totalRows = rows.length;
   let idx = 0;
 
   rows.forEach((rowSize, ri) => {
-    // Stack rows from top to bottom with a fixed gap instead of stretching across the screen
-    const yGap = 0.16; // 16% of height per row
+    const yGap = n > 60 ? 0.12 : 0.15; 
     const y = 0.08 + ri * yGap;
 
     for (let ci = 0; ci < rowSize; ci++) {
       const w = displayWebsites[idx++];
-      // Increase horizontal spread, pad is 0.05
-      const xPad = 0.05;
+      const xPad = 0.06;
       const xSpan = 1 - xPad * 2;
       const x = rowSize === 1 ? 0.5 : xPad + (ci / (rowSize - 1)) * xSpan;
 
       result.push({
         id: w.id, name: w.name, url: w.url, status: w.status || 'UNKNOWN',
-        x: Math.min(0.95, Math.max(0.05, x)),
-        y: Math.min(0.72, Math.max(0.08, y)), // Cap at 0.72 so it doesn't overlap server
+        x: Math.min(0.94, Math.max(0.06, x)),
+        y: Math.min(0.75, Math.max(0.08, y)),
         rowIdx: ri,
       });
     }
@@ -115,6 +121,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const [hoveredId, setHoveredId] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1100)
   const [showMoreNodes, setShowMoreNodes] = useState(false)
+  const [moreNodesSearch, setMoreNodesSearch] = useState('')
   const bgImgRef = useRef(null)
 
   useEffect(() => {
@@ -251,8 +258,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const isHov = node.id === hoveredId
       const isCrit = node.status === 'CRITICAL'
 
-      // Node size - expands if selected or hovered (Increased per user request)
-      const r = isHov ? 47 : (isSel ? 46 : 35)
+      // Node size - scales down as node count increases
+      const baseR = websites.length > 70 ? 25 : (websites.length > 50 ? 30 : 35)
+      const r = isHov ? baseR * 1.3 : (isSel ? baseR * 1.25 : baseR)
 
       // Critical pulse ring
       if (isCrit) {
@@ -300,30 +308,36 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
       // Label Box Positioning Logic
       const canvasScale = Math.min(width / 1400, height / 900)
-      const baseFontSize = Math.max(18, 16 * canvasScale)
-      const hoverFontSize = Math.max(20, 20 * canvasScale)
+      const labelFactor = websites.length > 70 ? 0.75 : (websites.length > 50 ? 0.85 : 1)
+      const baseFontSize = Math.max(12, 16 * canvasScale * labelFactor)
+      const hoverFontSize = Math.max(14, 20 * canvasScale)
       
       const name = node.name.length > 20 ? node.name.slice(0, 18) + '…' : node.name
       ctx.font = `${(isSel || isHov) ? '1000' : '900'} ${isHov ? hoverFontSize : baseFontSize}px "Inter", sans-serif`
       const tw = ctx.measureText(name).width + (isHov ? 16 : 12)
       const th = isHov ? 30 : 22
 
-      // Dynamic position based on quadrant
+      // Dynamic position based on quadrant/radial
       let lx = nx, ly = ny, txAlign = 'center', txBaseline = 'middle'
       const ang = Math.atan2(node.y - 0.5, node.x - 0.5) * 180 / Math.PI
-      const offset = r + (isHov ? 14 : 10)
+      const offset = r + (isHov ? 16 : 12)
 
       if (topoMode === 'tree') {
         ly = ny + offset; txBaseline = 'top'
       } else {
-        if (ang > -45 && ang <= 45) { // Right
-          lx = nx + offset; txAlign = 'left'
-        } else if (ang > 45 && ang <= 135) { // Bottom
-          ly = ny + offset; txBaseline = 'top'
-        } else if (ang > -135 && ang <= -45) { // Top
-          ly = ny - offset; txBaseline = 'bottom'
-        } else { // Left
-          lx = nx - offset; txAlign = 'right'
+        // STAR MODE: Push labels radially outwards from center
+        const radAngle = Math.atan2(node.y - 0.5, node.x - 0.5)
+        const labelDist = offset + (node.ring === 0 ? 5 : (node.ring === 1 ? 8 : 10))
+        lx = nx + Math.cos(radAngle) * labelDist
+        ly = ny + Math.sin(radAngle) * labelDist
+        
+        // Adjust alignment based on angle to avoid overlapping icon
+        if (Math.abs(Math.cos(radAngle)) > 0.7) {
+          txAlign = Math.cos(radAngle) > 0 ? 'left' : 'right'
+          txBaseline = 'middle'
+        } else {
+          txAlign = 'center'
+          txBaseline = Math.sin(radAngle) > 0 ? 'top' : 'bottom'
         }
       }
 
@@ -498,8 +512,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.1em', display: 'flex', alignItems: 'center' }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" style={{ marginRight: 8, filter: 'drop-shadow(0 0 4px var(--accent))' }}>
+        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" style={{ marginRight: 8, filter: 'drop-shadow(0 0 4px var(--accent))' }}>
             <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" />
             <line x1="12" y1="2" x2="12" y2="8" /><line x1="12" y1="16" x2="12" y2="22" />
           </svg>
@@ -513,11 +527,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               <button
                 key={m}
                 style={{
-                  background: topoMode === m ? 'rgba(59,130,246,0.2)' : 'transparent',
+                  background: topoMode === m ? 'rgba(59,130,246,0.3)' : 'transparent',
                   border: 'none',
                   color: topoMode === m ? '#3b82f6' : '#4a5568',
-                  fontSize: 9, fontWeight: 700, letterSpacing: '0.07em',
-                  padding: '3px 10px', cursor: 'pointer', transition: 'all 0.15s',
+                  fontSize: 11, fontWeight: 900, letterSpacing: '0.07em',
+                  padding: '6px 16px', cursor: 'pointer', transition: 'all 0.15s',
                   borderRight: m === 'star' ? `1px solid var(--border)` : 'none',
                 }}
                 onClick={() => setMode(m)}
@@ -528,28 +542,28 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           </div>
 
           {/* Node count */}
-          <span style={{ fontSize: 10, color: 'var(--text-sub)', background: 'var(--accent-light)', padding: '2px 8px', borderRadius: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-sub)', background: 'var(--accent-light)', padding: '2px 10px', borderRadius: 10, border: '1px solid var(--border)' }}>
             {websites.length} nodes
           </span>
 
           {/* LIVE badge */}
           <span style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 900, letterSpacing: '0.05em',
             color: wsConnected ? '#10b981' : '#f59e0b',
             background: wsConnected ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
             border: '1px solid ' + (wsConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'),
-            borderRadius: 10, padding: '2px 8px',
+            borderRadius: 10, padding: '3px 12px',
           }}>
-            <span style={{ width: 5, height: 5, borderRadius: '50%', display: 'inline-block', background: wsConnected ? '#10b981' : '#f59e0b' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', display: 'inline-block', background: wsConnected ? '#10b981' : '#f59e0b' }} />
             {wsConnected ? 'LIVE' : 'CONNECTING'}
           </span>
         </div>
       </div>
 
       {/* Canvas Layer & Radar */}
-      <div style={{ flex: 1, position: 'relative', overflowX: 'auto', overflowY: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, minWidth: isMobile ? 600 : '100%', minHeight: 300 }}>
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0 }}>
           {/* Radar Animations */}
           <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', width: '200%', height: '200%', background: 'conic-gradient(from 0deg, transparent 70%, rgba(99,102,241,0.15) 100%)', borderRadius: '50%', pointerEvents: 'none', animation: 'radarSweep 4s linear infinite', zIndex: 0 }} />
           <div style={{ position: 'absolute', top: topoMode === 'tree' ? '88%' : '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '200%', height: '200%', background: 'radial-gradient(circle, transparent 10%, rgba(99,102,241,0.05) 11%, transparent 12%, transparent 20%, rgba(99,102,241,0.05) 21%, transparent 22%, transparent 30%, rgba(99,102,241,0.05) 31%, transparent 32%)', pointerEvents: 'none', zIndex: 0 }} />
@@ -562,8 +576,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             onMouseLeave={() => setHoveredId(null)}
           />
 
-          {/* Moved + MORE button to bottom right of canvas */}
-          {websites.length > 50 && (
+          {/* + MORE button logic */}
+          {websites.length > 80 && (
             <button 
               onClick={() => setShowMoreNodes(true)}
               style={{
@@ -584,7 +598,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
               onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
-              + {websites.length - 50} MORE
+              + {websites.length - 80} MORE
             </button>
           )}
         </div>
@@ -599,9 +613,29 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         }}>
           <style>{`@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }`}</style>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h3 style={{ color: '#1e293b', margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '0.02em' }}>All Monitored Nodes</h3>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Showing all {websites.length} endpoints</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+              <div>
+                <h3 style={{ color: '#1e293b', margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '0.02em' }}>All Monitored Nodes</h3>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Showing all {websites.length} endpoints</div>
+              </div>
+              
+              {/* Overlay Search Bar */}
+              <div style={{ position: 'relative', width: 300 }}>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, opacity: 0.4 }}>🔍</span>
+                <input 
+                  style={{ 
+                    width: '100%', padding: '10px 36px 10px 38px', borderRadius: 20, 
+                    border: '1px solid #e2e8f0', background: '#f8fafc', 
+                    color: '#1e293b', fontSize: 13, outline: 'none', transition: 'all 0.2s'
+                  }} 
+                  placeholder="Search node name or URL..." 
+                  value={moreNodesSearch}
+                  onChange={(e) => setMoreNodesSearch(e.target.value)}
+                />
+                {moreNodesSearch && (
+                  <button onClick={() => setMoreNodesSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                )}
+              </div>
             </div>
             <button 
               onClick={() => setShowMoreNodes(false)}
@@ -621,7 +655,10 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
                 </tr>
               </thead>
               <tbody>
-                {websites.map(w => (
+                {websites.filter(w => 
+                  w.name.toLowerCase().includes(moreNodesSearch.toLowerCase()) || 
+                  w.url.toLowerCase().includes(moreNodesSearch.toLowerCase())
+                ).map(w => (
                   <tr 
                     key={w.id} 
                     style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s', cursor: 'pointer' }} 

@@ -1,29 +1,49 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { dashboardAPI, websiteAPI } from '../services/api'
-import { useWebSocket } from '../hooks/useWebSocket'
+import { useGlobalWebSocket } from '../store/WebSocketContext'
 import NetworkTopology from '../components/topology/NetworkTopology'
 import StatusPanel from '../components/dashboard/StatusPanel'
-import ServiceDetailModal from '../components/dashboard/ServiceDetailModal'
 
-export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpdate, onNewNotification, wsConnected, setWsConnected, realtimeSnapshot }) {
+export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpdate, onNewNotification, wsConnected, setWsConnected, realtimeSnapshot, onOpenDetail }) {
   const [selectedId, setSelectedId] = useState(null)
-  const [detailWebsite, setDetailWebsite] = useState(null)
   const prevStatusRef = useRef({})
+  const lastSummaryFetchRef = useRef(0)
 
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'monitor_update') {
       const p = msg.payload
-      onWebsitesUpdate?.(prev => prev.map(w => w.id === p.website_id ? { 
-        ...w, 
-        status: p.status, 
-        status_code: p.status_code, 
-        response_time_ms: p.response_time_ms, 
-        ssl_valid: p.ssl_valid, 
-        last_checked: p.checked_at, 
-        ip_address: p.ip_address, 
-        root_cause: p.root_cause 
-      } : w));
-      dashboardAPI.getSummary().then(r => onSummaryUpdate?.(r.data)).catch(() => { })
+      onWebsitesUpdate?.(prev => {
+        // Find existing index for O(1)-like update performance
+        const idx = prev.findIndex(w => w.id === p.website_id)
+        if (idx === -1) return prev
+        const newArr = [...prev]
+        newArr[idx] = { 
+          ...newArr[idx], 
+          status: p.status, 
+          status_code: p.status_code, 
+          response_time_ms: p.response_time_ms, 
+          dns_latency_ms: p.dns_latency_ms,
+          tls_latency_ms: p.tls_latency_ms,
+          ttfb_latency_ms: p.ttfb_latency_ms,
+          health_score: p.health_score,
+          confidence: p.confidence,
+          is_browser_ok: p.is_browser_ok,
+          recommendation: p.recommendation,
+          rt_history: [...(newArr[idx].rt_history || []), p.response_time_ms].slice(-10),
+          ssl_valid: p.ssl_valid, 
+          last_checked: p.checked_at, 
+          ip_address: p.ip_address, 
+          root_cause: p.root_cause 
+        }
+        return newArr
+      });
+
+      // Throttle summary update to max once every 2 seconds to prevent "Event Storm" DoS
+      const now = Date.now()
+      if (now - lastSummaryFetchRef.current > 2000) {
+        lastSummaryFetchRef.current = now
+        dashboardAPI.getSummary().then(r => onSummaryUpdate?.(r.data)).catch(() => { })
+      }
       setWsConnected?.(true)
     }
     if (msg.type === 'status_change') {
@@ -32,8 +52,8 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
     }
   }, [onWebsitesUpdate, onSummaryUpdate, onNewNotification, setWsConnected])
 
-  useWebSocket(handleWsMessage)
-  const handleOpenDetail = useCallback(p => setDetailWebsite(websites.find(w => w.id === p.id) || p), [websites])
+  useGlobalWebSocket(handleWsMessage)
+  const handleOpenDetail = useCallback(p => onOpenDetail(websites.find(w => w.id === p.id) || p), [websites, onOpenDetail])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -46,7 +66,6 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
           <StatusPanel websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} realtimeSnapshot={realtimeSnapshot} />
         </div>
       </div>
-      {detailWebsite && <ServiceDetailModal website={detailWebsite} onClose={() => setDetailWebsite(null)} />}
     </div>
   )
 }

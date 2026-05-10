@@ -6,6 +6,10 @@ import (
 	"github.com/google/uuid"
 )
 
+func PtrString(s string) *string {
+	return &s
+}
+
 // ─── User ────────────────────────────────────────────────────
 
 type Role string
@@ -48,8 +52,16 @@ type Website struct {
 	Status          string     `json:"status,omitempty"`
 	StatusCode      *int       `json:"status_code,omitempty"`
 	ResponseTimeMs  *int       `json:"response_time_ms,omitempty"`
+	DNSLatencyMs    *int       `json:"dns_latency_ms,omitempty"`
+	TLSLatencyMs    *int       `json:"tls_latency_ms,omitempty"`
+	TTFBLatencyMs   *int       `json:"ttfb_latency_ms,omitempty"`
 	SSLValid        *bool      `json:"ssl_valid,omitempty"`
 	LastChecked     *time.Time `json:"last_checked,omitempty"`
+	IPAddress       string     `json:"ip_address,omitempty"`
+	RootCause       string     `json:"root_cause,omitempty"`
+	HealthScore     int        `json:"health_score,omitempty"`
+	Confidence      int        `json:"confidence,omitempty"`
+	IsBrowserOK     bool       `json:"is_browser_ok,omitempty"`
 }
 
 type CreateWebsiteRequest struct {
@@ -72,6 +84,8 @@ type LogStatus string
 
 const (
 	StatusOnline   LogStatus = "ONLINE"
+	StatusDegraded LogStatus = "DEGRADED"
+	StatusWarning  LogStatus = "WARNING"
 	StatusCritical LogStatus = "CRITICAL"
 	StatusOffline  LogStatus = "OFFLINE"
 	StatusUnknown  LogStatus = "UNKNOWN"
@@ -86,6 +100,8 @@ type MonitoringLog struct {
 	ICMPStatus     bool       `json:"icmp_status" db:"icmp_status"`
 	ICMPLatencyMs  *int       `json:"icmp_latency_ms" db:"icmp_latency_ms"`
 	TCPPortOpen    bool       `json:"tcp_port_open" db:"tcp_port_open"`
+	TLSLatencyMs   *int       `json:"tls_latency_ms" db:"tls_latency_ms"`
+	TTFBLatencyMs  *int       `json:"ttfb_latency_ms" db:"ttfb_latency_ms"`
 	StatusCode     *int       `json:"status_code" db:"status_code"`
 	ResponseTimeMs *int       `json:"response_time_ms" db:"response_time_ms"`
 	SSLValid       bool       `json:"ssl_valid" db:"ssl_valid"`
@@ -94,6 +110,10 @@ type MonitoringLog struct {
 	ErrorMessage   *string    `json:"error_message" db:"error_message"`
 	Status         LogStatus  `json:"status" db:"status"`
 	RootCause      string     `json:"root_cause" db:"root_cause"`
+	Recommendation string     `json:"recommendation" db:"recommendation"`
+	HealthScore    int        `json:"health_score" db:"health_score"`
+	Confidence     int        `json:"confidence" db:"confidence"`
+	IsBrowserOK    bool       `json:"is_browser_ok" db:"is_browser_ok"`
 }
 
 // ─── Status Events ───────────────────────────────────────────
@@ -112,6 +132,8 @@ type StatusEvent struct {
 type StatusHistoryPoint struct {
 	Time     time.Time `json:"time"`
 	Online   int       `json:"online"`
+	Degraded int       `json:"degraded"`
+	Warning  int       `json:"warning"`
 	Critical int       `json:"critical"`
 	Offline  int       `json:"offline"`
 	Unknown  int       `json:"unknown"`
@@ -122,6 +144,8 @@ type StatusHistoryPoint struct {
 type DashboardSummary struct {
 	TotalWebsites   int       `json:"total_websites"`
 	OnlineCount     int       `json:"online_count"`
+	DegradedCount   int       `json:"degraded_count"`
+	WarningCount    int       `json:"warning_count"`
 	CriticalCount   int       `json:"critical_count"`
 	OfflineCount    int       `json:"offline_count"`
 	UnknownCount    int       `json:"unknown_count"`
@@ -193,12 +217,18 @@ type WSMonitorUpdate struct {
 	ICMPStatus     bool       `json:"icmp_status"`
 	ICMPLatencyMs  *int       `json:"icmp_latency_ms"`
 	TCPPortOpen    bool       `json:"tcp_port_open"`
+	TLSLatencyMs   *int       `json:"tls_latency_ms"`
+	TTFBLatencyMs  *int       `json:"ttfb_latency_ms"`
 	StatusCode     *int       `json:"status_code"`
 	ResponseTimeMs *int       `json:"response_time_ms"`
 	SSLValid       bool       `json:"ssl_valid"`
 	SSLExpiryDate  *time.Time `json:"ssl_expiry_date"`
 	ErrorMessage   *string    `json:"error_message"`
 	RootCause      string     `json:"root_cause"`
+	Recommendation string     `json:"recommendation"`
+	HealthScore    int        `json:"health_score"`
+	Confidence     int        `json:"confidence"`
+	IsBrowserOK    bool       `json:"is_browser_ok"`
 	CheckedAt      time.Time  `json:"checked_at"`
 }
 
@@ -214,4 +244,14 @@ type WSStatusChange struct {
 	IPAddress      string    `json:"ip_address"`
 	ResponseTimeMs *int      `json:"response_time_ms"`
 	Timestamp      time.Time `json:"timestamp"`
+}
+
+type SystemHealth struct {
+	ActiveWorkers    int       `json:"active_workers"`
+	WorkerQueueSize  int       `json:"worker_queue_size"`
+	ActiveGoroutines int       `json:"active_goroutines"`
+	WSConnections    int       `json:"ws_connections"`
+	BackendCPU       float64   `json:"backend_cpu"`
+	BackendRAM       float64   `json:"backend_ram"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }

@@ -3,8 +3,10 @@ import { useState } from 'react'
 const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    CRITICAL: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-    OFFLINE: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+    DEGRADED: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: 'rgba(139,92,246,0.3)' },
+    WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+    CRITICAL: { bg: 'rgba(217,119,6,0.15)', color: '#d97706', border: 'rgba(217,119,6,0.3)' },
+    OFFLINE: { bg: 'rgba(244,63,94,0.15)', color: '#f43f5e', border: 'rgba(244,63,94,0.3)' },
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
   return (
     <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>
@@ -16,22 +18,26 @@ const StatusBadge = ({ status }) => {
 const fmt = (ms) => ms != null ? `${ms}ms` : '—'
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('id-ID', { hour12: false }) : '—'
 
-export default function MetricDetailModal({ type, websites, summary, onClose }) {
+export default function MetricDetailModal({ type, websites, summary, onOpenDetail, onClose }) {
   if (!type) return null
+
+  const handleRowClick = (w) => {
+    onOpenDetail?.(w)
+  }
 
   const filtered = {
     ONLINE: websites.filter(w => w.status === 'ONLINE'),
-    CRITICAL: websites.filter(w => w.status === 'CRITICAL'),
+    CRITICAL: websites.filter(w => w.status === 'CRITICAL' || w.status === 'DEGRADED' || w.status === 'WARNING'),
     OFFLINE: websites.filter(w => w.status === 'OFFLINE'),
     TOTAL: websites,
-    ALERTS: websites.filter(w => w.status === 'OFFLINE' || w.status === 'CRITICAL'),
+    ALERTS: websites.filter(w => w.status !== 'ONLINE' && w.status !== 'UNKNOWN'),
     'AVG RT': [...websites].sort((a, b) => (b.response_time_ms ?? 0) - (a.response_time_ms ?? 0)),
     SLA: websites,
   }[type] || websites
 
   const titles = {
     ONLINE: '🟢 Online Services',
-    CRITICAL: '🟡 Critical Services',
+    CRITICAL: '🚨 Service Alerts (Critical/Degraded)',
     OFFLINE: '🔴 Offline Services',
     TOTAL: '📋 All Services',
     ALERTS: '🚨 Active Alerts',
@@ -55,12 +61,12 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
             </div>
             <div style={{ marginTop: 16 }}>
               {websites.map((w, i) => {
-                const sla = w.status === 'ONLINE' ? 100 : w.status === 'CRITICAL' ? 85 : 0
+                const sla = w.status === 'ONLINE' ? 100 : w.status === 'DEGRADED' ? 95 : w.status === 'WARNING' ? 90 : w.status === 'CRITICAL' ? 80 : 0
                 return (
-                  <div key={w.id} style={styles.slaRow}>
+                  <div key={w.id} style={{ ...styles.slaRow, cursor: 'pointer' }} onClick={() => handleRowClick(w)}>
                     <span style={styles.slaName}>{w.name}</span>
                     <div style={styles.slaBar}>
-                      <div style={{ ...styles.slaFill, width: `${sla}%`, background: sla > 99 ? '#10b981' : sla > 80 ? '#f59e0b' : '#ef4444' }} />
+                      <div style={{ ...styles.slaFill, width: `${sla}%`, background: sla > 99 ? '#10b981' : sla > 80 ? '#f59e0b' : '#f43f5e' }} />
                     </div>
                     <span style={{ fontSize: 11, color: 'var(--text)', width: 50, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{sla}%</span>
                   </div>
@@ -76,11 +82,22 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
               </thead>
               <tbody>
                 {filtered.map((w, i) => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                  <tr 
+                    key={w.id} 
+                    onClick={() => handleRowClick(w)}
+                    style={{ 
+                      borderBottom: '1px solid var(--border)', 
+                      background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'}
+                  >
                     <td style={{ ...styles.td, color: i < 3 ? '#f59e0b' : '#4a5568', fontWeight: 700 }}>{i + 1}</td>
                     <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                     <td style={{ ...styles.td, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url}</td>
-                    <td style={{ ...styles.td, color: w.response_time_ms > 3000 ? '#ef4444' : w.response_time_ms > 1000 ? '#f59e0b' : '#10b981', fontWeight: 600 }}>
+                    <td style={{ ...styles.td, color: w.response_time_ms > 10000 ? '#f43f5e' : w.response_time_ms > 3000 ? '#f59e0b' : '#10b981', fontWeight: 600 }}>
                       {fmt(w.response_time_ms)}
                     </td>
                     <td style={styles.td}><StatusBadge status={w.status} /></td>
@@ -100,10 +117,25 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
                 </thead>
                 <tbody>
                   {filtered.map((w, i) => (
-                    <tr key={w.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                    <tr 
+                      key={w.id} 
+                      onClick={() => handleRowClick(w)}
+                      style={{ 
+                        borderBottom: '1px solid var(--border)', 
+                        background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}
+                      onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'}
+                    >
                       <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                       <td style={styles.td}><StatusBadge status={w.status} /></td>
-                      <td style={styles.td}>{w.status === 'OFFLINE' ? 'Service Unreachable' : 'Degraded Performance'}</td>
+                      <td style={styles.td}>
+                        {w.status === 'OFFLINE' ? 'Service Unreachable' : 
+                         w.status === 'CRITICAL' ? 'Critical Failure' :
+                         w.status === 'WARNING' ? 'Stability Warning' : 'Degraded Performance'}
+                      </td>
                       <td style={styles.td}>{fmt(w.response_time_ms)}</td>
                       <td style={styles.td}>{fmtTime(w.last_checked)}</td>
                     </tr>
@@ -122,12 +154,23 @@ export default function MetricDetailModal({ type, websites, summary, onClose }) 
                 {filtered.length === 0 ? (
                   <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#4a5568', fontSize: 12 }}>No services found</td></tr>
                 ) : filtered.map((w, i) => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
+                  <tr 
+                    key={w.id} 
+                    onClick={() => handleRowClick(w)}
+                    style={{ 
+                      borderBottom: '1px solid var(--border)', 
+                      background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)'}
+                  >
                     <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                     <td style={{ ...styles.td, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.url}</td>
                     <td style={styles.td}><StatusBadge status={w.status} /></td>
                     <td style={styles.td}>{w.status_code ?? '—'}</td>
-                    <td style={{ ...styles.td, color: w.response_time_ms > 3000 ? '#ef4444' : w.response_time_ms > 1000 ? '#f59e0b' : '#10b981' }}>
+                    <td style={{ ...styles.td, color: w.response_time_ms > 10000 ? '#f43f5e' : w.response_time_ms > 3000 ? '#f59e0b' : '#10b981' }}>
                       {fmt(w.response_time_ms)}
                     </td>
                     <td style={styles.td}>{w.ssl_valid == null ? '—' : w.ssl_valid ? '✓' : '✗'}</td>
@@ -151,7 +194,8 @@ const styles = {
     backdropFilter: 'blur(2px)',
   },
   modal: {
-    width: 'min(780px, 95%)', maxHeight: '90vh',
+    width: 'min(900px, 95%)',
+    height: 'min(720px, 85vh)',
     background: 'var(--bg-main)',
     border: '1px solid var(--border)',
     borderRadius: '16px',

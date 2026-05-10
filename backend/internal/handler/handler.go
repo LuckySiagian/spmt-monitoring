@@ -435,3 +435,27 @@ func (h *Handler) GetUnreadNotificationCount(w http.ResponseWriter, r *http.Requ
 	}
 	respond(w, http.StatusOK, map[string]int{"unread": count})
 }
+// ─── CHAOS SIMULATOR ──────────────────────────────────────────
+
+func (h *Handler) ToggleChaos(w http.ResponseWriter, r *http.Request) {
+	mode := r.URL.Query().Get("mode")
+	active := r.URL.Query().Get("active") == "true"
+	
+	validModes := map[string]bool{"slow": true, "loss": true, "dns": true, "ssl": true, "firewall": true, "timeout": true}
+	if !validModes[mode] {
+		respondError(w, http.StatusBadRequest, "invalid chaos mode")
+		return
+	}
+
+	h.pool.SetChaos(mode, active)
+	respond(w, http.StatusOK, map[string]interface{}{"mode": mode, "active": active})
+}
+
+func (h *Handler) GetStatusDistribution(w http.ResponseWriter, r *http.Request) {
+	dist, err := h.svc.GetStatusDistribution(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	respond(w, http.StatusOK, dist)
+}

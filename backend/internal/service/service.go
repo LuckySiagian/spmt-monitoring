@@ -227,23 +227,7 @@ func (s *Service) DemoteUser(ctx context.Context, req model.DemoteRequest) error
 // ─── WEBSITES ────────────────────────────────────────────────
 
 func (s *Service) GetAllWebsites(ctx context.Context) ([]*model.Website, error) {
-	sites, err := s.repo.GetAllWebsites(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Enrich with latest log
-	for _, w := range sites {
-		log, err := s.repo.GetLatestLogByWebsite(ctx, w.ID)
-		if err == nil && log != nil {
-			w.Status = string(log.Status)
-			w.StatusCode = log.StatusCode
-			w.ResponseTimeMs = log.ResponseTimeMs
-			w.SSLValid = &log.SSLValid
-			w.LastChecked = &log.CheckedAt
-		}
-	}
-	return sites, nil
+	return s.repo.GetAllWebsites(ctx)
 }
 
 func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequest) (*model.Website, error) {
@@ -429,4 +413,31 @@ func (s *Service) SendTestEmail(ctx context.Context, userID uuid.UUID, notif *no
 	}
 
 	return notif.NotifyTestEmail(user.Email)
+}
+func (s *Service) GetStatusDistribution(ctx context.Context) (map[string]float64, error) {
+	sites, err := s.repo.GetAllWebsites(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(sites) == 0 {
+		return make(map[string]float64), nil
+	}
+
+	counts := make(map[string]int)
+	total := 0
+	for _, w := range sites {
+		log, err := s.repo.GetLatestLogByWebsite(ctx, w.ID)
+		if err == nil && log != nil {
+			counts[string(log.Status)]++
+			total++
+		}
+	}
+
+	dist := make(map[string]float64)
+	if total > 0 {
+		for status, count := range counts {
+			dist[status] = (float64(count) / float64(total)) * 100
+		}
+	}
+	return dist, nil
 }

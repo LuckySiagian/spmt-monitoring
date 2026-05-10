@@ -99,18 +99,36 @@ func (r *Repository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, p
 // ─── WEBSITES ────────────────────────────────────────────────
 
 func (r *Repository) GetAllWebsites(ctx context.Context) ([]*model.Website, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, name, url, description, interval_seconds, created_at FROM websites ORDER BY created_at`)
+	query := `
+		SELECT 
+			w.id, w.name, w.url, w.description, w.interval_seconds, w.created_at,
+			COALESCE(l.status, 'UNKNOWN'), l.status_code, l.response_time_ms, l.ssl_valid, l.checked_at, COALESCE(l.ip_address, ''),
+			l.dns_latency_ms, l.tls_latency_ms, l.ttfb_latency_ms, COALESCE(l.health_score, 0), COALESCE(l.confidence, 0), COALESCE(l.is_browser_ok, true), COALESCE(l.root_cause, '')
+		FROM websites w
+		LEFT JOIN LATERAL (
+			SELECT status, status_code, response_time_ms, ssl_valid, checked_at, ip_address, 
+			       dns_latency_ms, tls_latency_ms, ttfb_latency_ms, health_score, confidence, is_browser_ok, root_cause
+			FROM monitoring_logs 
+			WHERE website_id = w.id 
+			ORDER BY checked_at DESC LIMIT 1
+		) l ON TRUE
+		ORDER BY w.created_at
+	`
+	rows, err := r.db.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query websites: %w", err)
 	}
 	defer rows.Close()
 
 	var sites []*model.Website
 	for rows.Next() {
 		var w model.Website
-		if err := rows.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt); err != nil {
-			return nil, err
+		if err := rows.Scan(
+			&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt,
+			&w.Status, &w.StatusCode, &w.ResponseTimeMs, &w.SSLValid, &w.LastChecked, &w.IPAddress,
+			&w.DNSLatencyMs, &w.TLSLatencyMs, &w.TTFBLatencyMs, &w.HealthScore, &w.Confidence, &w.IsBrowserOK, &w.RootCause,
+		); err != nil {
+			return nil, fmt.Errorf("scan website (ID: %s): %w", w.ID, err)
 		}
 		sites = append(sites, &w)
 	}
@@ -176,10 +194,10 @@ func (r *Repository) InsertLog(ctx context.Context, log *model.MonitoringLog) er
 func (r *Repository) GetLatestLogByWebsite(ctx context.Context, websiteID uuid.UUID) (*model.MonitoringLog, error) {
 	var l model.MonitoringLog
 	row := r.db.QueryRow(ctx,
-		`SELECT id, website_id, checked_at, dns_resolved, status_code, response_time_ms, ssl_valid, error_message, status
+		`SELECT id, website_id, checked_at, dns_resolved, dns_latency_ms, icmp_status, icmp_latency_ms, tcp_port_open, tls_latency_ms, ttfb_latency_ms, status_code, response_time_ms, ssl_valid, ssl_expiry_date, ip_address, error_message, status, root_cause, recommendation, health_score, confidence, is_browser_ok
 		 FROM monitoring_logs WHERE website_id = $1 ORDER BY checked_at DESC LIMIT 1`, websiteID)
-	err := row.Scan(&l.ID, &l.WebsiteID, &l.CheckedAt, &l.DNSResolved, &l.StatusCode,
-		&l.ResponseTimeMs, &l.SSLValid, &l.ErrorMessage, &l.Status)
+	err := row.Scan(&l.ID, &l.WebsiteID, &l.CheckedAt, &l.DNSResolved, &l.DNSLatencyMs, &l.ICMPStatus, &l.ICMPLatencyMs, &l.TCPPortOpen, &l.TLSLatencyMs, &l.TTFBLatencyMs, &l.StatusCode,
+		&l.ResponseTimeMs, &l.SSLValid, &l.SSLExpiryDate, &l.IPAddress, &l.ErrorMessage, &l.Status, &l.RootCause, &l.Recommendation, &l.HealthScore, &l.Confidence, &l.IsBrowserOK)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +206,7 @@ func (r *Repository) GetLatestLogByWebsite(ctx context.Context, websiteID uuid.U
 
 func (r *Repository) GetLogsByWebsite(ctx context.Context, websiteID uuid.UUID, limit int) ([]*model.MonitoringLog, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, website_id, checked_at, dns_resolved, status_code, response_time_ms, ssl_valid, error_message, status
+		`SELECT id, website_id, checked_at, dns_resolved, dns_latency_ms, icmp_status, icmp_latency_ms, tcp_port_open, tls_latency_ms, ttfb_latency_ms, status_code, response_time_ms, ssl_valid, ssl_expiry_date, ip_address, error_message, status, root_cause, recommendation, health_score, confidence, is_browser_ok
 		 FROM monitoring_logs WHERE website_id = $1 ORDER BY checked_at DESC LIMIT $2`,
 		websiteID, limit)
 	if err != nil {
@@ -199,8 +217,8 @@ func (r *Repository) GetLogsByWebsite(ctx context.Context, websiteID uuid.UUID, 
 	var logs []*model.MonitoringLog
 	for rows.Next() {
 		var l model.MonitoringLog
-		if err := rows.Scan(&l.ID, &l.WebsiteID, &l.CheckedAt, &l.DNSResolved, &l.StatusCode,
-			&l.ResponseTimeMs, &l.SSLValid, &l.ErrorMessage, &l.Status); err != nil {
+		if err := rows.Scan(&l.ID, &l.WebsiteID, &l.CheckedAt, &l.DNSResolved, &l.DNSLatencyMs, &l.ICMPStatus, &l.ICMPLatencyMs, &l.TCPPortOpen, &l.TLSLatencyMs, &l.TTFBLatencyMs, &l.StatusCode,
+			&l.ResponseTimeMs, &l.SSLValid, &l.SSLExpiryDate, &l.IPAddress, &l.ErrorMessage, &l.Status, &l.RootCause, &l.Recommendation, &l.HealthScore, &l.Confidence, &l.IsBrowserOK); err != nil {
 			return nil, err
 		}
 		logs = append(logs, &l)
@@ -226,7 +244,7 @@ func (r *Repository) GetDashboardSummary(ctx context.Context) (*model.DashboardS
 			FROM monitoring_logs
 			ORDER BY website_id, checked_at DESC
 		)
-		SELECT status, COUNT(*), AVG(response_time_ms)
+		SELECT status, COUNT(*), AVG(response_time_ms)::double precision
 		FROM latest
 		GROUP BY status
 	`)
@@ -247,6 +265,10 @@ func (r *Repository) GetDashboardSummary(ctx context.Context) (*model.DashboardS
 		switch status {
 		case "ONLINE":
 			summary.OnlineCount = count
+		case "DEGRADED":
+			summary.DegradedCount = count
+		case "WARNING":
+			summary.WarningCount = count
 		case "CRITICAL":
 			summary.CriticalCount = count
 		case "OFFLINE":
@@ -265,7 +287,7 @@ func (r *Repository) GetDashboardSummary(ctx context.Context) (*model.DashboardS
 	}
 
 	// Websites with no logs yet (never checked) = UNKNOWN
-	loggedTotal := summary.OnlineCount + summary.CriticalCount + summary.OfflineCount + summary.UnknownCount
+	loggedTotal := summary.OnlineCount + summary.DegradedCount + summary.WarningCount + summary.CriticalCount + summary.OfflineCount + summary.UnknownCount
 	if loggedTotal < summary.TotalWebsites {
 		summary.UnknownCount += summary.TotalWebsites - loggedTotal
 	}
@@ -273,7 +295,7 @@ func (r *Repository) GetDashboardSummary(ctx context.Context) (*model.DashboardS
 	if summary.TotalWebsites > 0 {
 		summary.SLAPercent = float64(summary.OnlineCount) / float64(summary.TotalWebsites) * 100
 	}
-	summary.ActiveAlerts = summary.CriticalCount + summary.OfflineCount
+	summary.ActiveAlerts = summary.DegradedCount + summary.WarningCount + summary.CriticalCount + summary.OfflineCount
 
 	return summary, nil
 }
@@ -356,6 +378,8 @@ func (r *Repository) GetStatusHistory(ctx context.Context, rangeStr string) ([]*
 		SELECT
 			to_timestamp(floor(extract(epoch from checked_at) / $1) * $1) AS bucket,
 			COUNT(CASE WHEN status = 'ONLINE'   THEN 1 END)::int AS online_count,
+			COUNT(CASE WHEN status = 'DEGRADED' THEN 1 END)::int AS degraded_count,
+			COUNT(CASE WHEN status = 'WARNING'  THEN 1 END)::int AS warning_count,
 			COUNT(CASE WHEN status = 'CRITICAL' THEN 1 END)::int AS critical_count,
 			COUNT(CASE WHEN status = 'OFFLINE'  THEN 1 END)::int AS offline_count
 		FROM monitoring_logs
@@ -372,7 +396,7 @@ func (r *Repository) GetStatusHistory(ctx context.Context, rangeStr string) ([]*
 	var points []*model.StatusHistoryPoint
 	for rows.Next() {
 		p := &model.StatusHistoryPoint{}
-		if err := rows.Scan(&p.Time, &p.Online, &p.Critical, &p.Offline); err != nil {
+		if err := rows.Scan(&p.Time, &p.Online, &p.Degraded, &p.Warning, &p.Critical, &p.Offline); err != nil {
 			return nil, err
 		}
 		points = append(points, p)
@@ -389,6 +413,8 @@ func (r *Repository) GetStatusHistoryCustom(ctx context.Context, start, end stri
 		SELECT
 			to_timestamp(floor(extract(epoch from checked_at) / $1) * $1) AS bucket,
 			COUNT(CASE WHEN status = 'ONLINE'   THEN 1 END)::int AS online_count,
+			COUNT(CASE WHEN status = 'DEGRADED' THEN 1 END)::int AS degraded_count,
+			COUNT(CASE WHEN status = 'WARNING'  THEN 1 END)::int AS warning_count,
 			COUNT(CASE WHEN status = 'CRITICAL' THEN 1 END)::int AS critical_count,
 			COUNT(CASE WHEN status = 'OFFLINE'  THEN 1 END)::int AS offline_count
 		FROM monitoring_logs
@@ -405,7 +431,7 @@ func (r *Repository) GetStatusHistoryCustom(ctx context.Context, start, end stri
 	var points []*model.StatusHistoryPoint
 	for rows.Next() {
 		p := &model.StatusHistoryPoint{}
-		if err := rows.Scan(&p.Time, &p.Online, &p.Critical, &p.Offline); err != nil {
+		if err := rows.Scan(&p.Time, &p.Online, &p.Degraded, &p.Warning, &p.Critical, &p.Offline); err != nil {
 			return nil, err
 		}
 		points = append(points, p)
@@ -471,24 +497,26 @@ func (r *Repository) InsertLogEnhanced(ctx context.Context, log *model.Monitorin
 		 (id, website_id, checked_at,
 		  dns_resolved, dns_latency_ms,
 		  icmp_status, icmp_latency_ms,
-		  tcp_port_open,
+		  tcp_port_open, tls_latency_ms, ttfb_latency_ms,
 		  status_code, response_time_ms,
 		  ssl_valid, ssl_expiry_date,
-		  ip_address, error_message, status, root_cause)
+		  ip_address, error_message, status, 
+		  root_cause, recommendation, health_score, confidence, is_browser_ok)
 		 VALUES (uuid_generate_v4(), $1, $2,
 		         $3, $4,
 		         $5, $6,
-		         $7,
-		         $8, $9,
+		         $7, $8, $9,
 		         $10, $11,
-		         $12, $13, $14, $15)`,
+		         $12, $13,
+		         $14, $15, $16, $17, $18, $19, $20, $21)`,
 		log.WebsiteID, log.CheckedAt,
 		log.DNSResolved, log.DNSLatencyMs,
 		log.ICMPStatus, log.ICMPLatencyMs,
-		log.TCPPortOpen,
+		log.TCPPortOpen, log.TLSLatencyMs, log.TTFBLatencyMs,
 		log.StatusCode, log.ResponseTimeMs,
 		log.SSLValid, log.SSLExpiryDate,
-		log.IPAddress, log.ErrorMessage, log.Status, log.RootCause)
+		log.IPAddress, log.ErrorMessage, log.Status, 
+		log.RootCause, log.Recommendation, log.HealthScore, log.Confidence, log.IsBrowserOK)
 	return err
 }
 
