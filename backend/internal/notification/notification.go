@@ -78,7 +78,7 @@ func (s *Service) sendTelegram(websiteName, oldStatus, newStatus, rootCause stri
 	}
 
 	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", s.cfg.TelegramToken)
-	
+
 	// Use a map to avoid duplicate notifications to the same chat ID
 	sent := make(map[string]bool)
 
@@ -138,7 +138,7 @@ func (s *Service) sendEmails(websiteName, oldStatus, newStatus, rootCause string
 	subjectHeader := fmt.Sprintf("Subject: [SPMT] Status Change: %s is %s\r\n", websiteName, newStatus)
 	fromHeader := fmt.Sprintf("From: %s\r\n", s.cfg.SMTPFrom)
 	mime := "MIME-version: 1.0\r\nContent-Type: text/html; charset=\"UTF-8\"\r\n\r\n"
-	
+
 	color := "#64748b"
 	switch newStatus {
 	case "ONLINE":

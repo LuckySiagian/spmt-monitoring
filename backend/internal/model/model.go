@@ -61,7 +61,10 @@ type Website struct {
 	RootCause       string     `json:"root_cause,omitempty"`
 	HealthScore     int        `json:"health_score,omitempty"`
 	Confidence      int        `json:"confidence,omitempty"`
-	IsBrowserOK     bool       `json:"is_browser_ok,omitempty"`
+	IsBrowserAccessible bool       `json:"is_browser_accessible,omitempty"`
+	FinalReason         string     `json:"final_reason,omitempty"`
+	FinalDecisionSource string     `json:"final_decision_source,omitempty"`
+	ResolverStage       string     `json:"resolver_stage,omitempty"`
 }
 
 type CreateWebsiteRequest struct {
@@ -84,11 +87,8 @@ type LogStatus string
 
 const (
 	StatusOnline   LogStatus = "ONLINE"
-	StatusDegraded LogStatus = "DEGRADED"
-	StatusWarning  LogStatus = "WARNING"
 	StatusCritical LogStatus = "CRITICAL"
 	StatusOffline  LogStatus = "OFFLINE"
-	StatusUnknown  LogStatus = "UNKNOWN"
 )
 
 type MonitoringLog struct {
@@ -113,7 +113,10 @@ type MonitoringLog struct {
 	Recommendation string     `json:"recommendation" db:"recommendation"`
 	HealthScore    int        `json:"health_score" db:"health_score"`
 	Confidence     int        `json:"confidence" db:"confidence"`
-	IsBrowserOK    bool       `json:"is_browser_ok" db:"is_browser_ok"`
+	IsBrowserAccessible bool       `json:"is_browser_accessible" db:"is_browser_accessible"`
+	FinalReason         string     `json:"final_reason" db:"final_reason"`
+	FinalDecisionSource string     `json:"final_decision_source" db:"final_decision_source"`
+	ResolverStage       string     `json:"resolver_stage" db:"resolver_stage"`
 }
 
 // ─── Status Events ───────────────────────────────────────────
@@ -132,11 +135,8 @@ type StatusEvent struct {
 type StatusHistoryPoint struct {
 	Time     time.Time `json:"time"`
 	Online   int       `json:"online"`
-	Degraded int       `json:"degraded"`
-	Warning  int       `json:"warning"`
 	Critical int       `json:"critical"`
 	Offline  int       `json:"offline"`
-	Unknown  int       `json:"unknown"`
 }
 
 // ─── Dashboard Summary ───────────────────────────────────────
@@ -144,11 +144,8 @@ type StatusHistoryPoint struct {
 type DashboardSummary struct {
 	TotalWebsites   int       `json:"total_websites"`
 	OnlineCount     int       `json:"online_count"`
-	DegradedCount   int       `json:"degraded_count"`
-	WarningCount    int       `json:"warning_count"`
 	CriticalCount   int       `json:"critical_count"`
 	OfflineCount    int       `json:"offline_count"`
-	UnknownCount    int       `json:"unknown_count"`
 	SLAPercent      float64   `json:"sla_percent"`
 	AvgResponseTime float64   `json:"avg_response_time"`
 	ActiveAlerts    int       `json:"active_alerts"`
@@ -228,8 +225,11 @@ type WSMonitorUpdate struct {
 	Recommendation string     `json:"recommendation"`
 	HealthScore    int        `json:"health_score"`
 	Confidence     int        `json:"confidence"`
-	IsBrowserOK    bool       `json:"is_browser_ok"`
-	CheckedAt      time.Time  `json:"checked_at"`
+	IsBrowserAccessible bool       `json:"is_browser_accessible"`
+	FinalReason         string     `json:"final_reason"`
+	FinalDecisionSource string     `json:"final_decision_source"`
+	ResolverStage       string     `json:"resolver_stage"`
+	CheckedAt           time.Time  `json:"checked_at"`
 }
 
 // WSStatusChange — event perubahan status untuk notifikasi frontend
@@ -253,5 +253,23 @@ type SystemHealth struct {
 	WSConnections    int       `json:"ws_connections"`
 	BackendCPU       float64   `json:"backend_cpu"`
 	BackendRAM       float64   `json:"backend_ram"`
+	MonitorLatencyMs int       `json:"monitor_latency_ms"`
 	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// ─── Network Context ──────────────────────────────────────────
+
+type NetworkContext struct {
+	PublicIP     string    `json:"public_ip"`
+	LocalGateway string    `json:"local_gateway"`
+	DNSResolver  string    `json:"dns_resolver"`
+	ASN          string    `json:"asn"`
+	Provider     string    `json:"provider"`
+	NetworkType  string    `json:"network_type"` // OFFICE, PUBLIC, VPN, UNKNOWN
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type WSNetworkContextUpdate struct {
+	Type    string         `json:"type"`
+	Context NetworkContext `json:"context"`
 }

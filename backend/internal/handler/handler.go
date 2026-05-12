@@ -201,7 +201,7 @@ func (h *Handler) GetPublicWebsites(w http.ResponseWriter, r *http.Request) {
 
 	publicSites := make([]PublicSite, 0)
 	for _, s := range sites {
-		status := model.StatusUnknown
+		status := model.StatusOffline
 		if s.Status != "" {
 			status = model.LogStatus(s.Status)
 		}
@@ -217,6 +217,12 @@ func (h *Handler) GetPublicWebsites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respond(w, http.StatusOK, publicSites)
+}
+
+func (h *Handler) RecheckWebsites(w http.ResponseWriter, r *http.Request) {
+	log.Println("[Handler] Manual recheck triggered")
+	go h.pool.RevalidateAll()
+	respond(w, http.StatusOK, map[string]string{"message": "recheck triggered for all websites"})
 }
 
 func (h *Handler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
