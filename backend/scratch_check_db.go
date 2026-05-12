@@ -18,18 +18,19 @@ func main() {
 	}
 	defer conn.Close(context.Background())
 
-	rows, err := conn.Query(context.Background(), "SELECT column_name FROM information_schema.columns WHERE table_name = 'monitoring_logs'")
+	rows, err := conn.Query(context.Background(), "SELECT status, COUNT(*) FROM monitoring_logs GROUP BY status")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer rows.Close()
 
-	fmt.Println("Columns in monitoring_logs:")
+	fmt.Println("Status distribution in monitoring_logs:")
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println("-", name)
+		fmt.Printf("- %s: %d\n", status, count)
 	}
 }

@@ -55,10 +55,15 @@ func main() {
 	hub := ws.NewHub()
 	workerPool := worker.NewPool(repo, hub, notif, 10)
 
+	// ─── Network Monitoring ───────────────────────────────────
+	netSvc := service.NewNetworkService(hub, workerPool.RevalidateAll)
+	go netSvc.Start(context.Background())
+
 	// ─── Start services ───────────────────────────────────────
 	go hub.Run()
 	workerPool.Start()
 	log.Println("✅ Worker pool started")
+	log.Println("✅ Network context monitoring started")
 
 	// ─── Router ───────────────────────────────────────────────
 	h := handler.New(svc, workerPool, hub, notif)
@@ -102,6 +107,7 @@ func main() {
 		r.Get("/websites/{id}/events", h.GetWebsiteEvents)
 		r.Get("/dashboard/events", h.GetAllStatusEvents)
 		r.Get("/websites", h.GetWebsites)
+		r.Post("/websites/recheck", h.RecheckWebsites)
 
 		// Website management (admin + superadmin)
 		r.Group(func(r chi.Router) {
