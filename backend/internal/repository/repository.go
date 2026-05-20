@@ -104,12 +104,13 @@ func (r *Repository) GetAllWebsites(ctx context.Context) ([]*model.Website, erro
 			w.id, w.name, w.url, w.description, w.interval_seconds, w.created_at,
 			COALESCE(l.status, 'UNKNOWN'), l.status_code, l.response_time_ms, l.ssl_valid, l.checked_at, COALESCE(l.ip_address, ''),
 			l.dns_latency_ms, l.tls_latency_ms, l.ttfb_latency_ms, COALESCE(l.health_score, 0), COALESCE(l.confidence, 0), COALESCE(l.is_browser_accessible, true), COALESCE(l.root_cause, ''),
-			COALESCE(l.final_reason, ''), COALESCE(l.final_decision_source, ''), COALESCE(l.resolver_stage, '')
+			COALESCE(l.final_reason, ''), COALESCE(l.final_decision_source, ''), COALESCE(l.resolver_stage, ''),
+			l.ssl_expiry_date, COALESCE(l.dns_resolved, false)
 		FROM websites w
 		LEFT JOIN LATERAL (
 			SELECT status, status_code, response_time_ms, ssl_valid, checked_at, ip_address, 
 			       dns_latency_ms, tls_latency_ms, ttfb_latency_ms, health_score, confidence, is_browser_accessible, root_cause,
-			       final_reason, final_decision_source, resolver_stage
+			       final_reason, final_decision_source, resolver_stage, ssl_expiry_date, dns_resolved
 			FROM monitoring_logs 
 			WHERE website_id = w.id 
 			ORDER BY checked_at DESC LIMIT 1
@@ -129,7 +130,7 @@ func (r *Repository) GetAllWebsites(ctx context.Context) ([]*model.Website, erro
 			&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt,
 			&w.Status, &w.StatusCode, &w.ResponseTimeMs, &w.SSLValid, &w.LastChecked, &w.IPAddress,
 			&w.DNSLatencyMs, &w.TLSLatencyMs, &w.TTFBLatencyMs, &w.HealthScore, &w.Confidence, &w.IsBrowserAccessible, &w.RootCause,
-			&w.FinalReason, &w.FinalDecisionSource, &w.ResolverStage,
+			&w.FinalReason, &w.FinalDecisionSource, &w.ResolverStage, &w.SSLExpiryDate, &w.DNSResolved,
 		); err != nil {
 			return nil, fmt.Errorf("scan website (ID: %s): %w", w.ID, err)
 		}
@@ -267,11 +268,11 @@ func (r *Repository) GetDashboardSummary(ctx context.Context) (*model.DashboardS
 		}
 		switch status {
 		case "ONLINE":
-			summary.OnlineCount = count
-		case "CRITICAL":
-			summary.CriticalCount = count
+			summary.OnlineCount += count
+		case "CRITICAL", "DEGRADED", "WARNING":
+			summary.CriticalCount += count
 		case "OFFLINE":
-			summary.OfflineCount = count
+			summary.OfflineCount += count
 		}
 		if avg != nil {
 			totalAvg += *avg * float64(count)
@@ -375,7 +376,7 @@ func (r *Repository) GetStatusHistory(ctx context.Context, rangeStr string) ([]*
 		SELECT
 			to_timestamp(floor(extract(epoch from checked_at) / $1) * $1) AS bucket,
 			COUNT(CASE WHEN status = 'ONLINE'   THEN 1 END)::int AS online_count,
-			COUNT(CASE WHEN status = 'CRITICAL' THEN 1 END)::int AS critical_count,
+			COUNT(CASE WHEN status IN ('CRITICAL', 'DEGRADED', 'WARNING') THEN 1 END)::int AS critical_count,
 			COUNT(CASE WHEN status = 'OFFLINE'  THEN 1 END)::int AS offline_count
 		FROM monitoring_logs
 		WHERE checked_at >= NOW() - $2::interval
@@ -408,7 +409,7 @@ func (r *Repository) GetStatusHistoryCustom(ctx context.Context, start, end stri
 		SELECT
 			to_timestamp(floor(extract(epoch from checked_at) / $1) * $1) AS bucket,
 			COUNT(CASE WHEN status = 'ONLINE'   THEN 1 END)::int AS online_count,
-			COUNT(CASE WHEN status = 'CRITICAL' THEN 1 END)::int AS critical_count,
+			COUNT(CASE WHEN status IN ('CRITICAL', 'DEGRADED', 'WARNING') THEN 1 END)::int AS critical_count,
 			COUNT(CASE WHEN status = 'OFFLINE'  THEN 1 END)::int AS offline_count
 		FROM monitoring_logs
 		WHERE checked_at >= $2::timestamptz AND checked_at <= $3::timestamptz

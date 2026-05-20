@@ -55,7 +55,9 @@ type Website struct {
 	DNSLatencyMs    *int       `json:"dns_latency_ms,omitempty"`
 	TLSLatencyMs    *int       `json:"tls_latency_ms,omitempty"`
 	TTFBLatencyMs   *int       `json:"ttfb_latency_ms,omitempty"`
+	DNSResolved     bool       `json:"dns_resolved,omitempty"`
 	SSLValid        *bool      `json:"ssl_valid,omitempty"`
+	SSLExpiryDate   *time.Time `json:"ssl_expiry_date,omitempty"`
 	LastChecked     *time.Time `json:"last_checked,omitempty"`
 	IPAddress       string     `json:"ip_address,omitempty"`
 	RootCause       string     `json:"root_cause,omitempty"`
@@ -87,6 +89,8 @@ type LogStatus string
 
 const (
 	StatusOnline   LogStatus = "ONLINE"
+	StatusWarning  LogStatus = "WARNING"
+	StatusDegraded LogStatus = "DEGRADED"
 	StatusCritical LogStatus = "CRITICAL"
 	StatusOffline  LogStatus = "OFFLINE"
 )

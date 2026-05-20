@@ -40,6 +40,8 @@
 }
 
 .status-icon-glow-online { filter: drop-shadow(0 0 8px var(--status-online)); }
+.status-icon-glow-warning { filter: drop-shadow(0 0 8px var(--status-warning)); }
+.status-icon-glow-degraded { filter: drop-shadow(0 0 8px var(--status-degraded)); }
 .status-icon-glow-critical { filter: drop-shadow(0 0 8px var(--status-critical)); }
 .status-icon-glow-offline { filter: drop-shadow(0 0 8px var(--status-offline)); }
 
@@ -188,8 +190,10 @@ body::before {
   /* Status Colors (Gradients & Solid) */
   --status-online: #00f2fe;
   --status-online-to: #4facfe;
-  --status-critical: #f59e0b;
-  --status-offline: #ff4757;
+  --status-warning: #f59e0b;
+  --status-degraded: #f97316;
+  --status-critical: #ef4444;
+  --status-offline: #dc2626;
   
   --accent: var(--primary);
   --accent-light: rgba(0, 31, 63, 0.05);

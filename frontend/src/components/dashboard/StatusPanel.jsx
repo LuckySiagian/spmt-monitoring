@@ -21,9 +21,11 @@ function InfoModal({ onClose }) {
             <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 15, textTransform: 'uppercase' }}>Status Legend & Conditions</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { s: 'ONLINE', c: '#10b981', t: 'HTTP 200-399 + RT ≤ 3.000ms', d: 'Website sehat, responsif, dan seluruh parameter valid.' },
-                { s: 'CRITICAL', c: '#f59e0b', t: 'Slow / Degraded / Issues', d: 'Website terdeteksi lambat, mengalami gangguan akses, atau masalah SSL/DNS.' },
-                { s: 'OFFLINE', c: '#f43f5e', t: 'Down / Timeout / HTTP 5xx', d: 'Website tidak dapat diakses sama sekali atau mengalami kegagalan fatal.' }
+                { s: 'ONLINE', c: '#10b981', t: 'HTTP 200-399 + RT ≤ 5.000ms', d: 'Website sehat, responsif, dan seluruh parameter valid.' },
+                { s: 'WARNING', c: '#f59e0b', t: 'Slow / WAF / Intercept', d: 'Website bisa diakses tetapi mengalami perlambatan atau pembatasan ringan.' },
+                { s: 'DEGRADED', c: '#f97316', t: 'Error / HTTP 5xx / SSL Invalid', d: 'Website masih merespon tetapi mengalami masalah yang mengganggu (misal 503, sertifikat SSL invalid).' },
+                { s: 'CRITICAL', c: '#ef4444', t: 'Severe Timeout / WAF Block', d: 'Sangat sulit diakses, sebagian besar request gagal atau diblokir.' },
+                { s: 'OFFLINE', c: '#dc2626', t: 'Down / Timeout Total / TCP Fail', d: 'Website sama sekali tidak dapat dijangkau oleh sistem.' }
               ].map(item => (
                 <div key={item.s} style={{ display: 'flex', gap: 16, padding: 14, background: 'var(--bg-main)', borderRadius: 12, border: '1px solid var(--border)' }}>
                   <div style={{ width: 12, height: 12, borderRadius: '50%', background: item.c, marginTop: 4, flexShrink: 0, boxShadow: `0 0 10px ${item.c}44` }} />
@@ -60,10 +62,10 @@ const getDomain = u => { try { return new URL(u).hostname } catch { return u } }
 // ── Status colors ─────────────────────────────────────────────
 const BADGE = {
   ONLINE: { color: '#10b981', glow: 'rgba(16,185,129,0.15)' },
-  DEGRADED: { color: '#8b5cf6', glow: 'rgba(139,92,246,0.15)' },
   WARNING: { color: '#f59e0b', glow: 'rgba(245,158,11,0.15)' },
-  CRITICAL: { color: '#d97706', glow: 'rgba(217,119,6,0.15)' },
-  OFFLINE: { color: '#f43f5e', glow: 'rgba(244,63,94,0.15)' },
+  DEGRADED: { color: '#f97316', glow: 'rgba(249,115,22,0.15)' },
+  CRITICAL: { color: '#ef4444', glow: 'rgba(239,68,68,0.15)' },
+  OFFLINE: { color: '#dc2626', glow: 'rgba(220,38,38,0.15)' },
   UNKNOWN: { color: '#94a3b8', glow: 'none' },
 }
 
@@ -102,7 +104,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail }) {
 
   return (
     <div
-      className={`glass-card hover-glow ${w.status === 'OFFLINE' ? 'glitch-offline' : ''}`}
+      className={`glass-card hover-glow ${w.status === 'OFFLINE' || w.status === 'CRITICAL' ? 'glitch-offline' : ''}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
         cursor: 'pointer', transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease',

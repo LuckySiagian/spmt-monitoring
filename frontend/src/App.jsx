@@ -15,7 +15,7 @@ import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './service
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
-  const SC = { ONLINE: '#059669', DEGRADED: '#8b5cf6', WARNING: '#f59e0b', CRITICAL: '#d97706', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
+  const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
   const fmtTime = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
   return createPortal(
@@ -821,7 +821,7 @@ function AppInner() {
   }, [isSuperAdmin, triggerGlobalRefresh])
 
   const handleNewNotification = useCallback((notif) => {
-    if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL') return
+    if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL' && notif.type !== 'DEGRADED' && notif.type !== 'WARNING') return
     setNotifications(prev => {
       const dupe = prev.find(n => n.websiteId === notif.websiteId && n.type === notif.type && (Date.now() - n.ts) < 300000);
       if (dupe) return prev;
@@ -881,7 +881,7 @@ function AppInner() {
 
   const realtimeSnapshot = {
     online: websites.filter(w => w.status === 'ONLINE').length,
-    critical: websites.filter(w => w.status === 'CRITICAL').length,
+    critical: websites.filter(w => w.status === 'CRITICAL' || w.status === 'DEGRADED' || w.status === 'WARNING').length,
     offline: websites.filter(w => w.status === 'OFFLINE').length,
     unknown: websites.filter(w => !w.status || w.status === 'UNKNOWN').length
   }
