@@ -5,8 +5,10 @@ import {
 
 const COLORS = {
   ONLINE:   '#10b981',
-  CRITICAL: '#f59e0b',
-  OFFLINE:  '#ef4444',
+  WARNING:  '#f59e0b',
+  DEGRADED: '#f97316',
+  CRITICAL: '#ef4444',
+  OFFLINE:  '#dc2626',
 }
 
 const CustomTooltip = ({ active, payload }) => {
@@ -26,16 +28,20 @@ const CustomTooltip = ({ active, payload }) => {
 export default function StatusDistributionChart({ websites }) {
   const total   = websites.length
   const online  = websites.filter(w => w.status === 'ONLINE').length
+  const warning = websites.filter(w => w.status === 'WARNING').length
+  const degraded = websites.filter(w => w.status === 'DEGRADED').length
   const critical = websites.filter(w => w.status === 'CRITICAL').length
   const offline  = websites.filter(w => w.status === 'OFFLINE').length
-  const pending  = total - online - critical - offline
+  const pending  = total - online - warning - degraded - critical - offline
 
   const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0
 
   const data = [
     { name: 'ONLINE',   value: online,   percent: pct(online),   fill: '#10b981' },
-    { name: 'CRITICAL', value: critical, percent: pct(critical), fill: '#f59e0b' },
-    { name: 'OFFLINE',  value: offline,  percent: pct(offline),  fill: '#ef4444' },
+    { name: 'WARNING',  value: warning,  percent: pct(warning),  fill: '#f59e0b' },
+    { name: 'DEGRADED', value: degraded, percent: pct(degraded), fill: '#f97316' },
+    { name: 'CRITICAL', value: critical, percent: pct(critical), fill: '#ef4444' },
+    { name: 'OFFLINE',  value: offline,  percent: pct(offline),  fill: '#dc2626' },
   ].filter(d => d.value > 0)
 
   // Jika semua 0 (belum ada data)
@@ -103,8 +109,10 @@ export default function StatusDistributionChart({ websites }) {
             <div style={styles.legend}>
               {[
                 { label: 'ONLINE',   count: online,   color: '#10b981' },
-                { label: 'CRITICAL', count: critical, color: '#f59e0b' },
-                { label: 'OFFLINE',  count: offline,  color: '#ef4444' },
+                { label: 'WARNING',  count: warning,  color: '#f59e0b' },
+                { label: 'DEGRADED', count: degraded, color: '#f97316' },
+                { label: 'CRITICAL', count: critical, color: '#ef4444' },
+                { label: 'OFFLINE',  count: offline,  color: '#dc2626' },
                 ...(pending > 0 ? [{ label: 'PENDING', count: pending, color: '#4a5568' }] : []),
               ].map(item => (
                 <div key={item.label} style={styles.legendItem}>

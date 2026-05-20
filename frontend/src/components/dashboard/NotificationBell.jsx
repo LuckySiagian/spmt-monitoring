@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { notificationAPI } from '../../services/api'
 
-const SC = { ONLINE: '#059669', CRITICAL: '#d97706', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
-const SI = { ONLINE: '🟢', CRITICAL: '🟠', OFFLINE: '🔴', UNKNOWN: '⚪' }
+const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
+const SI = { ONLINE: '🟢', WARNING: '🟡', DEGRADED: '🟠', CRITICAL: '🔴', OFFLINE: '🔴', UNKNOWN: '⚪' }
 const DD_ID = 'spmt-notif-dd'
 const getDomain = url => { try { return new URL(url).hostname } catch { return null } }
 

@@ -294,6 +294,10 @@ func (h *Handler) GetDashboardSummary(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, summary)
 }
 
+func (h *Handler) GetSystemHealth(w http.ResponseWriter, r *http.Request) {
+	respond(w, http.StatusOK, h.pool.GetHealth())
+}
+
 func (h *Handler) GetWebsiteLogs(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := uuid.Parse(idStr)

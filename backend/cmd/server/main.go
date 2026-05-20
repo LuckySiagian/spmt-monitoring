@@ -102,6 +102,7 @@ func main() {
 
 		// Dashboard (all authenticated users)
 		r.Get("/dashboard/summary", h.GetDashboardSummary)
+		r.Get("/system/health", h.GetSystemHealth)
 		r.Get("/dashboard/history", h.GetStatusHistory)
 		r.Get("/websites/{id}/logs", h.GetWebsiteLogs)
 		r.Get("/websites/{id}/events", h.GetWebsiteEvents)

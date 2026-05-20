@@ -6,21 +6,22 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptrace"
-	"math/rand"
 	"strings"
 	"sync"
 	"time"
+
+	"runtime"
 
 	"github.com/google/uuid"
 	"github.com/spmt/monitoring/internal/model"
 	"github.com/spmt/monitoring/internal/notification"
 	"github.com/spmt/monitoring/internal/repository"
 	ws "github.com/spmt/monitoring/internal/websocket"
-	"runtime"
 )
 
 type MonitorJob struct {
@@ -47,32 +48,32 @@ type Pool struct {
 		FirewallDrop    bool
 		RandomTimeout   bool
 	}
-	websiteStates map[uuid.UUID]*websiteState
-	health        model.SystemHealth
-	recentFails   []time.Time
-	muFails       sync.Mutex
+	websiteStates        map[uuid.UUID]*websiteState
+	health               model.SystemHealth
+	recentFails          []time.Time
+	muFails              sync.Mutex
 	monitorBaselineLatMs int
 }
 
 type websiteState struct {
 	consecutiveFailures int
-	recentLatencies    []int
-	lastStatus         model.LogStatus
-	statusStartTime    time.Time
+	recentLatencies     []int
+	lastStatus          model.LogStatus
+	statusStartTime     time.Time
 }
 
 func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Service, workerSize int) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Pool{
-		repo:       repo,
-		hub:        hub,
-		notif:      notif,
-		jobs:       make(chan MonitorJob, 500),
-		workerSize: workerSize,
-		tickers:    make(map[uuid.UUID]*time.Ticker),
-		ctx:        ctx,
-		cancel:     cancel,
-		localNet:   true,
+		repo:          repo,
+		hub:           hub,
+		notif:         notif,
+		jobs:          make(chan MonitorJob, 500),
+		workerSize:    workerSize,
+		tickers:       make(map[uuid.UUID]*time.Ticker),
+		ctx:           ctx,
+		cancel:        cancel,
+		localNet:      true,
 		websiteStates: make(map[uuid.UUID]*websiteState),
 		recentFails:   []time.Time{},
 	}
@@ -81,8 +82,10 @@ func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Servi
 func (p *Pool) Start() {
 	// Increased worker size for production scalability (handled up to 500 sites)
 	size := p.workerSize
-	if size < 50 { size = 50 }
-	
+	if size < 50 {
+		size = 50
+	}
+
 	log.Printf("[Worker] Starting %d lightweight workers", size)
 	for i := 0; i < size; i++ {
 		go p.worker(i)
@@ -176,7 +179,7 @@ func (p *Pool) RevalidateAll() {
 	}
 
 	log.Printf("[Worker] Triggering instant revalidation for %d websites due to network change", len(websites))
-	
+
 	// Reset states to ensure fresh diagnosis
 	p.mu.Lock()
 	p.websiteStates = make(map[uuid.UUID]*websiteState)
@@ -204,11 +207,16 @@ func (p *Pool) worker(id int) {
 // ── TLS Helpers ────────────────────────────────────────────────
 func getTLSVersionName(v uint16) string {
 	switch v {
-	case tls.VersionTLS10: return "TLS 1.0"
-	case tls.VersionTLS11: return "TLS 1.1"
-	case tls.VersionTLS12: return "TLS 1.2"
-	case tls.VersionTLS13: return "TLS 1.3"
-	default: return "Unknown"
+	case tls.VersionTLS10:
+		return "TLS 1.0"
+	case tls.VersionTLS11:
+		return "TLS 1.1"
+	case tls.VersionTLS12:
+		return "TLS 1.2"
+	case tls.VersionTLS13:
+		return "TLS 1.3"
+	default:
+		return "Unknown"
 	}
 }
 
@@ -228,24 +236,40 @@ func getCipherSuiteName(id uint16) string {
 
 func parseTLSError(err error) (string, string) {
 	errStr := strings.ToLower(err.Error())
-	if strings.Contains(errStr, "expired") || strings.Contains(errStr, "validate certificate") {
-		return "SSL_EXPIRED", "Sertifikat keamanan website kedaluwarsa. Perlu pembaruan segera."
+
+	// 1. Error NET::ERR_CERT_INVALID / SSL_EXPIRED
+	if strings.Contains(errStr, "expired") || strings.Contains(errStr, "validate certificate") || strings.Contains(errStr, "not yet valid") {
+		return "SSL_EXPIRED", "Masa berlaku sertifikat sudah habis (Expired) atau belum aktif."
 	}
-	if strings.Contains(errStr, "self signed") || strings.Contains(errStr, "authority") {
-		return "SSL_INTERCEPTION_BY_NETWORK", "Koneksi terganggu atau dimodifikasi oleh sistem keamanan jaringan (SSL Interception)."
+
+	// 2. Hostname Mismatch (Nama domain tidak sesuai)
+	if strings.Contains(errStr, "hostname") || strings.Contains(errStr, "doesn't match") || (strings.Contains(errStr, "valid for") && strings.Contains(errStr, "not ")) {
+		return "HOSTNAME_MISMATCH", "Nama domain tidak sesuai dengan sertifikat SSL yang digunakan."
 	}
-	if strings.Contains(errStr, "hostname") || strings.Contains(errStr, "doesn't match") {
-		return "HOSTNAME_MISMATCH", "Nama domain tidak sesuai dengan sertifikat yang diterima."
+
+	// 3. Otoritas Tidak Tepercaya (Untrusted CA)
+	if strings.Contains(errStr, "authority") || strings.Contains(errStr, "self-signed") || strings.Contains(errStr, "untrusted") || strings.Contains(errStr, "signed by unknown authority") {
+		return "SSL_UNTRUSTED_CA", "Sertifikat diterbitkan oleh otoritas yang tidak diakui atau diintersepsi oleh jaringan."
 	}
-	if strings.Contains(errStr, "handshake failure") || strings.Contains(errStr, "protocol version") || strings.Contains(errStr, "remote error") {
-		return "PROXY_INTERVENTION", "Intervensi proxy atau firewall terdeteksi saat proses jabat tangan (handshake) SSL."
+
+	// 4. Private Key Missing / Handshake Issues
+	if strings.Contains(errStr, "private key") || strings.Contains(errStr, "bad tag") || strings.Contains(errStr, "no certificate found") {
+		return "PRIVATE_KEY_MISSING", "Ada masalah pada kunci privat (Private Key) atau konfigurasi sertifikat di server."
 	}
-	if strings.Contains(errStr, "timeout") {
+
+	// 5. ERR_SSL_PROTOCOL_ERROR
+	if strings.Contains(errStr, "protocol version") || strings.Contains(errStr, "handshake failure") || strings.Contains(errStr, "remote error") || strings.Contains(errStr, "record layer") {
+		return "SSL_PROTOCOL_ERROR", "Kegagalan pada protokol SSL. Browser gagal memverifikasi koneksi aman ke website."
+	}
+
+	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline") {
 		return "FIREWALL_INTERRUPTION", "Koneksi SSL terputus oleh firewall karena waktu tunggu habis."
 	}
+
 	if strings.Contains(errStr, "reset") || strings.Contains(errStr, "refused") || strings.Contains(errStr, "eof") {
 		return "NETWORK_POLICY_BLOCK", "Koneksi diputus paksa oleh kebijakan jaringan yang sedang digunakan."
 	}
+
 	return "SSL_GENERAL_ERROR", "Terjadi gangguan pada lapisan keamanan (SSL/TLS): " + err.Error()
 }
 
@@ -260,7 +284,7 @@ func (p *Pool) checkSSL(host string) (bool, *time.Time, string, string, string) 
 		return false, nil, rc, rec, ""
 	}
 	defer conn.Close()
-	
+
 	state := conn.ConnectionState()
 	if len(state.PeerCertificates) > 0 {
 		exp := state.PeerCertificates[0].NotAfter
@@ -294,10 +318,10 @@ func (p *Pool) isLocalNetworkOK() bool {
 	targets := []string{"8.8.8.8:53", "1.1.1.1:53", "208.67.222.222:53"}
 	successCount := 0
 	var latencies []int
-	
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	
+
 	for _, target := range targets {
 		wg.Add(1)
 		go func(t string) {
@@ -306,7 +330,7 @@ func (p *Pool) isLocalNetworkOK() bool {
 			dialer := &net.Dialer{Timeout: 2 * time.Second}
 			conn, err := dialer.Dial("tcp", t)
 			lat := int(time.Since(start).Milliseconds())
-			
+
 			if err == nil {
 				conn.Close()
 				mu.Lock()
@@ -319,11 +343,13 @@ func (p *Pool) isLocalNetworkOK() bool {
 	wg.Wait()
 
 	ok := successCount >= 2 // Majority quorum
-	
+
 	avgLat := 0
 	if len(latencies) > 0 {
 		sum := 0
-		for _, l := range latencies { sum += l }
+		for _, l := range latencies {
+			sum += l
+		}
 		avgLat = sum / len(latencies)
 	}
 
@@ -342,12 +368,18 @@ func (p *Pool) SetChaos(mode string, active bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	switch mode {
-	case "slow": p.chaos.SlowResponse = active
-	case "loss": p.chaos.PacketLoss = active
-	case "dns": p.chaos.DNSIntermittent = active
-	case "ssl": p.chaos.SSLExpiry = active
-	case "firewall": p.chaos.FirewallDrop = active
-	case "timeout": p.chaos.RandomTimeout = active
+	case "slow":
+		p.chaos.SlowResponse = active
+	case "loss":
+		p.chaos.PacketLoss = active
+	case "dns":
+		p.chaos.DNSIntermittent = active
+	case "ssl":
+		p.chaos.SSLExpiry = active
+	case "firewall":
+		p.chaos.FirewallDrop = active
+	case "timeout":
+		p.chaos.RandomTimeout = active
 	}
 	log.Printf("[Chaos] %s mode: %v", mode, active)
 }
@@ -355,11 +387,11 @@ func (p *Pool) SetChaos(mode string, active bool) {
 func (p *Pool) check(w model.Website) {
 	start := time.Now()
 	l := &model.MonitoringLog{
-		WebsiteID:   w.ID,
-		CheckedAt:   start,
-		Status:      "",
-		HealthScore: 0,     // Start at 0, build up if successful
-		Confidence:  100,   // Start at 100 confidence
+		WebsiteID:           w.ID,
+		CheckedAt:           start,
+		Status:              "",
+		HealthScore:         0,    // Start at 0, build up if successful
+		Confidence:          100,  // Start at 100 confidence
 		IsBrowserAccessible: true, // Start as accessible, prove otherwise
 	}
 
@@ -410,7 +442,7 @@ func (p *Pool) check(w model.Website) {
 	if isHTTPS {
 		sslOk, expiry, rc, rec, issuer := p.checkSSL(host)
 		sslIssuer = issuer
-		
+
 		// Chaos: SSL Expiry
 		if p.chaos.SSLExpiry {
 			sslOk = false
@@ -440,9 +472,11 @@ func (p *Pool) check(w model.Website) {
 		Timeout: 30 * time.Second,
 		Jar:     jar,
 		Transport: &http.Transport{
+			Proxy:             http.ProxyFromEnvironment,
 			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true, ServerName: host},
-			ForceAttemptHTTP2: true,
-			DisableKeepAlives: true,
+			ForceAttemptHTTP2: false,
+			DisableKeepAlives: false,
+			IdleConnTimeout:   10 * time.Second,
 		},
 	}
 
@@ -452,23 +486,29 @@ func (p *Pool) check(w model.Website) {
 	}
 
 	req, _ := http.NewRequest("GET", w.URL, nil)
-	req.Header.Set("User-Agent", getRandomUserAgent())
-	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7,ms;q=0.6")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
 
 	var tDnsStart, tTlsStart time.Time
 	var tDnsEnd, tTlsEnd, tTtfbEnd time.Time
 
 	trace := &httptrace.ClientTrace{
-		DNSStart: func(info httptrace.DNSStartInfo) { tDnsStart = time.Now() },
-		DNSDone:  func(info httptrace.DNSDoneInfo) { tDnsEnd = time.Now() },
+		DNSStart:     func(info httptrace.DNSStartInfo) { tDnsStart = time.Now() },
+		DNSDone:      func(info httptrace.DNSDoneInfo) { tDnsEnd = time.Now() },
 		ConnectStart: func(network, addr string) {},
 		ConnectDone: func(network, addr string, err error) {
-			if err == nil { l.TCPPortOpen = true }
+			if err == nil {
+				l.TCPPortOpen = true
+			}
 		},
 		TLSHandshakeStart: func() { tTlsStart = time.Now() },
 		TLSHandshakeDone: func(state tls.ConnectionState, err error) {
-			if err == nil { tTlsEnd = time.Now() }
+			if err == nil {
+				tTlsEnd = time.Now()
+			}
 		},
 		GotFirstResponseByte: func() { tTtfbEnd = time.Now() },
 	}
@@ -476,6 +516,24 @@ func (p *Pool) check(w model.Website) {
 
 	httpStart := time.Now()
 	resp, httpErr := client.Do(req)
+
+	// 1️⃣ If HTTPS request fails with connection refused or timeout, try plain HTTP as fallback
+	if httpErr != nil && isHTTPS {
+		if strings.Contains(httpErr.Error(), "refused") || strings.Contains(httpErr.Error(), "timeout") {
+			// Retry with HTTP scheme
+			fallbackURL := strings.Replace(w.URL, "https://", "http://", 1)
+			fallbackReq, _ := http.NewRequest("GET", fallbackURL, nil)
+			fallbackReq.Header = req.Header.Clone()
+			fallbackResp, fallbackErr := client.Do(fallbackReq)
+			if fallbackErr == nil && fallbackResp != nil {
+				// Use fallback response as successful
+				resp = fallbackResp
+				httpErr = nil
+				l.RootCause = "FALLBACK_HTTP_SUCCESS"
+				l.Recommendation = "HTTPS blocked, but HTTP reachable. Consider checking firewall rules for port 443."
+			}
+		}
+	}
 
 	// Chaos: Slow Response
 	if p.chaos.SlowResponse {
@@ -486,12 +544,12 @@ func (p *Pool) check(w model.Website) {
 		dnsLat := int(tDnsEnd.Sub(tDnsStart).Milliseconds())
 		l.DNSLatencyMs = &dnsLat
 	}
-	
+
 	if !tTlsEnd.IsZero() && !tTlsStart.IsZero() {
 		tlsLat := int(tTlsEnd.Sub(tTlsStart).Milliseconds())
 		l.TLSLatencyMs = &tlsLat
 	}
-	
+
 	if !tTtfbEnd.IsZero() {
 		ttfbLat := int(tTtfbEnd.Sub(httpStart).Milliseconds())
 		l.TTFBLatencyMs = &ttfbLat
@@ -502,14 +560,14 @@ func (p *Pool) check(w model.Website) {
 		l.ErrorMessage = model.PtrString(httpErr.Error())
 		rt := int(time.Since(httpStart).Milliseconds())
 		l.ResponseTimeMs = &rt
-		
-		// IMPORTANT: Don't give up yet! 
+
+		// IMPORTANT: Don't give up yet!
 		// Even if HTTP failed, we evaluate to see if it's an ISP block or WAF drop.
 		p.evaluateFinalStatus(l, cloudInfo, w, nil, sslIssuer)
 	} else {
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
-		
+
 		rt := int(time.Since(httpStart).Milliseconds())
 		l.ResponseTimeMs = &rt
 		code := resp.StatusCode
@@ -534,18 +592,22 @@ func (p *Pool) check(w model.Website) {
 
 func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w model.Website, body []byte, sslIssuer string) {
 	state := p.getWebsiteState(w.ID)
-	
+
 	code := 0
-	if l.StatusCode != nil { code = *l.StatusCode }
+	if l.StatusCode != nil {
+		code = *l.StatusCode
+	}
 	bodyStr := strings.ToLower(string(body))
 	errStr := ""
-	if l.ErrorMessage != nil { errStr = strings.ToLower(*l.ErrorMessage) }
-	
+	if l.ErrorMessage != nil {
+		errStr = strings.ToLower(*l.ErrorMessage)
+	}
+
 	l.ResolverStage = "INIT"
 	l.IsBrowserAccessible = true // Default to true
 
 	// Declare all variables used in goto scopes to avoid "jumps over declaration" errors
-	var isWafBlock, isCaptcha, isHardSSLError, shouldCheckContent bool
+	var isWafBlock, isCaptcha, shouldCheckContent bool
 	var isSuspiciouslySmall bool
 	isHttps := strings.HasPrefix(w.URL, "https://")
 	isOnlineCode := (code >= 200 && code < 410)
@@ -554,42 +616,103 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w m
 	isRefused := strings.Contains(errStr, "refused") || strings.Contains(errStr, "reset")
 	isDNSFail := !l.DNSResolved || strings.Contains(errStr, "no such host")
 
-	// ─── STAGE 1: CONNECTIVITY (OFFLINE) ──────────────────────────
+	// ─── STAGE 0: ISP / CONTENT POLICY BLOCK (CRITICAL) ───────────
+	// Detect ISP block / Internet Positif redirect or DNS interception
+	isISPBlock := false
+	ispBlockReason := ""
+
+	// Known ISP Block Landing Page IPs (DNS hijacking targets)
+	isBlockIP := false
+	blockIPs := []string{
+		"36.86.63.185",    // aduankonten.id / Telkom
+		"182.23.79.195",   // Internet Positif landing page / Telkom
+		"139.255.196.196", // First Media block page
+		"103.111.196.196", // Biznet block page
+		"103.111.196.197", // Biznet
+		"118.98.96.104",   // Kemdikbud / Kominfo
+	}
+	for _, bip := range blockIPs {
+		if l.IPAddress == bip {
+			isBlockIP = true
+			break
+		}
+	}
+
+	if isBlockIP {
+		isISPBlock = true
+		ispBlockReason = fmt.Sprintf("CRITICAL: Akses diblokir oleh ISP / Internet Positif (IP terarah ke halaman sensor %s).", l.IPAddress)
+	} else if errStr != "" && (strings.Contains(errStr, "internet-positif") ||
+		strings.Contains(errStr, "internetpositif") ||
+		strings.Contains(errStr, "aduankonten") ||
+		strings.Contains(errStr, "trustpositif") ||
+		strings.Contains(errStr, "kominfo")) {
+		isISPBlock = true
+		ispBlockReason = "CRITICAL: Akses diblokir oleh ISP / Internet Positif (Terdireksi ke halaman blokir)."
+	} else if sslIssuer != "" {
+		sslIssuerLower := strings.ToLower(sslIssuer)
+		if strings.Contains(sslIssuerLower, "kominfo") ||
+			strings.Contains(sslIssuerLower, "internet positif") ||
+			strings.Contains(sslIssuerLower, "aduankonten") ||
+			strings.Contains(sslIssuerLower, "trustpositif") {
+			isISPBlock = true
+			ispBlockReason = "CRITICAL: Akses diintersepsi oleh sertifikat keamanan Internet Positif / Kominfo."
+		}
+	}
+
+	if isISPBlock {
+		l.Status = model.StatusCritical
+		l.IsBrowserAccessible = false
+		l.HealthScore = 30
+		l.FinalDecisionSource = "CONTENT_BLOCKED_ISP"
+		l.RootCause = ispBlockReason
+		l.Recommendation = "Website ini masuk daftar blokir internet positif pemerintah. Gunakan DNS alternatif atau VPN jika ini merupakan kesalahan blokir."
+		goto FINALIZE
+	}
+
+	// ─── STAGE 1: CONNECTIVITY (OFFLINE / CRITICAL) ───────────────
 	l.ResolverStage = "NETWORK_CHECK"
-	if isDNSFail || isTimeout || isUnreachable || isRefused || (code == 0 && errStr != "") {
+	if isDNSFail {
 		l.Status = model.StatusOffline
 		l.IsBrowserAccessible = false
 		l.HealthScore = 0
 		l.FinalDecisionSource = "NET_OFFLINE"
+		l.RootCause = "OFFLINE: Domain gagal di-resolve (DNS Error)."
+		goto FINALIZE
+	} else if isTimeout || isUnreachable || isRefused || (code == 0 && errStr != "") {
+		l.Status = model.StatusCritical
+		l.IsBrowserAccessible = true // Might be firewall/office policy, actual user browser might be able to access
+		l.HealthScore = 20
+		l.FinalDecisionSource = "NET_CRITICAL"
 
-		if isDNSFail {
-			l.RootCause = "OFFLINE: Domain gagal di-resolve (DNS Error)."
-		} else if isTimeout {
-			l.RootCause = "OFFLINE: RTO (Request Time Out) - Server tidak merespon."
+		if isTimeout {
+			l.RootCause = "CRITICAL: RTO (Request Time Out) - Koneksi server tidak merespon."
 		} else if isRefused {
-			l.RootCause = "OFFLINE: Koneksi ditolak oleh server (Connection Refused)."
+			l.RootCause = "CRITICAL: Koneksi ditolak oleh server (Connection Refused)."
 		} else {
-			l.RootCause = "OFFLINE: Masalah jaringan atau server tidak dapat dijangkau."
+			l.RootCause = "CRITICAL: Masalah jaringan (Akses tertutup atau firewall blokir)."
 		}
 		goto FINALIZE
 	}
 
 	// ─── STAGE 2: SSL/SECURITY (CRITICAL) ─────────────────────────
 	l.ResolverStage = "SSL_CHECK"
-	// Hard SSL Errors that always trigger CRITICAL
-	isHardSSLError = l.SSLValid == false && (l.RootCause == "SSL_EXPIRED" || l.RootCause == "HOSTNAME_MISMATCH")
-
 	if isHttps && !l.SSLValid {
-		// Only mark as CRITICAL if it's a hard server-side failure
-		if isHardSSLError || code == 0 {
+		// Hard SSL Errors: Expired or Mismatch (Actual server-side danger)
+		isHardServerSSLError := l.RootCause == "SSL_EXPIRED" || l.RootCause == "HOSTNAME_MISMATCH"
+
+		// Soft SSL Errors: Untrusted Root (Often due to office monitoring environment)
+		isProxyIssue := l.RootCause == "SSL_UNTRUSTED_CA" || l.RootCause == "PROXY_INTERVENTION"
+
+		if isHardServerSSLError || (code == 0 && !isProxyIssue) {
 			l.Status = model.StatusCritical
-			l.IsBrowserAccessible = false 
+			l.IsBrowserAccessible = false
 			l.HealthScore = 40
 			l.FinalDecisionSource = "SSL_CRITICAL"
 			l.RootCause = "CRITICAL: Sertifikat SSL tidak valid atau kedaluwarsa (Keamanan Terancam)."
-		} else {
-			// Proxy/Env issue on monitoring node, we log but keep looking for ONLINE status
+		} else if isProxyIssue {
+			// It's likely a network environment issue, treat as a warning but keep searching for ONLINE status
 			l.FinalDecisionSource = "SSL_ENV_WARNING"
+			// We don't set status to OFFLINE/CRITICAL yet, let Stage 3 (HTTP) decide
 		}
 	}
 
@@ -598,11 +721,28 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w m
 	if isOnlineCode {
 		// If status wasn't already set to CRITICAL by SSL
 		if l.Status == "" {
-			l.Status = model.StatusOnline
-			l.IsBrowserAccessible = true
-			l.HealthScore = 100
-			l.FinalDecisionSource = "HTTP_ONLINE"
-			l.RootCause = fmt.Sprintf("ONLINE: Website dapat diakses dengan normal (HTTP %d).", code)
+			if isHttps && !l.SSLValid {
+				// Decide severity based on root cause
+				if l.RootCause == "SSL_UNTRUSTED_CA" {
+					l.Status = model.StatusWarning // Use Warning instead of Degraded for proxy issues
+					l.IsBrowserAccessible = true
+					l.HealthScore = 85
+					l.FinalDecisionSource = "HTTP_ONLINE_SSL_PROXY_WARNING"
+					l.RootCause = fmt.Sprintf("WARNING: Website aktif (HTTP %d), namun SSL tidak dipercaya oleh jaringan monitor (Kemungkinan Intersepsi Proksi).", code)
+				} else {
+					l.Status = model.StatusDegraded
+					l.IsBrowserAccessible = true
+					l.HealthScore = 70
+					l.FinalDecisionSource = "HTTP_ONLINE_SSL_INVALID"
+					l.RootCause = fmt.Sprintf("DEGRADED: Website dapat diakses (HTTP %d), tetapi memiliki sertifikat SSL yang tidak valid atau kedaluwarsa.", code)
+				}
+			} else {
+				l.Status = model.StatusOnline
+				l.IsBrowserAccessible = true
+				l.HealthScore = 100
+				l.FinalDecisionSource = "HTTP_ONLINE"
+				l.RootCause = fmt.Sprintf("ONLINE: Website dapat diakses dengan normal (HTTP %d).", code)
+			}
 		} else {
 			// It's CRITICAL (likely SSL), but we log the HTTP code
 			l.RootCause += fmt.Sprintf(" (Server merespon HTTP %d)", code)
@@ -618,7 +758,7 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w m
 
 	// ─── STAGE 4: CONTENT / SECURITY BLOCKS (CRITICAL) ────────────
 	l.ResolverStage = "CONTENT_CHECK"
-	
+
 	// Only run deep content inspection for blocks if:
 	// 1. We got an error code (401, 403, 503, etc)
 	// 2. OR the response is 200 but suspiciously small (< 5KB) - block pages are usually tiny
@@ -626,13 +766,13 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w m
 	shouldCheckContent = code != 200 || isSuspiciouslySmall
 
 	if shouldCheckContent {
-		isWafBlock = strings.Contains(bodyStr, "fortigate") || strings.Contains(bodyStr, "zscaler") || 
-					   strings.Contains(bodyStr, "palo alto") || strings.Contains(bodyStr, "firewall block") ||
-					   strings.Contains(bodyStr, "policy restricted") || strings.Contains(bodyStr, "web filter")
+		isWafBlock = strings.Contains(bodyStr, "fortigate") || strings.Contains(bodyStr, "zscaler") ||
+			strings.Contains(bodyStr, "palo alto") || strings.Contains(bodyStr, "firewall block") ||
+			strings.Contains(bodyStr, "policy restricted") || strings.Contains(bodyStr, "web filter")
 
-		isCaptcha = strings.Contains(bodyStr, "recaptcha") || strings.Contains(bodyStr, "h-captcha") || 
-					   strings.Contains(bodyStr, "turnstile") || strings.Contains(bodyStr, "cf-challenge") ||
-					   strings.Contains(bodyStr, "verifikasi keamanan")
+		isCaptcha = strings.Contains(bodyStr, "recaptcha") || strings.Contains(bodyStr, "h-captcha") ||
+			strings.Contains(bodyStr, "turnstile") || strings.Contains(bodyStr, "cf-challenge") ||
+			strings.Contains(bodyStr, "verifikasi keamanan")
 
 		if isWafBlock || isCaptcha {
 			l.Status = model.StatusCritical
@@ -646,6 +786,23 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w m
 			}
 			goto FINALIZE
 		}
+
+		// Check for Mixed Content (HTTP resources on HTTPS page)
+		if isHttps && (strings.Contains(bodyStr, "src=\"http://") || strings.Contains(bodyStr, "href=\"http://")) {
+			l.Status = model.StatusWarning
+			l.HealthScore = 80
+			l.FinalDecisionSource = "MIXED_CONTENT"
+			l.RootCause = "MIXED CONTENT: Website menggunakan HTTPS, namun memuat gambar/skrip dari sumber HTTP yang tidak aman."
+		}
+	}
+
+	// ─── STAGE 5: REDIRECT LOOP (WARNING) ─────────────────────────
+	if errStr != "" && (strings.Contains(errStr, "too many redirects") || strings.Contains(errStr, "redirect_loop")) {
+		l.Status = model.StatusWarning
+		l.HealthScore = 70
+		l.FinalDecisionSource = "REDIRECT_LOOP"
+		l.RootCause = "TOO MANY REDIRECTS: Terjadi perulangan pengalihan (Redirect Loop) yang mencegah halaman dimuat."
+		goto FINALIZE
 	}
 
 	// ─── STAGE 5: LATENCY HANDLING (INFORMATION ONLY) ─────────────
@@ -658,7 +815,7 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, cloudInfo string, w m
 
 FINALIZE:
 	l.FinalReason = l.RootCause
-	
+
 	// Anti-Flapping (2-failure rule)
 	if l.Status != model.StatusOnline {
 		state.consecutiveFailures++
@@ -725,28 +882,28 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog) 
 	}
 
 	p.hub.Broadcast("monitor_update", model.WSMonitorUpdate{
-		WebsiteID:      w.ID.String(),
-		WebsiteName:    w.Name,
-		URL:            w.URL,
-		Status:         logEntry.Status,
-		IPAddress:      logEntry.IPAddress,
-		DNSResolved:    logEntry.DNSResolved,
-		DNSLatencyMs:   logEntry.DNSLatencyMs,
-		ICMPStatus:     logEntry.ICMPStatus,
-		ICMPLatencyMs:  logEntry.ICMPLatencyMs,
-		TCPPortOpen:    logEntry.TCPPortOpen,
-		TLSLatencyMs:   logEntry.TLSLatencyMs,
-		TTFBLatencyMs:  logEntry.TTFBLatencyMs,
-		StatusCode:     logEntry.StatusCode,
-		ResponseTimeMs: logEntry.ResponseTimeMs,
-		SSLValid:       logEntry.SSLValid,
-		SSLExpiryDate:  logEntry.SSLExpiryDate,
-		ErrorMessage:   logEntry.ErrorMessage,
-		RootCause:      logEntry.RootCause,
-		Recommendation: logEntry.Recommendation,
-		HealthScore:    logEntry.HealthScore,
-		Confidence:     logEntry.Confidence,
-		IsBrowserAccessible:    logEntry.IsBrowserAccessible,
+		WebsiteID:           w.ID.String(),
+		WebsiteName:         w.Name,
+		URL:                 w.URL,
+		Status:              logEntry.Status,
+		IPAddress:           logEntry.IPAddress,
+		DNSResolved:         logEntry.DNSResolved,
+		DNSLatencyMs:        logEntry.DNSLatencyMs,
+		ICMPStatus:          logEntry.ICMPStatus,
+		ICMPLatencyMs:       logEntry.ICMPLatencyMs,
+		TCPPortOpen:         logEntry.TCPPortOpen,
+		TLSLatencyMs:        logEntry.TLSLatencyMs,
+		TTFBLatencyMs:       logEntry.TTFBLatencyMs,
+		StatusCode:          logEntry.StatusCode,
+		ResponseTimeMs:      logEntry.ResponseTimeMs,
+		SSLValid:            logEntry.SSLValid,
+		SSLExpiryDate:       logEntry.SSLExpiryDate,
+		ErrorMessage:        logEntry.ErrorMessage,
+		RootCause:           logEntry.RootCause,
+		Recommendation:      logEntry.Recommendation,
+		HealthScore:         logEntry.HealthScore,
+		Confidence:          logEntry.Confidence,
+		IsBrowserAccessible: logEntry.IsBrowserAccessible,
 		FinalReason:         logEntry.FinalReason,
 		FinalDecisionSource: logEntry.FinalDecisionSource,
 		ResolverStage:       logEntry.ResolverStage,
@@ -782,7 +939,7 @@ func extractHost(rawURL string) string {
 func (p *Pool) healthMonitor() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -797,15 +954,13 @@ func (p *Pool) healthMonitor() {
 func (p *Pool) updateHealth() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
 
 	p.health.ActiveWorkers = p.workerSize
 	p.health.WorkerQueueSize = len(p.jobs)
 	p.health.ActiveGoroutines = runtime.NumGoroutine()
 	p.health.WSConnections = p.hub.ConnectionCount()
-	p.health.BackendRAM = float64(m.Alloc) / 1024 / 1024 // MB
+	p.health.BackendCPU = GetSystemCPUUsage()
+	p.health.BackendRAM = GetSystemRAMUsage()
 	p.health.MonitorLatencyMs = p.monitorBaselineLatMs
 	p.health.UpdatedAt = time.Now()
 }
@@ -834,10 +989,10 @@ func (p *Pool) getWebsiteState(id uuid.UUID) *websiteState {
 func (p *Pool) trackFailure() {
 	p.muFails.Lock()
 	defer p.muFails.Unlock()
-	
+
 	now := time.Now()
 	p.recentFails = append(p.recentFails, now)
-	
+
 	// Clean up old fails (older than 10s)
 	cutoff := now.Add(-10 * time.Second)
 	newFails := []time.Time{}
@@ -847,13 +1002,13 @@ func (p *Pool) trackFailure() {
 		}
 	}
 	p.recentFails = newFails
-	
+
 	if len(p.recentFails) >= 5 {
 		// Potential mass incident
 		p.hub.Broadcast("system_alert", map[string]interface{}{
-			"type": "INCIDENT_GROUP",
+			"type":  "INCIDENT_GROUP",
 			"count": len(p.recentFails),
-			"msg": "Mass Incident Detected: Multiple services failing simultaneously.",
+			"msg":   "Mass Incident Detected: Multiple services failing simultaneously.",
 		})
 	}
 }

@@ -1,7 +1,7 @@
 import { useTheme } from '../store/theme'
 
-const SC = { ONLINE:'#10b981', CRITICAL:'#f59e0b', OFFLINE:'#ef4444', SERVER_DOWN:'#dc2626', WEB_DOWN:'#f97316', DNS_ERROR:'#8b5cf6', SSL_INVALID:'#ec4899', SLOW:'#eab308' }
-const SB = { ONLINE:'rgba(16,185,129,0.12)', CRITICAL:'rgba(245,158,11,0.12)', OFFLINE:'rgba(239,68,68,0.12)' }
+const SC = { ONLINE:'#10b981', WARNING:'#f59e0b', DEGRADED:'#f97316', CRITICAL:'#ef4444', OFFLINE:'#dc2626', SERVER_DOWN:'#dc2626', WEB_DOWN:'#f97316', DNS_ERROR:'#8b5cf6', SSL_INVALID:'#ec4899', SLOW:'#eab308' }
+const SB = { ONLINE:'rgba(16,185,129,0.12)', WARNING:'rgba(245,158,11,0.12)', DEGRADED:'rgba(249,115,22,0.12)', CRITICAL:'rgba(239,68,68,0.12)', OFFLINE:'rgba(220,38,38,0.12)' }
 
 const StatusBadge = ({ s }) => (
   <span style={{ background:SB[s]||'rgba(74,85,104,0.12)', color:SC[s]||'#64748b', border:`1px solid ${SC[s]||'#64748b'}44`, borderRadius:4, padding:'2px 8px', fontSize:10, fontWeight:700 }}>{s}</span>

@@ -1,24 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { websiteAPI, eventsAPI } from '../../services/api'
+import { websiteAPI, eventsAPI, systemAPI } from '../../services/api'
 import { useGlobalWebSocket } from '../../store/WebSocketContext'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 const STATUS_COLORS = { 
   ONLINE: '#10b981', 
-  DEGRADED: '#8b5cf6', 
   WARNING: '#f59e0b', 
-  CRITICAL: '#d97706', 
-  OFFLINE: '#f43f5e',
+  DEGRADED: '#f97316', 
+  CRITICAL: '#ef4444', 
+  OFFLINE: '#dc2626',
   UNKNOWN: '#64748b'
 }
+
+let cachedSysHealth = null
 
 const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    DEGRADED: { bg: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: 'rgba(139,92,246,0.3)' },
     WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-    CRITICAL: { bg: 'rgba(217,119,6,0.15)', color: '#d97706', border: 'rgba(217,119,6,0.3)' },
-    OFFLINE: { bg: 'rgba(244,63,94,0.15)', color: '#f43f5e', border: 'rgba(244,63,94,0.3)' },
+    DEGRADED: { bg: 'rgba(249,115,22,0.15)', color: '#f97316', border: 'rgba(249,115,22,0.3)' },
+    CRITICAL: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
+    OFFLINE: { bg: 'rgba(220,38,38,0.15)', color: '#dc2626', border: 'rgba(220,38,38,0.3)' },
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
   return (
     <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em' }}>
@@ -174,120 +176,477 @@ function AvailabilityTimeline({ websiteId }) {
 }
 
 // ── Translation & Helpers ─────────────────────────────────────
-const getHttpDesc = (code) => {
-  if (!code) return 'Koneksi Terputus (Timeout/Refused)';
-  if (code === 403) return 'Akses Ditolak (Locked). Server memblokir permintaan monitor.';
-  if (code === 401) return 'Perlu Login (Unauthorized). Monitor tidak memiliki izin akses.';
-  if (code === 404) return 'Halaman Tidak Ditemukan. Alamat URL salah atau sudah dihapus.';
-  if (code >= 500) return 'Server Error. Aplikasi di server sedang mengalami gangguan internal.';
-  if (code >= 400) return 'Masalah Akses. Ada kendala pada sisi permintaan ke server.';
-  return `Sukses (HTTP ${code})`;
+const getStatusEmojiAndText = (status) => {
+  if (status === 'ONLINE') return '🟢 ONLINE'
+  if (status === 'WARNING') return '🟡 ONLINE'
+  if (status === 'DEGRADED') return '🟠 ONLINE'
+  if (status === 'CRITICAL') return '🔴 ONLINE'
+  if (status === 'OFFLINE') return '🔴 OFFLINE'
+  return '⚪ UNKNOWN'
 }
 
-const getSslDesc = (valid) => {
-  if (valid === true) return 'Aman & Terenkripsi (Sertifikat Valid)';
-  if (valid === false) return 'Tidak Aman (Sertifikat Rusak/Kadaluarsa)';
-  return 'Tidak Dicek / Non-HTTPS';
+const getDnsStatus = (status, resolved) => {
+  if (resolved) {
+    return '🟢 Terhubung ke IP'
+  }
+  if (status === 'OFFLINE') {
+    return '❌ Gagal (Domain Tidak Terurai)'
+  }
+  return '🟢 Sukses (Normal)'
+}
+
+const getHttpCodeValue = (status, code, rootCause = '') => {
+  const rc = String(rootCause || '').toUpperCase()
+  if (rc.includes('BLOKIR') || rc.includes('POSITIF') || rc.includes('ISP') || rc.includes('ADUAN')) {
+    return '— (Akses Diblokir / Koneksi Diintersepsi)'
+  }
+  if (status === 'OFFLINE') {
+    return '— (Request Time Out / Connection Refused)'
+  }
+  if (!code) return '— (Request Time Out / Connection Refused)'
+  if (code === 200) return '200 OK'
+  if (code === 201) return '201 Created'
+  if (code === 301) return '301 Moved Permanently'
+  if (code === 302) return '302 Found'
+  if (code === 400) return '400 Bad Request'
+  if (code === 401) return '401 Unauthorized'
+  if (code === 403) return '403 Forbidden'
+  if (code === 404) return '404 Not Found'
+  if (code === 500) return '500 Internal Server Error'
+  if (code === 502) return '502 Bad Gateway'
+  if (code === 503) return '503 Service Unavailable'
+  if (code === 504) return '504 Gateway Timeout'
+  return `${code}`
 }
 
 const getLatencyDesc = (ms) => {
-  if (!ms) return 'Tidak Terdeteksi';
-  if (ms < 500) return 'Sangat Cepat (Lancar)';
-  if (ms < 1500) return 'Normal (Standar)';
-  if (ms < 5000) return 'Lambat (Perlu Diperhatikan)';
-  return 'Sangat Lambat (Berisiko Down)';
+  if (!ms) return 'Tidak Terdeteksi'
+  if (ms < 300) return 'Sangat Cepat'
+  if (ms < 1000) return 'Normal (Standar)'
+  if (ms < 3000) return 'Lambat'
+  return 'Sangat Lambat'
+}
+
+const getSslStatusText = (status, valid, expiryStr, rootCause = '') => {
+  const rc = String(rootCause || '').toUpperCase()
+
+  // 1. Deteksi Intersepsi atau Proksi Kantor (Priority)
+  if (rc.includes('PROKSI') || rc.includes('PROXY') || rc.includes('INTERSEPSI') || rc.includes('UNTRUSTED') || rc.includes('DIINTERSEPSI') || rc.includes('DIINTIP')) {
+    return '🟠 Peringatan (Keamanan Dipantau Jaringan / Proksi)'
+  }
+
+  // 2. Deteksi Mixed Content
+  if (rc.includes('MIXED CONTENT')) {
+    return '🟡 Peringatan (Mixed Content / Tidak Sepenuhnya Aman)'
+  }
+
+  // 3. Deteksi Redirect Loop
+  if (rc.includes('REDIRECTS') || rc.includes('REDIRECT_LOOP')) {
+    return '❌ Gagal (Too Many Redirects)'
+  }
+
+  if (rc.includes('BLOKIR') || rc.includes('POSITIF') || rc.includes('ISP') || rc.includes('ADUAN')) {
+    return '❌ Gagal (Keamanan Diintersepsi ISP)'
+  }
+  if (status === 'OFFLINE') {
+    return '— (Tidak Dapat Diperiksa)'
+  }
+  if (valid === false) {
+    return '❌ Tidak Aktif (Kadaluarsa / Hostname Mismatch)'
+  }
+  if (!expiryStr) {
+    return '— (Tidak Dicek / Non-HTTPS)'
+  }
+
+  try {
+    const expiry = new Date(expiryStr)
+    if (isNaN(expiry.getTime())) return '— (Tidak Dicek / Non-HTTPS)'
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    expiry.setHours(0, 0, 0, 0)
+
+    const diffTime = expiry.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+    const day = String(expiry.getDate()).padStart(2, '0')
+    const month = String(expiry.getMonth() + 1).padStart(2, '0')
+    const year = expiry.getFullYear()
+    const formattedDate = `${day}/${month}/${year}`
+
+    if (diffDays < 0) {
+      return `❌ Tidak Aktif (Kadaluarsa pada ${formattedDate} — ${Math.abs(diffDays)} Hari yang Lalu)`
+    } else if (diffDays === 0) {
+      return `🟢 Aktif (Kadaluarsa Hari Ini — valid s.d ${formattedDate})`
+    } else {
+      return `🟢 Aktif (Valid s.d ${formattedDate} — ${diffDays} Hari Lagi)`
+    }
+  } catch (err) {
+    return valid ? '🟢 Aktif (Sertifikat Valid)' : '— (Tidak Dicek / Non-HTTPS)'
+  }
+}
+
+const getServerLoadText = (health) => {
+  if (!health) return 'Loading...'
+  const cpu = Math.round(health.backend_cpu || 0)
+  const ram = Math.round(health.backend_ram || 0)
+  let status = 'Sehat'
+  if (cpu > 80 || ram > 85) status = 'Kritis'
+  else if (cpu > 60 || ram > 70) status = 'Tinggi'
+  return `CPU: ${cpu}% | RAM: ${ram}% (${status})`
 }
 
 // ── Analisis Kondisi Section ────────────────────────────────────────
 
-function AnalisisKondisi({ website }) {
+function AnalisisKondisi({ website, sysHealth }) {
   const [analyzing, setAnalyzing] = useState(true)
   const [analysis, setAnalysis] = useState(null)
 
-  useEffect(() => {
-    setAnalyzing(true)
-    const timer = setTimeout(() => {
-      const result = performAIAnalysis(website)
-      setAnalysis(result)
-      setAnalyzing(false)
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [website.status, website.root_cause, website.url])
-
-  const performAIAnalysis = (w) => {
+  const performAIAnalysis = (w, health) => {
     const rc = w.root_cause?.toUpperCase() || ''
     const status = w.status
     const code = w.status_code
     const sslValid = w.ssl_valid
     const rt = w.response_time_ms || 0
+    const dnsResolved = w.dns_resolved
+    const ip = w.ip_address || ''
 
-    if (status === 'OFFLINE' || rc.includes('DNS') || rc.includes('TIMEOUT')) {
-      if (rc.includes('DNS')) {
+    const isBlockIP = ['36.86.63.185', '182.23.79.195', '139.255.196.196', '103.111.196.196', '103.111.196.197', '118.98.96.104'].includes(ip)
+    const isISPBlock = isBlockIP || rc.includes('BLOKIR') || rc.includes('POSITIF') || rc.includes('ISP') || rc.includes('ADUAN') || rc.includes('SENSOR')
+
+    // Extract health info
+    const cpu = health ? Math.round(health.backend_cpu || 0) : 0
+    const ram = health ? Math.round(health.backend_ram || 0) : 0
+    const isNodeCritical = cpu > 80 || ram > 85
+
+    // 0. ISP Block Check First (Highest Priority)
+    if (isISPBlock) {
+      return {
+        title: "AKSES DIBLOKIR (ISP FILTER)",
+        icon: "🚫", color: "#f59e0b",
+        summary: "Websitenya kena blokir sensor internet, Bos!",
+        explanation: `Websitenya sebenarnya aktif dan bisa dibuka (seperti yang Anda lihat di HP/Browser jika Anda pakai Secure DNS / DoH / VPN), tapi jaringan internet di server pemantau kami terblokir oleh kebijakan penapisan konten ISP lokal (IP terarah ke ${ip || 'halaman blokir'}).`,
+        recommendation: "Ini bukan karena websitenya mati. Jika ini server Anda, pastikan DNS server monitor menggunakan DNS alternatif atau VPN."
+      }
+    }
+
+    if (!dnsResolved) {
+      return {
+        title: "DOMAIN TIDAK DITEMUKAN",
+        icon: "📍", color: "#ef4444",
+        summary: "Koneksi gagal karena nama domain tidak terurai (DNS Error).",
+        explanation: "Sistem tidak berhasil menerjemahkan nama domain menjadi alamat IP sehingga koneksi ke website tidak dapat dilakukan.\n\nKemungkinan penyebab:\n• Nama domain salah ketik atau tidak valid\n• Domain tidak aktif / expired\n• Gangguan DNS atau nameserver\n• Domain belum terpropagasi dengan benar\n\nCatatan:\nKarena DNS gagal, pemeriksaan SSL dan HTTP tidak dapat dilanjutkan.",
+        recommendation: "Periksa kembali penulisan nama domain (pastikan tidak ada typo), cek masa aktif domain, dan konfigurasi DNS Anda."
+      }
+    }
+
+    // 1. OFFLINE Status
+    if (status === 'OFFLINE') {
+      return {
+        title: "KONEKSI PUTUS TOTAL (OFFLINE)",
+        icon: "💀", color: "#ef4444",
+        summary: "Websitenya mati total, Bos!",
+        explanation: "Tidak ada rute yang berhasil dijangkau dan koneksi terputus total. Server target kemungkinan besar mati dari jaringan (Down).",
+        recommendation: "Pastikan fisik servernya menyala dan jaringan di lokasi tujuan tidak mengalami gangguan massal."
+      }
+    }
+
+    // 2. CRITICAL Status
+    if (status === 'CRITICAL') {
+
+      if (code >= 500) {
         return {
-          title: "GANGGUAN TOTAL: Alamat Tidak Ditemukan",
-          icon: "📍", color: "#f43f5e",
-          summary: "Kesalahan pada Buku Alamat (DNS)",
-          explanation: "Sistem monitor tidak bisa menemukan 'alamat rumah' dari aplikasi ini. Hal ini biasanya terjadi karena nama domain sudah mati, salah ketik, atau ada gangguan di penyedia domain.",
-          recommendation: "Periksa pengaturan DNS atau hubungi penyedia domain Anda."
+          title: "SERVER ERROR",
+          icon: "💥", color: "#ef4444",
+          summary: "Server websitenya lagi rusak/crash, Bos!",
+          explanation: `Server ngebalas dengan kode error ${code}. Jaringan ke sana aman, tapi aplikasi di dalam servernya lagi error atau mati total.`,
+          recommendation: "Coba hubungi developer webnya buat meriksa log error di server."
         }
       }
+
+      if (code === 403 || code === 401) {
+        return {
+          title: "AKSES DITOLAK",
+          icon: "🔒", color: "#ef4444",
+          summary: "Pintu masuk websitenya dikunci, Bos!",
+          explanation: `Servernya nyala tapi nolak ngasih akses ke sistem monitor kita (Kode ${code}). Mungkin karena diproteksi sistem keamanan ketat.`,
+          recommendation: "Minta admin web buat masukin IP server monitor kita ke whitelist/daftar aman."
+        }
+      }
+
+      const isSocialMedia = /tiktok\.com|reddit\.com|facebook\.com|instagram\.com|youtube\.com|twitter\.com|x\.com|pinterest\.com|tumblr\.com|linkedin\.com|netflix\.com|spotify\.com|twitch\.tv|steamcommunity\.com/.test(w.url?.toLowerCase())
+      if (isSocialMedia && !code) {
+        return {
+          title: "AKSES TERBATAS (FIREWALL)",
+          icon: "🛡", color: "#f59e0b",
+          summary: "Akses diblokir jaringan kantor, Bos!",
+          explanation: `Sistem monitor mendeteksi RTO (Koneksi Ditolak) saat menghubungi server ${w.name || 'sosial media'}. Sebagai platform global yang sangat besar, server target hampir pasti aktif normal. Kemungkinan besar koneksi ke platform ini diblokir atau dibatasi oleh sistem firewall/kebijakan keamanan jaringan kantor tempat Anda berada.`,
+          recommendation: "Coba akses menggunakan data seluler di HP Anda (tanpa WiFi kantor). Jika di HP lancar, berarti firewall kantor Anda yang membatasi aksesnya."
+        }
+      }
+
+      if (!code && (rc.includes('RTO') || rc.includes('Time Out') || rc.includes('timeout') || rc.includes('ditolak') || rc.includes('refused') || rc.includes('diblokir') || rt > 12000 || rt === 0)) {
+        return {
+          title: "KONEKSI HTTPS TIDAK BERHASIL DIVERIFIKASI",
+          icon: "🔌", color: "#ef4444",
+          summary: "Alamat IP ditemukan, tapi request HTTPS ditolak atau timeout.",
+          explanation: "Sistem berhasil menemukan alamat IP target, namun proses koneksi HTTPS tidak selesai sehingga status SSL dan HTTP tidak dapat dipastikan.\n\nKemungkinan penyebab:\n• Timeout koneksi dari node monitoring\n• Firewall/proxy jaringan membatasi request tertentu\n• Gangguan TLS/HTTPS sementara\n• Pembatasan akses terhadap automated monitoring\n• Resource node monitoring sedang tinggi\n\nCatatan:\nWebsite target belum tentu benar-benar offline karena DNS masih aktif dan akses dapat berbeda tergantung jaringan pengguna.",
+          recommendation: "Coba akses secara manual di perangkat/jaringan berbeda. Jika web bisa dibuka, kemungkinan server target menolak automated monitoring atau firewall corporate menahan koneksi."
+        }
+      }
+
+      // 2a. Private Key Missing (Error #4 dari referensi)
+      if (rc.includes('PRIVATE_KEY')) {
+        return {
+          title: "PRIVATE KEY MISSING",
+          icon: "🔑", color: "#ef4444",
+          summary: "Kunci privat SSL tidak ditemukan di server!",
+          explanation: "Sertifikat SSL yang diinstal tidak memiliki pasangan Private Key yang cocok di web server. Akibatnya, website tidak bisa memuat HTTPS sama sekali.",
+          recommendation: "Lakukan pengajuan ulang (re-issue) sertifikat SSL dengan membuat CSR baru dan Private Key baru di server yang sama."
+        }
+      }
+
+      // 2b. ERR_SSL_PROTOCOL_ERROR (Error #5 dari referensi)
+      if (rc.includes('PROTOCOL_ERROR')) {
+        return {
+          title: "ERR_SSL_PROTOCOL_ERROR",
+          icon: "🚫", color: "#ef4444",
+          summary: "Browser gagal memverifikasi protokol keamanan!",
+          explanation: "Ada kesalahan pada protokol SSL yang bikin browser gagal memverifikasi koneksi aman. Bisa karena cache corrupt, firewall memblokir, atau sertifikat benar-benar rusak.",
+          recommendation: "1. Bersihkan cache & cookies browser. 2. Nonaktifkan antivirus/firewall sementara. 3. Update browser ke versi terbaru."
+        }
+      }
+
+      if (code === 404) {
+        return {
+          title: "HALAMAN TIDAK DITEMUKAN",
+          icon: "🔎", color: "#ef4444",
+          summary: "Halamannya gak ada, Bos! (404)",
+          explanation: `Server websitenya nyala, tapi dia bilang halaman yang kamu cari (${w.url}) itu gak terdaftar atau udah dihapus.`,
+          recommendation: "Cek lagi pengetikan alamatnya. Bisa jadi ada typo atau link-nya udah basi."
+        }
+      }
+
+      if (rt > 10000) {
+        return {
+          title: "LEMOT PARAH",
+          icon: "⏳", color: "#ef4444",
+          summary: "Respon website lambat banget (>10 detik), Bos!",
+          explanation: `Websitenya masih hidup, tapi loadingnya minta ampun lamanya (${(rt/1000).toFixed(1)} detik). Pengunjung bakal ngira websitenya rusak atau mati.`,
+          recommendation: "Cek beban resource server target, barangkali database-nya lagi overload."
+        }
+      }
+
+      if (sslValid === false) {
+        // Deteksi jika masalahnya adalah salah nama domain (Hostname Mismatch)
+        if (rc.includes('MISMATCH') || rc.includes('COCOK')) {
+          return {
+            title: "ALAMAT MUNGKIN SALAH",
+            icon: "🧐", color: "#ef4444",
+            summary: "Alamat web atau sertifikat gak cocok, Bos!",
+            explanation: `Sistem monitor dapet respon, tapi sertifikat keamanannya nggak cocok buat nama domain '${w.name}'. Ini sering terjadi kalau ada salah ketik alamat (kayak hasil eksperimen kamu) atau servernya belum dikonfigurasi bener buat domain ini.`,
+            recommendation: "Coba cek lagi penulisan alamat websitenya, pastikan nggak ada huruf yang kelebihan atau kurang (typo)."
+          }
+        }
+
+        return {
+          title: "SSL TIDAK VALID",
+          icon: "🔒", color: "#ef4444",
+          summary: "Sertifikat keamanan (SSL) rusak, Bos!",
+          explanation: "Websitenya masih bisa dibuka, tapi browser bakal nampilin peringatan merah 'Koneksi Tidak Aman'. Ini biasanya karena sertifikatnya sudah expired.",
+          recommendation: "Segera perbarui atau pasang ulang sertifikat SSL/HTTPS websitenya."
+        }
+      }
+
+      if (isNodeCritical) {
+        return {
+          title: "BEBAN MONITOR KRITIS",
+          icon: "💻", color: "#ef4444",
+          summary: "Server pemantau kita lagi megap-megap, Bos!",
+          explanation: `Websitenya sih aman, tapi RAM/CPU dari server monitor kita udah di atas batas wajar (RAM: ${ram}%, CPU: ${cpu}%). Ini bisa bikin hasil pantauan telat.`,
+          recommendation: "Bisa coba restart service monitor atau tambah kapasitas RAM/CPU server kita."
+        }
+      }
+
       return {
-        title: "GANGGUAN TOTAL: Koneksi Terputus",
-        icon: "🔌", color: "#f43f5e",
-        summary: "Server Tidak Menjawab",
-        explanation: `Sistem mencoba menghubungi server selama ${rt}ms tapi tidak ada balasan. Ini seperti menelepon tapi tidak diangkat. Server mungkin sedang mati atau jaringan internet ke sana terputus.`,
-        recommendation: "Pastikan server sedang menyala dan tidak ada firewall yang memblokir akses."
+        title: "KONDISI KRITIS",
+        icon: "⚠", color: "#ef4444",
+        summary: "Ada masalah kritis pada performa website, Bos!",
+        explanation: "Websitenya masih online, tapi ada beberapa parameter penting (seperti kecepatan atau resource) yang kondisinya lagi gak sehat.",
+        recommendation: "Periksa detail parameter teknis di atas untuk mencari tahu penyebab pastinya."
       }
     }
 
-    if (sslValid === false) {
+    // 3. WARNING / DEGRADED Status (🟡 or 🟠 ONLINE)
+    // 3. WARNING / DEGRADED Status (🟡 or 🟠 ONLINE)
+    if (status === 'WARNING' || status === 'DEGRADED') {
+      const isProxy = rc.includes('PROKSI') || rc.includes('PROXY') || rc.includes('INTERSEPSI') || rc.includes('UNTRUSTED') || rc.includes('DIINTERSEPSI') || rc.includes('DIINTIP')
+      
+      // 3a. Kasus Mixed Content (Error #2 dari referensi)
+      if (rc.includes('MIXED CONTENT')) {
+        return {
+          title: "MIXED CONTENT DETECTED",
+          icon: "⚠️", color: "#f59e0b",
+          summary: "Website tidak sepenuhnya aman (Mixed Content)!",
+          explanation: "Website sudah pakai HTTPS, tapi ada gambar, skrip, atau stylesheet yang masih dimuat pakai HTTP biasa. Ini bikin ikon gembok di browser nggak muncul atau ada peringatan.",
+          recommendation: "Gunakan plugin 'Really Simple SSL' (jika pakai WordPress) atau ganti semua link 'http://' di kode website kamu menjadi 'https://' secara manual."
+        }
+      }
+
+      // 3b. Kasus Redirect Loop (Error #3 dari referensi)
+      if (rc.includes('REDIRECTS') || rc.includes('REDIRECT_LOOP')) {
+        return {
+          title: "TOO MANY REDIRECTS",
+          icon: "🔄", color: "#f59e0b",
+          summary: "Website terjebak perulangan pengalihan!",
+          explanation: "Ada kesalahan pengaturan URL atau konflik plugin yang bikin browser bolak-balik dialihkan (looping). Biasanya terjadi karena pengaturan HTTPS yang tabrakan.",
+          recommendation: "Pastikan alamat WordPress dan Website sudah menggunakan protokol HTTPS semua. Coba nonaktifkan plugin keamanan atau redirect satu per satu untuk mencari penyebabnya."
+        }
+      }
+
+      if (sslValid === false) {
+        if (isProxy) {
+          return {
+            title: "KONEKSI DIPANTAU (JARINGAN KANTOR)",
+            icon: "🛡️", color: "#f59e0b",
+            summary: "Jaringan kantor lagi 'memantau' akses ini, Bos!",
+            explanation: `Websitenya secara sistem aktif normal, tapi sistem keamanan kantor kamu (Firewall/Proxy) berada di tengah koneksi untuk memonitor traffic. Itulah alasan muncul peringatan 'Koneksi Tidak Privat' di browser. Kamu tetap bisa buka webnya, tapi keamanannya melewati filter kantor dulu.`,
+            recommendation: "Gak usah panik, ini kebijakan umum di jaringan kantor. Kalau mau akses yang bener-bener bebas pantauan, pakailah internet pribadi."
+          }
+        }
+
+        // NET::ERR_CERT_INVALID (Error #1 dari referensi)
+        return {
+          title: "NET::ERR_CERT_INVALID",
+          icon: "🔒", color: "#f59e0b",
+          summary: "Browser tidak bisa memverifikasi sertifikat SSL!",
+          explanation: "Ini bisa disebabkan oleh 3 hal: Sertifikat expired, nama domain tidak sesuai, atau otoritas penerbit sertifikat tidak diakui oleh browser.",
+          recommendation: "1. Cek masa berlaku SSL (Let's Encrypt hanya 90 hari). 2. Pastikan domain sudah sesuai. 3. Cek pengaturan waktu/tanggal di perangkat kamu."
+        }
+      }
+
+      if (rt > 5000) {
+        return {
+          title: "KONEKSI LAMBAT",
+          icon: "🐢", color: "#f59e0b",
+          summary: "Websitenya agak lemot nih, Bos!",
+          explanation: `Butuh waktu sekitar ${(rt/1000).toFixed(1)} detik buat ngerespon. Pengunjung mungkin bakal ngerasa loadingnya agak tersendat.`,
+          recommendation: "Optimalkan server atau kurangi beban file yang berat di halaman utama."
+        }
+      }
+
+      if (isNodeCritical) {
+        return {
+          title: "BEBAN MONITOR TINGGI",
+          icon: "💻", color: "#f59e0b",
+          summary: "Server pemantau kita lagi sibuk banget, Bos!",
+          explanation: `Websitenya lancar, cuma RAM server monitor kita (${ram}%) udah mau penuh. Untungnya sejauh ini pemantauan masih berjalan.`,
+          recommendation: "Pantau terus server monitor, lakukan pembersihan RAM jika diperlukan."
+        }
+      }
+
       return {
-        title: "BERISIKO: Masalah Keamanan",
-        icon: "🔒", color: "#f59e0b",
-        summary: "Sertifikat Keamanan Bermasalah (SSL)",
-        explanation: "Website ini menggunakan HTTPS tapi 'surat ijin'-nya (Sertifikat SSL) sudah kadaluarsa atau tidak cocok. Ini akan membuat browser memunculkan peringatan 'TIDAK AMAN' kepada pengguna.",
-        recommendation: "Perbarui sertifikat SSL website Anda segera."
+        title: "KONDISI KURANG OPTIMAL",
+        icon: "⚡", color: "#f59e0b",
+        summary: "Websitenya online, tapi ada sedikit kendala, Bos!",
+        explanation: "Secara umum bisa diakses, cuma ada beberapa indikator performa atau keamanan yang nilainya kurang dari standar normal.",
+        recommendation: "Coba cek bagian parameter yang berwarna kuning atau jingga ya."
       }
     }
 
-    if (code === 403 || code === 401) {
-      return {
-        title: "GANGGUAN AKSES: Pintu Terkunci",
-        icon: "🚫", color: "#d97706",
-        summary: "Akses Ditolak oleh Server",
-        explanation: "Server website aktif dan sehat, namun dia sengaja menolak memberikan akses ke sistem monitor kami. Ini sering terjadi jika server memiliki sistem keamanan (WAF) yang sangat ketat.",
-        recommendation: "Masukkan alamat IP monitor ke daftar putih (Whitelist) di server Anda."
-      }
-    }
-
-    if (code >= 500) {
-      return {
-        title: "GANGGUAN APLIKASI: Server Error",
-        icon: "💥", color: "#f43f5e",
-        summary: "Aplikasi di Server Mengalami Crash",
-        explanation: `Server membalas dengan kode kesalahan ${code}. Ini berarti koneksi internet aman, tapi aplikasi/website di dalam server tersebut gagal dijalankan karena ada error internal.`,
-        recommendation: "Periksa log error aplikasi di dalam server untuk melihat bagian yang rusak."
-      }
-    }
-
+    // 4. ONLINE Status (🟢 ONLINE)
     if (status === 'ONLINE') {
+      // 4a. Anti-Flapping validation in progress
+      if (rc.includes('MEMVALIDASI') || rc.includes('FLAPPING')) {
+        return {
+          title: "VALIDASI KESTABILAN JARINGAN",
+          icon: "🔄", color: "#f59e0b",
+          summary: "Sedang menguji kestabilan koneksi, Bos!",
+          explanation: "Sistem mendeteksi adanya kegagalan koneksi/respon (seperti RTO atau kegagalan SSL). Untuk menghindari alarm palsu (flapping), sistem monitor sementara menahan status dan melakukan verifikasi ulang apakah gangguan ini bersifat permanen.",
+          recommendation: "Tunggu pengecekan berikutnya (sekitar 1 menit) untuk melihat apakah status berubah menjadi OFFLINE atau kembali ONLINE normal."
+        }
+      }
+
+      // 4b. Falsy/Zero HTTP code or extremely slow response (e.g. timeout / RTO)
+      if (!code || rt > 12000) {
+        return {
+          title: "KONEKSI KURANG STABIL",
+          icon: "⏳", color: "#f59e0b",
+          summary: "Respon website lambat atau terputus, Bos!",
+          explanation: `Sistem mendeteksi waktu respon yang sangat lambat (${rt ? (rt/1000).toFixed(1) + ' detik' : 'Timeout'}) atau kegagalan respon HTTP. Kemungkinan rute jaringan lokal Anda sedang lambat atau server target sedang sibuk.`,
+          recommendation: "Coba akses secara manual di browser Anda untuk memastikan respon website saat ini."
+        }
+      }
+
+      // 4c. SSL warning check
+      if (sslValid === false) {
+        const isProxy = rc.includes('PROKSI') || rc.includes('PROXY') || rc.includes('INTERSEPSI') || rc.includes('UNTRUSTED') || rc.includes('DIINTERSEPSI') || rc.includes('DIINTIP')
+        
+        if (isProxy) {
+          return {
+            title: "AKSES TERFILTER (KANTOR)",
+            icon: "🛡️", color: "#f59e0b",
+            summary: "Akses web ini melewati filter harian, Bos!",
+            explanation: `Websitenya sehat walafiat, cuma sistem monitor kami mendeteksi adanya 'perantara' (Proxy/Firewall) dari jaringan kantor kamu yang ikut campur di koneksi SSL. Browser mungkin menganggap ini bahaya, padahal itu cuma sistem keamanan kantor yang lagi bekerja.`,
+            recommendation: "Gunakan koneksi pribadi jika butuh privasi maksimal saat membuka website ini."
+          }
+        }
+
+        return {
+          title: "SISTEM SEHAT (SSL PERINGATAN)",
+          icon: "⚠", color: "#f59e0b",
+          summary: "Websitenya online, tapi SSL bermasalah, Bos!",
+          explanation: `Websitenya online normal dan responsnya cepat (${rt}ms) serta DNS terhubung baik, namun sertifikat SSL-nya terdeteksi tidak valid atau tidak terpercaya.`,
+          recommendation: "Segera periksa konfigurasi SSL target agar pengguna tidak mendapati peringatan keamanan di browser."
+        }
+      }
+
+      // 4d. Server monitor high load (lowest priority)
+      if (isNodeCritical) {
+        return {
+          title: "BEBAN MONITOR TINGGI",
+          icon: "💻", color: "#f59e0b",
+          summary: "Websitenya lancar, tapi server monitor lelah, Bos!",
+          explanation: `Websitenya sih sehat walafiat dan bisa diakses cepat (${rt}ms), cuma server pemantau kita (Node Monitor) bebannya lagi tinggi banget (RAM: ${ram}%, CPU: ${cpu}%).`,
+          recommendation: "Tenang, websitenya aman kok. Cuma server pemantau kita aja yang perlu dicek biar gak nge-hang."
+        }
+      }
+
       return {
-        title: "SISTEM SEHAT: Kondisi Optimal",
+        title: "SISTEM SEHAT",
         icon: "✨", color: "#10b981",
-        summary: "Aplikasi Berjalan Normal",
-        explanation: `Semua parameter hijau. Aplikasi merespon dalam waktu ${rt}ms (${getLatencyDesc(rt)}), sertifikat keamanan valid, dan server memberikan akses penuh.`,
-        recommendation: "Teruskan pemantauan rutin untuk menjaga stabilitas."
+        summary: "Semua lancar aman, Bos!",
+        explanation: `Websitenya online normal, responsnya super cepet (${rt}ms), alamat DNS-nya terhubung baik, dan sertifikat SSL-nya aktif aman. Gak ada masalah sama sekali!`,
+        recommendation: "Semuanya mantap! Tetap pertahankan performa terbaiknya ya."
       }
     }
 
+    // Fallback
     return {
-      title: "KONDISI TIDAK DIKETAHUI",
-      icon: "❓", color: "#64748b",
-      summary: "Menunggu Data Terkumpul",
-      explanation: "Sistem belum memiliki cukup data untuk memberikan analisa narasi yang akurat.",
-      recommendation: "Tunggu beberapa saat selagi sistem mengumpulkan data."
+      title: "MENUNGGU DATA",
+      icon: "🔍", color: "#64748b",
+      summary: "Lagi ngumpulin data pantauan, Bos!",
+      explanation: "Sistem belum dapet cukup data buat ngasih analisa kondisi yang pas saat ini.",
+      recommendation: "Tunggu beberapa detik lagi ya, nanti analisanya bakal muncul otomatis."
     }
   }
+
+  useEffect(() => {
+    setAnalyzing(true)
+    const timer = setTimeout(() => {
+      const result = performAIAnalysis(website, sysHealth)
+      setAnalysis(result)
+      setAnalyzing(false)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [website.id, website.status, website.root_cause])
+
+  useEffect(() => {
+    if (!analyzing) {
+      const result = performAIAnalysis(website, sysHealth)
+      setAnalysis(result)
+    }
+  }, [sysHealth, website, analyzing])
 
   if (analyzing) return (
     <div style={{ background: 'linear-gradient(90deg, rgba(59,130,246,0.05), rgba(99,102,241,0.05))', borderRadius: 12, padding: '24px', border: '1px dashed rgba(99,102,241,0.3)', textAlign: 'center', marginTop: 16 }}>
@@ -298,6 +657,7 @@ function AnalisisKondisi({ website }) {
     </div>
   )
 
+  if (!analysis) return null
 
   return (
     <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -320,7 +680,7 @@ function AnalisisKondisi({ website }) {
           <div style={{ height: 1, background: 'var(--border)', margin: '15px 0' }} />
           
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: '0.05em' }}>PENJELASAN KONDISI:</div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-sub)', lineHeight: 1.6, marginBottom: 15 }}>{analysis.explanation}</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-sub)', lineHeight: 1.6, marginBottom: 15, whiteSpace: 'pre-line' }}>{analysis.explanation}</div>
           
           <div style={{ background: `${analysis.color}08`, border: `1px dashed ${analysis.color}44`, borderRadius: 10, padding: '12px 16px' }}>
             <div style={{ fontSize: 10, fontWeight: 900, color: analysis.color, marginBottom: 4, letterSpacing: '0.05em' }}>💡 SARAN TINDAKAN:</div>
@@ -373,6 +733,28 @@ export default function ServiceDetailModal({ website, onClose }) {
   const [tab, setTab] = useState('overview')
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
+  const [sysHealth, setSysHealth] = useState(cachedSysHealth)
+
+  useEffect(() => {
+    let active = true
+    const fetchSysHealth = async () => {
+      try {
+        const res = await systemAPI.getHealth()
+        if (res.data && active) {
+          setSysHealth(res.data)
+          cachedSysHealth = res.data
+        }
+      } catch (err) {
+        console.error("Failed to fetch system health:", err)
+      }
+    }
+    fetchSysHealth()
+    const timer = setInterval(fetchSysHealth, 5000)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [])
 
   const fetchLogs = useCallback(async (silent = false) => {
     if (!website?.id) return
@@ -393,10 +775,13 @@ export default function ServiceDetailModal({ website, onClose }) {
     fetchLogs()
   }, [fetchLogs])
 
-  // WebSocket Sync for Logs
+  // WebSocket Sync for Logs and System Health
   useGlobalWebSocket(useCallback((msg) => {
     if ((msg.type === 'monitor_update' || msg.type === 'status_change') && msg.payload.website_id === website?.id) {
       fetchLogs(true) // Silent update
+    } else if (msg.type === 'system_health') {
+      setSysHealth(msg.payload)
+      cachedSysHealth = msg.payload
     }
   }, [website?.id, fetchLogs]))
 
@@ -485,25 +870,65 @@ export default function ServiceDetailModal({ website, onClose }) {
           {/* ── OVERVIEW ── */}
           {tab === 'overview' && (
             <div>
-              <AnalisisKondisi website={website} />
-
               <div style={{ marginTop: 24, padding: '20px', background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 16 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 15, fontWeight: 900, letterSpacing: '0.05em' }}>DETAIL PARAMETER TEKNIS</div>
-                <InfoRow label="Status Saat Ini" value={<StatusBadge status={website.status} />} />
-                <InfoRow label="Kode Respon" value={getHttpDesc(website.status_code)} valueColor={!website.status_code ? '#ef4444' : undefined} />
-                <InfoRow label="Keamanan (SSL)" value={getSslDesc(website.ssl_valid)} valueColor={website.ssl_valid ? '#10b981' : (website.ssl_valid === false ? '#ef4444' : undefined)} />
-                <InfoRow label="Kecepatan Respon" value={`${fmt(website.response_time_ms)} — ${getLatencyDesc(website.response_time_ms)}`} />
-                <InfoRow label="Kesehatan Website" value={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 60, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ width: `${website.health_score || 0}%`, height: '100%', background: website.health_score > 80 ? '#10b981' : website.health_score > 50 ? '#f59e0b' : '#ef4444' }} />
-                    </div>
-                    <span style={{ color: website.health_score > 80 ? '#10b981' : website.health_score > 50 ? '#f59e0b' : '#ef4444' }}>{website.health_score || 0}%</span>
-                  </div>
-                } />
-                <InfoRow label="Alamat IP" value={website.ip_address || '—'} />
-                <InfoRow label="Pengecekan Terakhir" value={fmtTime(website.last_checked)} />
+                
+                <InfoRow 
+                  label="Status Web" 
+                  value={getStatusEmojiAndText(website.status)} 
+                  valueColor={website.status === 'ONLINE' ? '#10b981' : website.status === 'CRITICAL' ? '#f59e0b' : '#ef4444'} 
+                />
+                
+                <InfoRow 
+                  label="Status DNS" 
+                  value={getDnsStatus(website.status, website.dns_resolved)} 
+                  valueColor={website.dns_resolved ? '#10b981' : (website.status === 'OFFLINE' ? '#ef4444' : '#10b981')} 
+                />
+                
+                <InfoRow 
+                  label="Kode Respon (HTTP Code)" 
+                  value={getHttpCodeValue(website.status, website.status_code, website.root_cause)} 
+                  valueColor={website.status_code === 200 ? '#10b981' : (website.status === 'OFFLINE' ? 'var(--text-muted)' : '#ef4444')} 
+                />
+                
+                {/* Dynamic Row for Kecepatan Respon (TTFB) in Critical state */}
+                {website.status === 'CRITICAL' && (
+                  <InfoRow 
+                     label="Kecepatan Respon (TTFB)" 
+                     value={`${fmt(website.ttfb_latency_ms || website.response_time_ms)} — ${getLatencyDesc(website.ttfb_latency_ms || website.response_time_ms)}`} 
+                     valueColor="#f59e0b"
+                  />
+                )}
+                
+                <InfoRow 
+                  label="Status SSL" 
+                  value={getSslStatusText(website.status, website.ssl_valid, website.ssl_expiry_date, website.root_cause)} 
+                  valueColor={
+                    website.status === 'OFFLINE' ? 'var(--text-muted)' : 
+                    (getSslStatusText(website.status, website.ssl_valid, website.ssl_expiry_date, website.root_cause).includes('Peringatan') ? '#f59e0b' : 
+                    (website.ssl_valid ? '#10b981' : '#ef4444'))
+                  } 
+                />
+                
+                <InfoRow 
+                  label="Server Load (Node Monitor)" 
+                  value={getServerLoadText(sysHealth)} 
+                  valueColor={sysHealth && (sysHealth.backend_cpu > 80 || sysHealth.backend_ram > 85) ? '#ef4444' : '#10b981'} 
+                />
+                
+                <InfoRow 
+                  label="IP Address" 
+                  value={website.ip_address || '—'} 
+                />
+                
+                <InfoRow 
+                  label="Last Check" 
+                  value={fmtTime(website.last_checked)} 
+                />
               </div>
+              
+              {/* Analisis Narasi Kondisi */}
+              <AnalisisKondisi website={website} sysHealth={sysHealth} />
               
               <div style={{ marginTop: 20 }}>
                 <a href={website.url} target="_blank" rel="noopener noreferrer" 

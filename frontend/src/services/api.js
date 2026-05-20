@@ -35,9 +35,11 @@ export const websiteAPI = {
   create: (d, c)=>api.post('/websites', d, c), 
   update: (id, d, c)=>api.put(`/websites/${id}`, d, c), 
   delete: (id, c)=>api.delete(`/websites/${id}`, c), 
-  getLogs: (id, l=100, c)=>api.get(`/websites/${id}/logs?limit=${l}`, c) 
+  getLogs: (id, l=100, c)=>api.get(`/websites/${id}/logs?limit=${l}`, c),
+  recheck: (c)=>api.post('/websites/recheck', {}, c)
 }
 export const dashboardAPI = { getSummary: (c)=>api.get('/dashboard/summary', c) }
+export const systemAPI = { getHealth: (c)=>api.get('/system/health', c) }
 export const userAPI    = { getAll: (c)=>api.get('/users', c), promote: (id, c)=>api.post('/users/promote', {user_id:id}, c), demote: (id, c)=>api.post('/users/demote', {user_id:id}, c) }
 export const WS_URL     = `ws://${window.location.hostname}:8080/ws`
 export default api

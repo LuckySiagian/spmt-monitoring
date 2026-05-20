@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '../../store/theme'
+import { websiteAPI } from '../../services/api'
+import { showToast } from '../dashboard/Toast'
 
 const STATUS_COLORS = {
-  ONLINE: '#10b981', CRITICAL: '#f59e0b', OFFLINE: '#ef4444', UNKNOWN: '#4a5568',
+  ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#4a5568',
 }
 const STATUS_GLOW = {
-  ONLINE: 'rgba(16,185,129,0.4)', CRITICAL: 'rgba(245,158,11,0.6)',
-  OFFLINE: 'rgba(239,68,68,0.4)', UNKNOWN: 'rgba(74,85,104,0.2)',
+  ONLINE: 'rgba(16,185,129,0.4)', WARNING: 'rgba(245,158,11,0.6)', DEGRADED: 'rgba(249,115,22,0.6)', CRITICAL: 'rgba(239,68,68,0.6)',
+  OFFLINE: 'rgba(220,38,38,0.4)', UNKNOWN: 'rgba(74,85,104,0.2)',
 }
 
 function hexToRgb(hex) {
@@ -123,6 +125,22 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const [showMoreNodes, setShowMoreNodes] = useState(false)
   const [moreNodesSearch, setMoreNodesSearch] = useState('')
   const bgImgRef = useRef(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleManualRecheck = useCallback(async () => {
+    if (isRefreshing) return
+    setIsRefreshing(true)
+    try {
+      await websiteAPI.recheck()
+      showToast('Recheck triggered for all websites!', 'success')
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to trigger recheck', 'error')
+    } finally {
+      setTimeout(() => {
+        setIsRefreshing(false)
+      }, 1200)
+    }
+  }, [isRefreshing])
 
   useEffect(() => {
     const img = new Image()
@@ -215,8 +233,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       ctx.stroke()
 
       // Animated data packet
-      if (node.status === 'ONLINE' || node.status === 'CRITICAL') {
-        const speed = node.status === 'CRITICAL' ? 1.8 : 0.8
+      if (node.status !== 'OFFLINE' && node.status !== 'UNKNOWN') {
+        const speed = (node.status === 'CRITICAL' || node.status === 'DEGRADED') ? 1.8 : (node.status === 'WARNING' ? 1.2 : 0.8)
         const t2 = (timeRef.current * speed + node.x * 3 + node.y * 2) % 1
         let px, py
         if (topoMode === 'tree') {
@@ -256,7 +274,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       const glow = STATUS_GLOW[node.status] || STATUS_GLOW.UNKNOWN
       const isSel = node.id === selectedId
       const isHov = node.id === hoveredId
-      const isCrit = node.status === 'CRITICAL'
+      const isCrit = node.status === 'CRITICAL' || node.status === 'DEGRADED' || node.status === 'WARNING'
 
       // Node size - scales down as node count increases
       const baseR = websites.length > 70 ? 25 : (websites.length > 50 ? 30 : 35)
@@ -266,7 +284,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       if (isCrit) {
         const p = Math.abs(Math.sin(timeRef.current * 3))
         ctx.beginPath(); ctx.arc(nx, ny, r + (isHov ? 16 : 12) * p, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(245,158,11,${0.12 * p})`; ctx.fill()
+        const pulseColor = hexToRgb(color)
+        ctx.fillStyle = `rgba(${pulseColor},${0.12 * p})`; ctx.fill()
       }
 
       // Glow halo
@@ -444,6 +463,15 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-card)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', flex: isMobile ? 'none' : 1, height: isMobile ? '380px' : 'auto', position: 'relative', marginBottom: isMobile ? 12 : 0 }}>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .spin-anim {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
       {/* ── CENTRAL HOLOGRAM PANEL ── */}
       {hoveredNodeData && hoveredNodeObj && (
         <div style={{
@@ -540,6 +568,62 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               </button>
             ))}
           </div>
+
+          {/* Manual Refresh Button */}
+          <button
+            onClick={handleManualRecheck}
+            disabled={isRefreshing}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              background: isRefreshing ? 'var(--accent-light)' : 'rgba(99,102,241,0.1)',
+              border: `1px solid ${isRefreshing ? 'var(--accent)' : 'var(--border)'}`,
+              borderRadius: '8px',
+              padding: '6px 14px',
+              cursor: isRefreshing ? 'not-allowed' : 'pointer',
+              color: 'var(--accent)',
+              fontSize: '11px',
+              fontWeight: 900,
+              letterSpacing: '0.07em',
+              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              boxShadow: isRefreshing ? '0 0 10px var(--accent-light)' : 'none',
+              transform: isRefreshing ? 'scale(0.95)' : 'scale(1)',
+            }}
+            onMouseEnter={e => {
+              if (!isRefreshing) {
+                e.currentTarget.style.background = 'var(--accent-light)'
+                e.currentTarget.style.transform = 'scale(1.05)'
+                e.currentTarget.style.boxShadow = '0 0 8px var(--accent-light)'
+              }
+            }}
+            onMouseLeave={e => {
+              if (!isRefreshing) {
+                e.currentTarget.style.background = 'rgba(99,102,241,0.1)'
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.boxShadow = 'none'
+              }
+            }}
+          >
+            <svg
+              className={isRefreshing ? 'spin-anim' : ''}
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                transition: 'transform 0.5s ease',
+              }}
+            >
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            <span>{isRefreshing ? 'REFRESHING...' : 'REFRESH'}</span>
+          </button>
 
           {/* Node count */}
           <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-sub)', background: 'var(--accent-light)', padding: '2px 10px', borderRadius: 10, border: '1px solid var(--border)' }}>
