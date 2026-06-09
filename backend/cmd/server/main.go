@@ -35,7 +35,7 @@ func main() {
 
 	// ─── Database ─────────────────────────────────────────────
 	connStr := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s&pool_max_conns=50&pool_max_conn_idle_time=10m",
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s&pool_max_conns=10&pool_max_conn_idle_time=10m",
 		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBSSLMode,
 	)
 	pool, err := pgxpool.New(context.Background(), connStr)

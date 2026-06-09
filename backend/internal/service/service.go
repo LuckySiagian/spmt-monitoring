@@ -230,6 +230,10 @@ func (s *Service) GetAllWebsites(ctx context.Context) ([]*model.Website, error) 
 	return s.repo.GetAllWebsites(ctx)
 }
 
+func (s *Service) GetWebsiteByID(ctx context.Context, id uuid.UUID) (*model.Website, error) {
+	return s.repo.GetWebsiteByID(ctx, id)
+}
+
 func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequest) (*model.Website, error) {
 	existing, err := s.repo.GetAllWebsites(ctx)
 	if err == nil && len(existing) >= 100 {

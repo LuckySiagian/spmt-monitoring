@@ -662,15 +662,36 @@ export default function ServiceDetailModal({ website, onClose }) {
               return 'Kondisi operasional website belum dapat ditentukan.'
             }
 
-            const getHttpDesc = (code, error) => {
+            const getHttpDesc = (code, error, websiteName) => {
+              const w = websiteName || 'Website ini'
               if (error) return `Koneksi gagal dilakukan: ${error}.`
               if (!code) return 'Tidak menerima respon HTTP dari server (koneksi ditolak atau RTO).'
-              if (code === 200) return 'HTTP 200 OK: Permintaan sukses. Server memproses halaman dengan lancar.'
-              if (code === 403) return 'HTTP 403 Forbidden: Akses ditolak sistem keamanan server/WAF.'
-              if (code === 401) return 'HTTP 401 Unauthorized: Halaman terkunci dan memerlukan otentikasi login.'
-              if (code === 404) return 'HTTP 404 Not Found: Alamat halaman utama tidak ditemukan di server.'
-              if (code >= 500) return `HTTP ${code}: Server mengalami error internal/crash saat memproses halaman.`
-              return `HTTP ${code}: Server merespons dengan kode status ini.`
+              if (code >= 100 && code < 200) return `HTTP ${code}: Informasi sementara dari server ${w}. Proses permintaan masih berlangsung — ini normal dan biasanya tidak terlihat oleh pengguna biasa.`
+              if (code === 200) return `HTTP 200: ${w} merespons dengan sukses. Semua berjalan lancar — halaman berhasil dimuat seperti yang diharapkan.`
+              if (code === 201) return `HTTP 201: ${w} berhasil membuat data baru. Permintaan sukses diproses.`
+              if (code === 204) return `HTTP 204: ${w} berhasil menerima permintaan, tapi tidak ada konten yang perlu dikirimkan kembali. Ini normal untuk beberapa jenis permintaan.`
+              if (code === 301) return `HTTP 301: ${w} sudah pindah alamat secara permanen. Website ini telah bermigrasi ke URL baru — pengguna dan mesin pencari otomatis akan diarahkan ke alamat yang baru.`
+              if (code === 302) return `HTTP 302: ${w} untuk sementara waktu dialihkan ke halaman lain. Ini biasanya bersifat sementara, mungkin karena pemeliharaan atau pengalihan musiman.`
+              if (code === 304) return `HTTP 304: Konten ${w} tidak berubah sejak terakhir dikunjungi. Server menghemat bandwidth dengan menyuruh kita pakai data yang sudah tersimpan.`
+              if (code === 307) return `HTTP 307: ${w} mengalihkan permintaan ke alamat lain, tapi metode permintaannya tetap sama. Ini pengalihan sementara.`
+              if (code === 308) return `HTTP 308: ${w} sudah pindah permanen ke alamat baru — sama seperti 301, tapi metode permintaan dipertahankan.`
+              if (code >= 300 && code < 400) return `HTTP ${code}: ${w} mengalihkan (redirect) ke halaman lain. Biasanya ini terjadi kalau website pindah alamat atau sedang mengarahkan pengguna ke versi terbaru halaman.`
+              if (code === 400) return `HTTP 400: ${w} menolak permintaan alat pantau kami karena terdeteksi sebagai robot/bot. Ini bukan berarti website-nya error — server sengaja memblokir permintaan otomatis untuk keamanan. Tenang saja, Chrome bot kami akan tetap membuka langsung halaman ${w} seperti kamu buka pakai Chrome biasa — jadi kalau websitenya normal, hasilnya tetap ONLINE.`
+              if (code === 401) return `HTTP 401: ${w} seperti pintu rumah yang terkunci dan kamu tidak punya kuncinya. Server bilang: 'Kamu harus login dulu, kasih tau siapa kamu, baru saya kasih lihat isinya.' Ini wajar untuk website yang punya halaman khusus anggota atau admin — artinya website hidup, cuma perlu password dulu.`
+              if (code === 403) return `HTTP 403: ${w} seperti kamu mau masuk ke gedung, tapi satpamnya bilang: 'Maaf, kamu tidak diizinkan masuk.' Berbeda dengan 401 (tidak punya kunci), 403 ini kamu sudah dikenal tapi aksesmu diblokir. Biasanya karena sistem keamanan server (WAF) menganggap alat pantau kita mencurigakan. Banyak website pakai ini untuk memblokir akses otomatis dari bot.`
+              if (code === 404) return `HTTP 404: ${w} seperti kamu datang ke alamat rumah seseorang, tapi rumahnya tidak ada di sana — mungkin sudah pindah atau alamatnya salah. Server bilang: 'Maaf, halaman yang kamu cari tidak ada di sini.' Bisa karena URL-nya salah, halaman sudah dihapus, atau website belum selesai dibangun.`
+              if (code === 405) return `HTTP 405: ${w} tidak mengizinkan metode permintaan yang kita gunakan. Seperti kamu mau masuk pintu tapi kamu malah coba lewat jendela — cara minta aksesnya tidak sesuai dengan yang server harapkan.`
+              if (code === 408) return `HTTP 408: ${w} kehabisan waktu menunggu permintaan dari kita. Koneksi terlalu lambat atau terputus di tengah jalan — server sudah capek nunggu.`
+              if (code === 409) return `HTTP 409: ${w} mendeteksi adanya konflik — seperti kamu mau menyimpan data yang sama dua kali, atau ada bentrokan antara data baru dan lama di server.`
+              if (code === 410) return `HTTP 410: ${w} dulunya punya halaman ini, tapi sekarang sudah hilang dan tidak akan kembali. Beda dengan 404 yang 'tidak ditemukan', 410 ini 'sudah dihapus permanen'.`
+              if (code === 429) return `HTTP 429: ${w} seperti kamu pencet tombol bel rumah terlalu keras dan terlalu cepat — penghuni rumahnya bilang: 'Woy sabar dikit, jangan ngebell terus!' Server merasa kita minta akses terlalu banyak dalam waktu singkat, jadi dia minta kita jeda dulu. Biasanya sementara, setelah beberapa saat bisa akses lagi.`
+              if (code >= 400 && code < 500) return `HTTP ${code}: ${w} menolak permintaan — ada yang salah dari sisi pengirim. Ini bukan berarti server mati, tapi server menolak permintaan kita karena suatu alasan. Bisa karena akses diblokir, halaman tidak ditemukan, atau metode permintaan yang tidak sesuai.`
+              if (code === 500) return `HTTP 500: ${w} aplikasi-nya lagi error dari dalam — seperti mesin yang tiba-tiba mati karena ada komponen yang rusak. Bukan masalah koneksi atau jaringan, tapi perangkat lunak server-nya sendiri yang sedang bermasalah. Butuh dicek dan diperbaiki oleh tim teknis.`
+              if (code === 502) return `HTTP 502: ${w} seperti kamu menelepon seseorang, tapi yang angkat telepon bukan dia, malah orang lain yang juga bingung dan bilang: 'Maaf, yang kamu cari sedang tidak bisa dihubungi.' Server kita minta data ke server lain, tapi server lain itu tidak memberikan jawaban yang benar.`
+              if (code === 503) return `HTTP 503: ${w} seperti toko yang tutup sementara karena lagi sibuk atau lagi bersih-bersih. Servernya bilang: 'Hari ini lagi sibuk banget, coba lagi nanti ya.' Bisa karena website lagi maintenance, atau memang lagi kebanjiran pengunjung. Biasanya sementara dan akan normal lagi.`
+              if (code === 504) return `HTTP 504: ${w} seperti kamu nungguin temen yang janjian tapi tidak kunjung datang — setelah menunggu lama, kamu akhirnya pergi. Server kita sudah menunggu jawaban dari server lain tapi tidak kunjung dapat, akhirnya waktu habis dan kita anggap gagal.`
+              if (code >= 500 && code < 600) return `HTTP ${code}: ${w} mengalami kendala atau error dari dalam server. Ada komponen yang rusak atau crash di sisi server — perlu ditangani tim teknis.`
+              return `HTTP ${code}: Server ${w} merespons dengan kode status ini.`
             }
 
             const getResponseTimeDesc = (time) => {
@@ -770,6 +791,21 @@ export default function ServiceDetailModal({ website, onClose }) {
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                     {latestLog?.recommendation || website.recommendation || 'Halo! Sistem sedang menyiapkan penjelasan kondisi website Anda. Mohon tunggu sejenak.'}
                   </div>
+                  {screenshot && code && (code === 400 || code === 403 || code === 401) ? (
+                    <div style={{
+                      marginTop: 12,
+                      padding: '10px 14px',
+                      background: 'rgba(59,130,246,0.1)',
+                      border: '1px solid rgba(59,130,246,0.25)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      color: '#3b82f6',
+                      lineHeight: 1.5,
+                      fontWeight: 500
+                    }}>
+                      💡 <strong>Catatan:</strong> Alat pemantau otomatis kami sempat diblokir oleh <strong>{website?.name || 'website ini'}</strong> (HTTP {code}), namun Chrome bot berhasil membuka dan memverifikasi langsung halaman <strong>{website?.name || 'website ini'}</strong> — status yang ditampilkan sudah ditentukan berdasarkan hasil Chrome bot sebagai sumber kebenaran utama. Jadi meskipun alat otomatis kena blokir, hasil akhirnya tetap akurat.
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* 2. BOT CHROME */}
@@ -838,7 +874,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
                   <CardBox title="SERVICE HEALTH">
                     <CardRow label="Status" value={statusText} valueColor={boxColor} desc={getStatusDesc(latestLog?.status || website.status)} />
-                    <CardRow label="HTTP Code" value={getHttpCodeValue(latestLog?.status || website.status, code, ev?.http_error)} valueColor={codeColor} desc={getHttpDesc(code, ev?.http_error)} />
+                    <CardRow label="HTTP Code" value={getHttpCodeValue(latestLog?.status || website.status, code, ev?.http_error)} valueColor={codeColor} desc={getHttpDesc(code, ev?.http_error, website?.name)} />
                     <CardRow label="Response Time" value={rt ? `${rt} ms` : '—'} valueColor={rtColor} desc={getResponseTimeDesc(rt)} />
                     <CardRow label="TTFB" value={ev?.ttfb_ms ? `${ev.ttfb_ms} ms` : (latestLog?.ttfb_latency_ms ? `${latestLog.ttfb_latency_ms} ms` : '—')} desc={getTtfbDesc(ev?.ttfb_ms || latestLog?.ttfb_latency_ms)} />
                     <CardRow label="Last Check" value={fmtTimeOnly(latestLog?.checked_at || website.last_checked)} desc={fmtTimeOnly(latestLog?.checked_at || website.last_checked) !== '—' ? 'Waktu terakhir sistem memvalidasi keadaan website ini.' : 'Pengecekan belum dilakukan.'} />
