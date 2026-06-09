@@ -16,9 +16,11 @@ type Telemetry struct {
 	Timestamp     time.Time
 	
 	// DNS
-	DNSResolved   bool
-	IPAddress     string
-	DNSLatencyMs  int
+	DNSResolved    bool
+	IPAddress      string
+	AllResolvedIPs []string // Semua IP hasil DNS
+	IsPrivateIP    bool     // True if resolved IP is in private/intranet range (RFC 1918)
+	DNSLatencyMs   int
 	
 	// TCP / Network
 	TCPPortOpen   bool
@@ -32,14 +34,18 @@ type Telemetry struct {
 	TLSError      string
 
 	// HTTP / Application
-	HTTPStatus    int
-	ResponseTimeMs int
-	TTFBLatencyMs  int
-	ResponseBody  []byte // Might be truncated
-	HTTPError     string
+	HTTPStatus          int
+	ResponseTimeMs      int
+	TTFBLatencyMs       int
+	ResponseBody        []byte // Might be truncated
+	ResponseBodyPreview string // First 500 characters
+	ContentType         string // Content-Type header
+	ServerHeader        string // Server header
+	HTTPError           string
 	
 	// Headers / Context
 	Headers       map[string][]string
+	RedirectChain []string // Redirect chain URLs
 	IsCDN         bool
 	CDNProvider   string
 	
@@ -47,6 +53,8 @@ type Telemetry struct {
 	RedirectCount int
 	NetworkType   string // Office, Public, VPN (dari NetworkService)
 	NodeHealth    NodeHealth
+	Traceroute    string // Opsional
+	WhoisASN      string // Opsional
 }
 
 type NodeHealth struct {
@@ -90,17 +98,24 @@ const (
 	StatusSuspectedOutage  Status = "SUSPECTED_OUTAGE"
 	StatusOffline          Status = "OFFLINE"
 	StatusUnknown          Status = "UNKNOWN"
+	StatusInsufficientEvidence Status = "INSUFFICIENT_EVIDENCE"
 )
 
 // Conclusion is the final output of the Inference Engine.
 type Conclusion struct {
 	Status              Status
 	PrimaryRootCauseKey string   // Machine readable key (e.g., "ERR_CONNECTION_REFUSED")
-	PrimaryRootCauseMsg string   // Human readable explanation
+	
+	// Narrative Layers
+	Summary             string   // 1-2 sentence simple summary
+	TechnicalDetails    []string // List of technical facts based on evidence
+	Recommendation      string   // Actionable recommendation
+
 	ConfidenceScore     int      // 0 - 100
 	HealthScore         int      // 0 - 100
 	IsBrowserAccessible bool     // True if a user can actually see a page (even if it's a 403 or WAF)
 	Evidence            []Signal // The signals that led to this conclusion
+	RawEvidenceJSON     string   // Semua evidence dalam struktur JSON
 }
 
 // DiagnosticResult wraps the entire pipeline output.

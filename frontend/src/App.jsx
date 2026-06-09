@@ -10,12 +10,13 @@ import UsersPage from './pages/UsersPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TopBar from './components/dashboard/TopBar'
 import ServiceDetailModal from './components/dashboard/ServiceDetailModal'
+import ServerDetailModal from './components/dashboard/ServerDetailModal'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
 import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './services/api'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
-  const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
+  const SC = { ONLINE: '#10b981', WARNING: '#10b981', DEGRADED: '#10b981', CRITICAL: '#10b981', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
   const fmtTime = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
   return createPortal(
@@ -23,18 +24,18 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{
         width: 'min(540px,95vw)', height: 'calc(100vh - 86px)', marginRight: 12,
-        background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(99,102,241,0.2)', borderRadius: 14,
-        boxShadow: '0 16px 48px rgba(99,102,241,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'fadeIn 0.2s ease'
+        background: 'var(--bg-card)', backdropFilter: 'blur(20px)',
+        border: '1px solid var(--border-strong)', borderRadius: 14,
+        boxShadow: '0 16px 48px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'fadeIn 0.2s ease'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(255,255,255,0.95)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>🔔 All Notifications</div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Status change events this session ({notifications.length})</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Status change events this session ({notifications.length})</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {notifications.length > 0 && <button onClick={onClearAll} style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', color: '#dc2626', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Clear All</button>}
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
           </div>
         </div>
         {notifications.length === 0 ? (
@@ -52,9 +53,9 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>{n.name}</span>
-                    <span style={{ background: (SC[n.type] || '#64748b') + '18', color: SC[n.type] || '#64748b', border: `1px solid ${SC[n.type] || '#64748b'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
+                    <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
                   </div>
-                  {n.reason && <div style={{ fontSize: 11, color: '#64748b', marginBottom: 3 }}>{n.reason}</div>}
+                  {n.reason && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{n.reason}</div>}
                   <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fmtTime(n.ts)}</div>
                 </div>
                 <button onClick={() => onDelete?.(i)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✕</button>
@@ -151,10 +152,10 @@ function AboutModal({ onClose }) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 14, width: 500, maxWidth: '94vw', boxShadow: '0 16px 48px rgba(99,102,241,0.2)', animation: 'fadeIn 0.15s ease' }}>
+      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 14, width: 500, maxWidth: '94vw', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>ℹ️ About SPMT Monitoring</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18, padding: '14px', background: 'rgba(79,70,229,0.06)', borderRadius: 10, border: '1px solid rgba(79,70,229,0.1)' }}>
@@ -173,13 +174,13 @@ function AboutModal({ onClose }) {
           ].map(([t, d]) => (
             <div key={t} style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(99,102,241,0.03)', borderRadius: 8, border: '1px solid rgba(99,102,241,0.08)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{t}</div>
-              <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.6 }}>{d}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>{d}</div>
             </div>
           ))}
 
           {/* Sinergi Section */}
-          <div style={{ marginTop: 20, borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase' }}>Sinergi & Core Values</div>
+          <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase' }}>Sinergi & Core Values</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {[
                 { img: 'pelindo.png', title: 'PELINDO', desc: 'Integrasi layanan pelabuhan nasional.' },
@@ -187,11 +188,11 @@ function AboutModal({ onClose }) {
                 { img: 'bumn', title: 'BUMN', desc: 'Transformasi digital ekonomi nasional.' },
                 { img: 'akhlak', title: 'AKHLAK', desc: 'Nilai inti budaya kerja yang luhur.' }
               ].map(b => (
-                <div key={b.title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <div key={b.title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', background: 'var(--bg-main)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <img src={`/images/logos/${b.img}${b.img.includes('.') ? '' : '.png'}`} alt={b.title} style={{ height: 20, width: 'auto', maxWidth: 40, objectFit: 'contain' }} />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: 9, fontWeight: 900, color: 'var(--primary)' }}>{b.title}</span>
-                    <span style={{ fontSize: 8, color: '#64748b', lineHeight: 1.2 }}>{b.desc}</span>
+                    <span style={{ fontSize: 8, color: 'var(--text-muted)', lineHeight: 1.2 }}>{b.desc}</span>
                   </div>
                 </div>
               ))}
@@ -209,10 +210,10 @@ function LogoutModal({ onConfirm, onCancel }) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: '32px', width: 320, textAlign: 'center', boxShadow: '0 16px 48px rgba(99,102,241,0.2)', animation: 'fadeIn 0.15s ease' }}>
+      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: '32px', width: 320, textAlign: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>🚪</div>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Logout?</div>
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>Are you sure you want to logout?</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Are you sure you want to logout?</div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
           <button onClick={onCancel} style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--text-sub)', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
           <button onClick={onConfirm} style={{ background: 'linear-gradient(135deg,#dc2626,#ef4444)', border: 'none', color: 'var(--text)', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Logout</button>
@@ -913,7 +914,10 @@ function AppInner() {
         {activeNav === 'users' && isSuperAdmin && <UsersPage users={users} onUserUpdate={handleUserUpdate} />}
       </div>
 
-      {detailWebsiteId && (
+      {detailWebsiteId === 'spmt-server' && (
+        <ServerDetailModal onClose={() => setDetailWebsiteId(null)} />
+      )}
+      {detailWebsiteId && detailWebsiteId !== 'spmt-server' && (
         <ServiceDetailModal 
           website={websites.find(w => w.id === detailWebsiteId)} 
           onClose={() => setDetailWebsiteId(null)} 

@@ -18,6 +18,10 @@ func New(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) GetDB() *pgxpool.Pool {
+	return r.db
+}
+
 // ─── USER ────────────────────────────────────────────────────
 
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
@@ -101,7 +105,7 @@ func (r *Repository) UpdateUserPassword(ctx context.Context, userID uuid.UUID, p
 func (r *Repository) GetAllWebsites(ctx context.Context) ([]*model.Website, error) {
 	query := `
 		SELECT 
-			w.id, w.name, w.url, w.description, w.interval_seconds, w.created_at,
+			w.id, w.name, w.url, w.description, w.interval_seconds, w.save_screenshot, w.created_at,
 			COALESCE(l.status, 'UNKNOWN'), l.status_code, l.response_time_ms, l.ssl_valid, l.checked_at, COALESCE(l.ip_address, ''),
 			l.dns_latency_ms, l.tls_latency_ms, l.ttfb_latency_ms, COALESCE(l.health_score, 0), COALESCE(l.confidence, 0), COALESCE(l.is_browser_accessible, true), COALESCE(l.root_cause, ''),
 			COALESCE(l.final_reason, ''), COALESCE(l.final_decision_source, ''), COALESCE(l.resolver_stage, ''),
@@ -127,7 +131,7 @@ func (r *Repository) GetAllWebsites(ctx context.Context) ([]*model.Website, erro
 	for rows.Next() {
 		var w model.Website
 		if err := rows.Scan(
-			&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt,
+			&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.SaveScreenshot, &w.CreatedAt,
 			&w.Status, &w.StatusCode, &w.ResponseTimeMs, &w.SSLValid, &w.LastChecked, &w.IPAddress,
 			&w.DNSLatencyMs, &w.TLSLatencyMs, &w.TTFBLatencyMs, &w.HealthScore, &w.Confidence, &w.IsBrowserAccessible, &w.RootCause,
 			&w.FinalReason, &w.FinalDecisionSource, &w.ResolverStage, &w.SSLExpiryDate, &w.DNSResolved,
@@ -142,8 +146,8 @@ func (r *Repository) GetAllWebsites(ctx context.Context) ([]*model.Website, erro
 func (r *Repository) GetWebsiteByID(ctx context.Context, id uuid.UUID) (*model.Website, error) {
 	var w model.Website
 	row := r.db.QueryRow(ctx,
-		`SELECT id, name, url, description, interval_seconds, created_at FROM websites WHERE id = $1`, id)
-	err := row.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt)
+		`SELECT id, name, url, description, interval_seconds, save_screenshot, created_at FROM websites WHERE id = $1`, id)
+	err := row.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.SaveScreenshot, &w.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -153,11 +157,11 @@ func (r *Repository) GetWebsiteByID(ctx context.Context, id uuid.UUID) (*model.W
 func (r *Repository) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequest) (*model.Website, error) {
 	var w model.Website
 	row := r.db.QueryRow(ctx,
-		`INSERT INTO websites (id, name, url, description, interval_seconds, created_at)
-		 VALUES (uuid_generate_v4(), $1, $2, $3, $4, NOW())
-		 RETURNING id, name, url, description, interval_seconds, created_at`,
-		req.Name, req.URL, req.Description, req.IntervalSeconds)
-	err := row.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt)
+		`INSERT INTO websites (id, name, url, description, interval_seconds, save_screenshot, created_at)
+		 VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, NOW())
+		 RETURNING id, name, url, description, interval_seconds, save_screenshot, created_at`,
+		req.Name, req.URL, req.Description, req.IntervalSeconds, req.SaveScreenshot)
+	err := row.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.SaveScreenshot, &w.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -167,11 +171,11 @@ func (r *Repository) CreateWebsite(ctx context.Context, req model.CreateWebsiteR
 func (r *Repository) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.UpdateWebsiteRequest) (*model.Website, error) {
 	var w model.Website
 	row := r.db.QueryRow(ctx,
-		`UPDATE websites SET name=$1, url=$2, description=$3, interval_seconds=$4
-		 WHERE id=$5
-		 RETURNING id, name, url, description, interval_seconds, created_at`,
-		req.Name, req.URL, req.Description, req.IntervalSeconds, id)
-	err := row.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.CreatedAt)
+		`UPDATE websites SET name=$1, url=$2, description=$3, interval_seconds=$4, save_screenshot=$5
+		 WHERE id=$6
+		 RETURNING id, name, url, description, interval_seconds, save_screenshot, created_at`,
+		req.Name, req.URL, req.Description, req.IntervalSeconds, req.SaveScreenshot, id)
+	err := row.Scan(&w.ID, &w.Name, &w.URL, &w.Description, &w.IntervalSeconds, &w.SaveScreenshot, &w.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -544,3 +548,71 @@ func (r *Repository) MarkNotificationRead(ctx context.Context, eventID uuid.UUID
 	_, err := r.db.Exec(ctx, `UPDATE status_events SET is_read = TRUE WHERE id = $1`, eventID)
 	return err
 }
+
+// InsertAuditLog menyimpan record aktivitas audit operator
+func (r *Repository) InsertAuditLog(ctx context.Context, log *model.AuditLog) error {
+	_, err := r.db.Exec(ctx,
+		`INSERT INTO audit_logs (id, user_id, username, action, target, details, ip_address, created_at)
+		 VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, NOW())`,
+		log.UserID, log.Username, log.Action, log.Target, log.Details, log.IPAddress)
+	return err
+}
+
+func (r *Repository) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*model.WebsiteSLA, error) {
+	sla := &model.WebsiteSLA{
+		SLA24h: 100.0,
+		SLA7d:  100.0,
+		SLA30d: 100.0,
+	}
+
+	// Calculate 24h SLA
+	var total24h, online24h int
+	err := r.db.QueryRow(ctx, `
+		SELECT 
+			COALESCE(COUNT(*), 0) AS total,
+			COALESCE(COUNT(CASE WHEN status = 'ONLINE' THEN 1 END), 0) AS online
+		FROM monitoring_logs
+		WHERE website_id = $1 AND checked_at >= NOW() - INTERVAL '24 hours'
+	`, websiteID).Scan(&total24h, &online24h)
+	if err != nil {
+		return nil, fmt.Errorf("calculate 24h SLA: %w", err)
+	}
+	if total24h > 0 {
+		sla.SLA24h = (float64(online24h) / float64(total24h)) * 100.0
+	}
+
+	// Calculate 7d SLA
+	var total7d, online7d int
+	err = r.db.QueryRow(ctx, `
+		SELECT 
+			COALESCE(SUM(total_checks), 0) AS total,
+			COALESCE(SUM(online_checks), 0) AS online
+		FROM daily_aggregates
+		WHERE website_id = $1 AND day >= (NOW() - INTERVAL '7 days')::date
+	`, websiteID).Scan(&total7d, &online7d)
+	if err != nil {
+		return nil, fmt.Errorf("calculate 7d SLA: %w", err)
+	}
+	if total7d > 0 {
+		sla.SLA7d = (float64(online7d) / float64(total7d)) * 100.0
+	}
+
+	// Calculate 30d SLA
+	var total30d, online30d int
+	err = r.db.QueryRow(ctx, `
+		SELECT 
+			COALESCE(SUM(total_checks), 0) AS total,
+			COALESCE(SUM(online_checks), 0) AS online
+		FROM daily_aggregates
+		WHERE website_id = $1 AND day >= (NOW() - INTERVAL '30 days')::date
+	`, websiteID).Scan(&total30d, &online30d)
+	if err != nil {
+		return nil, fmt.Errorf("calculate 30d SLA: %w", err)
+	}
+	if total30d > 0 {
+		sla.SLA30d = (float64(online30d) / float64(total30d)) * 100.0
+	}
+
+	return sla, nil
+}
+

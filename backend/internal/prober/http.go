@@ -51,12 +51,8 @@ func NewHTTPProber() *HTTPProber {
 					return nil, fmt.Errorf("no IP found for host %s", host)
 				}
 
-				// SSRF Protection: Check if any resolved IP is private
-				for _, ip := range ips {
-					if isPrivateIP(ip) {
-						return nil, fmt.Errorf("SSRF prevention: blocked attempt to connect to private IP %s", ip.String())
-					}
-				}
+				// SSRF Protection: Disabled because this monitoring system is deployed
+				// inside Pelindo intranet to monitor both private and public IP targets.
 
 				// DNS Rebinding Mitigation: Dial the exact validated IP, not the hostname
 				safeAddr := net.JoinHostPort(ips[0].String(), port)
@@ -106,6 +102,7 @@ func (p *HTTPProber) Probe(ctx context.Context, target model.Website) (engine.Te
 				return fmt.Errorf("REDIRECT_LOOP")
 			}
 			telemetry.RedirectCount++
+			telemetry.RedirectChain = append(telemetry.RedirectChain, req.URL.String())
 			return nil
 		},
 	}
@@ -136,6 +133,11 @@ func (p *HTTPProber) Probe(ctx context.Context, target model.Website) (engine.Te
 			telemetry.DNSResolved = (info.Err == nil)
 			if len(info.Addrs) > 0 {
 				telemetry.IPAddress = info.Addrs[0].IP.String()
+				// Flag if the resolved IP is a private/intranet address (RFC 1918)
+				telemetry.IsPrivateIP = isPrivateIP(info.Addrs[0].IP)
+				for _, addr := range info.Addrs {
+					telemetry.AllResolvedIPs = append(telemetry.AllResolvedIPs, addr.IP.String())
+				}
 			}
 		},
 		ConnectStart: func(network, addr string) { tTcpStart = time.Now() },
@@ -191,6 +193,8 @@ func (p *HTTPProber) Probe(ctx context.Context, target model.Website) (engine.Te
 
 	telemetry.HTTPStatus = resp.StatusCode
 	telemetry.Headers = resp.Header
+	telemetry.ContentType = resp.Header.Get("Content-Type")
+	telemetry.ServerHeader = resp.Header.Get("Server")
 
 	// Check for common CDN signatures
 	serverHeader := resp.Header.Get("Server")
@@ -205,6 +209,12 @@ func (p *HTTPProber) Probe(ctx context.Context, target model.Website) (engine.Te
 	bodyBytes, readErr := io.ReadAll(limitedReader)
 	if readErr == nil {
 		telemetry.ResponseBody = bodyBytes
+		
+		previewLen := len(bodyBytes)
+		if previewLen > 500 {
+			previewLen = 500
+		}
+		telemetry.ResponseBodyPreview = string(bodyBytes[:previewLen])
 	}
 
 	return telemetry, nil

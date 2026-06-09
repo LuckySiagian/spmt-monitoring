@@ -48,6 +48,7 @@ type Website struct {
 	URL             string     `json:"url" db:"url"`
 	Description     string     `json:"description" db:"description"`
 	IntervalSeconds int        `json:"interval_seconds" db:"interval_seconds"`
+	SaveScreenshot  bool       `json:"save_screenshot" db:"save_screenshot"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
 	Status          string     `json:"status,omitempty"`
 	StatusCode      *int       `json:"status_code,omitempty"`
@@ -74,6 +75,7 @@ type CreateWebsiteRequest struct {
 	URL             string `json:"url"`
 	Description     string `json:"description"`
 	IntervalSeconds int    `json:"interval_seconds"`
+	SaveScreenshot  bool   `json:"save_screenshot"`
 }
 
 type UpdateWebsiteRequest struct {
@@ -81,6 +83,7 @@ type UpdateWebsiteRequest struct {
 	URL             string `json:"url"`
 	Description     string `json:"description"`
 	IntervalSeconds int    `json:"interval_seconds"`
+	SaveScreenshot  bool   `json:"save_screenshot"`
 }
 
 // ─── Monitoring Log ──────────────────────────────────────────
@@ -259,21 +262,106 @@ type SystemHealth struct {
 	BackendRAM       float64   `json:"backend_ram"`
 	MonitorLatencyMs int       `json:"monitor_latency_ms"`
 	UpdatedAt        time.Time `json:"updated_at"`
+	PublicIP         string    `json:"public_ip"`
+	NetworkType      string    `json:"network_type"`
+	NetworkName      string    `json:"network_name"`
+	InterfaceAlias   string    `json:"interface_alias"`
+	LocalGateway     string    `json:"local_gateway"`
+	DNSResolver      string    `json:"dns_resolver"`
 }
 
 // ─── Network Context ──────────────────────────────────────────
 
 type NetworkContext struct {
-	PublicIP     string    `json:"public_ip"`
-	LocalGateway string    `json:"local_gateway"`
-	DNSResolver  string    `json:"dns_resolver"`
-	ASN          string    `json:"asn"`
-	Provider     string    `json:"provider"`
-	NetworkType  string    `json:"network_type"` // OFFICE, PUBLIC, VPN, UNKNOWN
-	UpdatedAt    time.Time `json:"updated_at"`
+	PublicIP       string    `json:"public_ip"`
+	LocalGateway   string    `json:"local_gateway"`
+	DNSResolver    string    `json:"dns_resolver"`
+	ASN            string    `json:"asn"`
+	Provider       string    `json:"provider"`
+	NetworkType    string    `json:"network_type"` // OFFICE, PUBLIC, VPN, UNKNOWN
+	InterfaceAlias string    `json:"interface_alias"`
+	ConnectionName string    `json:"connection_name"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type WSNetworkContextUpdate struct {
 	Type    string         `json:"type"`
 	Context NetworkContext `json:"context"`
 }
+
+// ─── Audit Log ────────────────────────────────────────────────
+
+type AuditLog struct {
+	ID        uuid.UUID `json:"id" db:"id"`
+	UserID    *uuid.UUID `json:"user_id,omitempty" db:"user_id"`
+	Username  string    `json:"username" db:"username"`
+	Action    string    `json:"action" db:"action"`
+	Target    string    `json:"target" db:"target"`
+	Details   string    `json:"details" db:"details"`
+	IPAddress string    `json:"ip_address" db:"ip_address"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// ─── Incidents & Maintenance ───────────────────────────────────
+
+type Incident struct {
+	ID             uuid.UUID  `json:"id" db:"id"`
+	WebsiteID      uuid.UUID  `json:"website_id" db:"website_id"`
+	WebsiteName    string     `json:"website_name,omitempty" db:"website_name"`
+	Title          string     `json:"title" db:"title"`
+	Status         string     `json:"status" db:"status"` // TRIGGERED, ACKNOWLEDGED, INVESTIGATING, RESOLVED, CLOSED
+	Severity       string     `json:"severity" db:"severity"`
+	AssignedUserID *uuid.UUID `json:"assigned_user_id" db:"assigned_user_id"`
+	AssignedName   *string    `json:"assigned_name,omitempty" db:"assigned_name"`
+	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
+	ResolvedAt     *time.Time `json:"resolved_at" db:"resolved_at"`
+	ClosedAt       *time.Time `json:"closed_at" db:"closed_at"`
+}
+
+type MaintenanceWindow struct {
+	ID            uuid.UUID  `json:"id" db:"id"`
+	WebsiteID     *uuid.UUID `json:"website_id" db:"website_id"`
+	WebsiteName   *string    `json:"website_name,omitempty" db:"website_name"`
+	StartTime     time.Time  `json:"start_time" db:"start_time"`
+	EndTime       time.Time  `json:"end_time" db:"end_time"`
+	Description   string     `json:"description" db:"description"`
+	CreatedBy     *uuid.UUID `json:"created_by" db:"created_by"`
+	CreatedByName *string    `json:"created_by_name,omitempty" db:"created_by_name"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+}
+
+type IncidentComment struct {
+	ID         uuid.UUID `json:"id" db:"id"`
+	IncidentID uuid.UUID `json:"incident_id" db:"incident_id"`
+	UserID     uuid.UUID `json:"user_id" db:"user_id"`
+	Username   string    `json:"username" db:"username"`
+	Comment    string    `json:"comment" db:"comment"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+}
+
+type IncidentHistory struct {
+	ID         uuid.UUID  `json:"id" db:"id"`
+	IncidentID uuid.UUID  `json:"incident_id" db:"incident_id"`
+	UserID     *uuid.UUID `json:"user_id" db:"user_id"`
+	Username   string     `json:"username" db:"username"`
+	Action     string     `json:"action" db:"action"`
+	Details    string     `json:"details" db:"details"`
+	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+}
+
+type WebsiteSLA struct {
+	SLA24h float64 `json:"sla_24h"`
+	SLA7d  float64 `json:"sla_7d"`
+	SLA30d float64 `json:"sla_30d"`
+}
+
+type AIChatMessage struct {
+	Role    string `json:"role"`    // "user" or "model"
+	Message string `json:"message"`
+}
+
+type AIChatRequest struct {
+	Message string          `json:"message"`
+	History []AIChatMessage `json:"history"`
+}
+

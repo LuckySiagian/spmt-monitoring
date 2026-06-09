@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { dashboardAPI, websiteAPI } from '../services/api'
+import { dashboardAPI, websiteAPI, incidentAPI } from '../services/api'
 import { useGlobalWebSocket } from '../store/WebSocketContext'
 import NetworkTopology from '../components/topology/NetworkTopology'
 import StatusPanel from '../components/dashboard/StatusPanel'
@@ -8,12 +8,26 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
   const [selectedId, setSelectedId] = useState(null)
   const prevStatusRef = useRef({})
   const lastSummaryFetchRef = useRef(0)
+  const [activeIncidents, setActiveIncidents] = useState([])
+
+  const loadActiveIncidents = useCallback(async () => {
+    try {
+      const res = await incidentAPI.getAll()
+      const active = (res.data || []).filter(inc => inc.status !== 'RESOLVED' && inc.status !== 'CLOSED')
+      setActiveIncidents(active)
+    } catch (e) {}
+  }, [])
+
+  useEffect(() => {
+    loadActiveIncidents()
+    const iv = setInterval(loadActiveIncidents, 10000)
+    return () => clearInterval(iv)
+  }, [loadActiveIncidents])
 
   const handleWsMessage = useCallback((msg) => {
     if (msg.type === 'monitor_update') {
       const p = msg.payload
       onWebsitesUpdate?.(prev => {
-        // Find existing index for O(1)-like update performance
         const idx = prev.findIndex(w => w.id === p.website_id)
         if (idx === -1) return prev
         const newArr = [...prev]
@@ -38,7 +52,6 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
         return newArr
       });
 
-      // Throttle summary update to max once every 2 seconds to prevent "Event Storm" DoS
       const now = Date.now()
       if (now - lastSummaryFetchRef.current > 2000) {
         lastSummaryFetchRef.current = now
@@ -49,21 +62,28 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
     if (msg.type === 'status_change') {
       const p = msg.payload
       onNewNotification?.({ type: p.new_status, name: p.website, websiteId: p.website_id, url: p.url, oldStatus: p.old_status, reason: p.root_cause, ip: p.ip_address, responseTime: p.response_time_ms, ts: Date.now(), read: false })
+      loadActiveIncidents()
     }
-  }, [onWebsitesUpdate, onSummaryUpdate, onNewNotification, setWsConnected])
+  }, [onWebsitesUpdate, onSummaryUpdate, onNewNotification, setWsConnected, loadActiveIncidents])
 
   useGlobalWebSocket(handleWsMessage)
   const handleOpenDetail = useCallback(p => onOpenDetail(websites.find(w => w.id === p.id) || p), [websites, onOpenDetail])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {/* Responsive grid — automatically stacks on mobile via CSS class */}
       <div className="dashboard-grid">
         <div style={s.topo}>
           <NetworkTopology websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} wsConnected={wsConnected} />
         </div>
         <div style={s.status}>
-          <StatusPanel websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} realtimeSnapshot={realtimeSnapshot} />
+          <StatusPanel 
+            websites={websites} 
+            selectedId={selectedId} 
+            onSelect={setSelectedId} 
+            onOpenDetail={handleOpenDetail} 
+            realtimeSnapshot={realtimeSnapshot} 
+            activeIncidents={activeIncidents}
+          />
         </div>
       </div>
     </div>

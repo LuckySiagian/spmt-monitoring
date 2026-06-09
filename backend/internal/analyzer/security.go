@@ -72,16 +72,16 @@ func (a *SecurityAnalyzer) Analyze(t engine.Telemetry) []engine.Signal {
 	if t.HTTPStatus == 403 || isWafBody || (isWafHeader && t.HTTPStatus >= 400 && t.HTTPStatus != 404) {
 		signals = append(signals, engine.Signal{
 			Name:        "POSSIBLE_WAF_BLOCK",
-			Description: "Access likely blocked by a Web Application Firewall or security policy.",
-			Severity:    engine.SeverityCritical,
+			Description: "Access likely blocked by a Web Application Firewall, CDN, or Geo-blocking policy.",
+			Severity:    engine.SeverityWarning,
 		})
 	}
 
 	if isCaptcha {
 		signals = append(signals, engine.Signal{
 			Name:        "CAPTCHA_DETECTED",
-			Description: "Target is demanding a CAPTCHA challenge.",
-			Severity:    engine.SeverityCritical,
+			Description: "Target is demanding a CAPTCHA challenge. Access is restricted.",
+			Severity:    engine.SeverityWarning,
 		})
 	}
 

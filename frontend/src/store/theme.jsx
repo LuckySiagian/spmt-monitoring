@@ -44,17 +44,16 @@ export const TRANSLATIONS = {
 }
 
 export const THEME_OPTIONS = [
-  { id: 'theme-crystal-cyan', name: 'Crystal Cyan', color: '#00d1b2', dark: false },
-  { id: 'theme-emerald-mint', name: 'Emerald Mint', color: '#00b894', dark: false },
-  { id: 'theme-solar-amber', name: 'Solar Amber', color: '#f39c12', dark: false },
-  { id: 'theme-electric-sky', name: 'Electric Sky', color: '#3498db', dark: false },
-  { id: 'theme-plasma-pink', name: 'Plasma Pink', color: '#e056fd', dark: false },
-  { id: 'theme-obsidian-soft', name: 'Soft Obsidian', color: '#2d3436', dark: false },
+  { id: 'theme-light', name: 'Light Mode', color: '#3b82f6', dark: false },
+  { id: 'theme-dark', name: 'Dark Mode', color: '#00d1b2', dark: true }
 ]
 
 export function ThemeProvider({ children }) {
   const [lang] = useState('en')
-  const [themeId, setThemeId] = useState(() => localStorage.getItem('spmt_theme') || 'theme-light')
+  const [themeId, setThemeId] = useState(() => {
+    const saved = localStorage.getItem('spmt_theme')
+    return saved === 'theme-light' || saved === 'theme-dark' ? saved : 'theme-light'
+  })
 
   // The theme is now applied locally in App.jsx to prevent affecting Public/Login pages
 

@@ -172,68 +172,71 @@ body::before {
   min-height: 100vh;
 }
 
-/* â”€â”€ Base Theme: Light Sci-Fi (Cyber-Clean) â”€â”€ */
-:root {
+/* ── Base Theme: Light Mode (Anti-Glare Soft Slate) ── */
+:root,
+.theme-light {
   /* Core Colors */
-  --primary: #001f3f; /* Deep Blue from P logo */
-  --bg-main: #f8fafc;
-  --bg-card: rgba(255, 255, 255, 0.9);
-  --bg-header: rgba(255, 255, 255, 0.95);
-  --border: rgba(0, 0, 0, 0.08);
-  --border-strong: rgba(0, 0, 0, 0.15);
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --shadow-glow: 0 0 15px rgba(0, 0, 0, 0.05);
-  --text: #0f172a;
-  --text-sub: #334155;
+  --primary: #001f3f; /* Deep Navy Blue */
+  --bg-main: #eef2f6; /* Soft, cool slate gray background */
+  --bg-card: #fafbfc; /* Anti-glare soft off-white card */
+  --bg-header: #f1f5f9; /* Soft gray header */
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  --shadow-glow: 0 0 15px rgba(0, 31, 63, 0.04);
+  --text: #1e293b; /* Softer slate dark text to reduce stark contrast */
+  --text-sub: #475569;
   --text-muted: #64748b;
   
-  /* Status Colors (Gradients & Solid) */
-  --status-online: #00f2fe;
-  --status-online-to: #4facfe;
-  --status-warning: #f59e0b;
-  --status-degraded: #f97316;
-  --status-critical: #ef4444;
+  /* Status Colors */
+  --status-online: #10b981;
+  --status-online-to: #059669;
+  --status-warning: #d97706;
+  --status-degraded: #ea580c;
+  --status-critical: #d97706;
   --status-offline: #dc2626;
   
-  --accent: var(--primary);
-  --accent-light: rgba(0, 31, 63, 0.05);
+  --accent: #3b82f6; /* Vibrant blue for light accent interactive elements */
+  --accent-light: rgba(59, 130, 246, 0.06);
   
-  --grid-color: rgba(0, 0, 0, 0.04);
+  --grid-color: rgba(0, 0, 0, 0.02);
   --header-height: 80px;
   --container-padding: 24px;
+  --bg-hover: rgba(59, 130, 246, 0.03);
 }
 
-/* â”€â”€ LIGHT SCI-FI PALETTES â”€â”€ */
-.theme-crystal-cyan {
+/* ── Base Theme: Dark Mode (Eye-Care Space Slate) ── */
+.theme-dark {
+  /* Core Colors */
+  --primary: #00d1b2; /* Cyber Teal/Cyan */
+  --bg-main: #0f172a; /* Slate 900 soft midnight background */
+  --bg-card: #1e293b; /* Slate 800 comfortable card background */
+  --bg-header: #182232; /* Soft dark header */
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --shadow-glow: 0 0 20px rgba(0, 209, 178, 0.08);
+  --text: #f1f5f9; /* Bright off-white text for clear readability */
+  --text-sub: #cbd5e1; /* Brighter secondary text */
+  --text-muted: #94a3b8; /* Boosted muted text — clearly readable */
+  
+  /* Status Colors */
+  --status-online: #34d399;
+  --status-online-to: #10b981;
+  --status-warning: #fbbf24;
+  --status-degraded: #f97316;
+  --status-critical: #fbbf24;
+  --status-offline: #f87171;
+  
   --accent: #00d1b2;
   --accent-light: rgba(0, 209, 178, 0.15);
-  --border: rgba(0, 209, 178, 0.25);
+  
+  --grid-color: rgba(255, 255, 255, 0.04);
+  --header-height: 80px;
+  --container-padding: 24px;
+  --bg-hover: rgba(255, 255, 255, 0.06);
 }
-.theme-emerald-mint {
-  --accent: #00b894;
-  --accent-light: rgba(0, 184, 148, 0.15);
-  --border: rgba(0, 184, 148, 0.25);
-}
-.theme-solar-amber {
-  --accent: #f39c12;
-  --accent-light: rgba(243, 156, 18, 0.15);
-  --border: rgba(243, 156, 18, 0.25);
-}
-.theme-electric-sky {
-  --accent: #3498db;
-  --accent-light: rgba(52, 152, 219, 0.15);
-  --border: rgba(52, 152, 219, 0.25);
-}
-.theme-plasma-pink {
-  --accent: #e056fd;
-  --accent-light: rgba(224, 86, 253, 0.15);
-  --border: rgba(224, 86, 253, 0.25);
-}
-.theme-obsidian-soft {
-  --accent: #2d3436;
-  --accent-light: rgba(45, 52, 54, 0.15);
-  --border: rgba(45, 52, 54, 0.25);
-}
+
 
 .topbar {
   display: flex !important;
@@ -328,40 +331,38 @@ body::before {
 .metric-card.m-avg-rt   { border-left-color: #8b5cf6 !important; color: #8b5cf6; }
 .metric-card.m-alerts   { border-left-color: #f97316 !important; color: #f97316; }
 
-/* â”€â”€ LIGHT THEME VARIANTS: Dark Backgrounds, Solid White Text â”€â”€ */
-[class*="theme-light"] .metric-card { background: #f1f5f9; color: #1e293b; border-color: #e2e8f0; } /* Default fallback */
-[class*="theme-light"] .metric-card.m-online   { background: #064E3B !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-critical { background: #92400E !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-offline  { background: #991B1B !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-unknown  { background: #1e293b !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-sla      { background: #1e3a8a !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-total    { background: #334155 !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-avg-rt   { background: #4c1d95 !important; color: #ffffff !important; }
-[class*="theme-light"] .metric-card.m-alerts   { background: #7c2d12 !important; color: #ffffff !important; }
+/* ── LIGHT THEME VARIANTS: Soft Backgrounds, High-Contrast Text ── */
+[class*="theme-light"] .metric-card { background: #e2e8f0; color: #334155; border-color: #cbd5e1; } /* Default fallback */
+[class*="theme-light"] .metric-card.m-online   { background: rgba(16, 185, 129, 0.08) !important; color: #047857 !important; border-color: rgba(16, 185, 129, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-critical { background: rgba(245, 158, 11, 0.08) !important; color: #b45309 !important; border-color: rgba(245, 158, 11, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-offline  { background: rgba(220, 38, 38, 0.08) !important; color: #b91c1c !important; border-color: rgba(220, 38, 38, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-unknown  { background: rgba(100, 116, 139, 0.08) !important; color: #475569 !important; border-color: rgba(100, 116, 139, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-sla      { background: rgba(59, 130, 246, 0.08) !important; color: #1d4ed8 !important; border-color: rgba(59, 130, 246, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-total    { background: rgba(71, 85, 105, 0.08) !important; color: #334155 !important; border-color: rgba(71, 85, 105, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-avg-rt   { background: rgba(139, 92, 246, 0.08) !important; color: #6d28d9 !important; border-color: rgba(139, 92, 246, 0.25) !important; }
+[class*="theme-light"] .metric-card.m-alerts   { background: rgba(249, 115, 22, 0.08) !important; color: #c2410c !important; border-color: rgba(249, 115, 22, 0.25) !important; }
 
-/* â”€â”€ DARK THEME VARIANTS: Bright Backgrounds, Solid Black Text â”€â”€ */
-[class*="theme-dark"] .metric-card { background: #0f172a; color: #f1f5f9; border-color: #1e293b; } /* Default fallback */
-[class*="theme-dark"] .metric-card.m-online   { background: #34D399 !important; color: #000000 !important; border-color: #10b981 !important; }
-[class*="theme-dark"] .metric-card.m-critical { background: #FBBF24 !important; color: #000000 !important; border-color: #f59e0b !important; }
-[class*="theme-dark"] .metric-card.m-offline  { background: #F87171 !important; color: #000000 !important; border-color: #ef4444 !important; }
-[class*="theme-dark"] .metric-card.m-unknown  { background: #94A3B8 !important; color: #000000 !important; border-color: #64748b !important; }
-[class*="theme-dark"] .metric-card.m-sla      { background: #60A5FA !important; color: #000000 !important; border-color: #3b82f6 !important; }
-[class*="theme-dark"] .metric-card.m-total    { background: #CBD5E1 !important; color: #000000 !important; border-color: #475569 !important; }
-[class*="theme-dark"] .metric-card.m-avg-rt   { background: #A78BFA !important; color: #000000 !important; border-color: #8b5cf6 !important; }
-[class*="theme-dark"] .metric-card.m-alerts   { background: #FB923C !important; color: #000000 !important; border-color: #f97316 !important; }
+[class*="theme-dark"] .metric-card.m-online   { background: #10b981 !important; color: #000000 !important; border-color: #10b981 !important; }
+[class*="theme-dark"] .metric-card.m-critical { background: #f59e0b !important; color: #000000 !important; border-color: #f59e0b !important; }
+[class*="theme-dark"] .metric-card.m-offline  { background: #ef4444 !important; color: #000000 !important; border-color: #ef4444 !important; }
+[class*="theme-dark"] .metric-card.m-unknown  { background: #94a3b8 !important; color: #000000 !important; border-color: #94a3b8 !important; }
+[class*="theme-dark"] .metric-card.m-sla      { background: #3b82f6 !important; color: #000000 !important; border-color: #3b82f6 !important; }
+[class*="theme-dark"] .metric-card.m-total    { background: #cbd5e1 !important; color: #000000 !important; border-color: #cbd5e1 !important; }
+[class*="theme-dark"] .metric-card.m-avg-rt   { background: #8b5cf6 !important; color: #000000 !important; border-color: #8b5cf6 !important; }
+[class*="theme-dark"] .metric-card.m-alerts   { background: #f97316 !important; color: #000000 !important; border-color: #f97316 !important; }
 
-/* â”€â”€ NAV BUTTON HIGH CONTRAST SYNC â”€â”€ */
+/* ── NAV BUTTON HIGH CONTRAST SYNC ── */
 [class*="theme-light"] .nav-btn-custom.active {
-  background: #0f172a !important; /* Solid Dark */
+  background: #3b82f6 !important; /* Soft warm blue */
   color: #ffffff !important;
-  border-color: #334155 !important;
+  border-color: #2563eb !important;
 }
 
 [class*="theme-dark"] .nav-btn-custom.active {
-  background: #f8fafc !important; /* Solid Bright */
-  color: #000000 !important;
-  border-color: #ffffff !important;
-  box-shadow: 0 0 15px rgba(255,255,255,0.3) !important;
+  background: rgba(0, 209, 178, 0.15) !important; /* Soft glowing teal */
+  color: #00d1b2 !important;
+  border-color: #00d1b2 !important;
+  box-shadow: 0 0 15px rgba(0, 209, 178, 0.15) !important;
 }
 
 /* Remove any glowing/shadow from metric numbers permanently */
@@ -556,7 +557,7 @@ tr {
 }
 
 tr:hover {
-  background: rgba(0, 31, 63, 0.03) !important;
+  background: var(--bg-hover) !important;
 }
 
 /* Modern Badges */

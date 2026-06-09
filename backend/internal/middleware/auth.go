@@ -91,3 +91,8 @@ func GetRole(ctx context.Context) model.Role {
 	role, _ := ctx.Value(CtxUserRole).(model.Role)
 	return role
 }
+
+func GetUsername(ctx context.Context) string {
+	username, _ := ctx.Value(CtxUsername).(string)
+	return username
+}

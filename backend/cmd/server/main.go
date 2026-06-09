@@ -14,6 +14,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spmt/monitoring/internal/config"
 	"github.com/spmt/monitoring/internal/handler"
 	"github.com/spmt/monitoring/internal/middleware"
@@ -57,6 +58,7 @@ func main() {
 
 	// ─── Network Monitoring ───────────────────────────────────
 	netSvc := service.NewNetworkService(hub, workerPool.RevalidateAll)
+	workerPool.SetNetworkReader(netSvc)
 	go netSvc.Start(context.Background())
 
 	// ─── Start services ───────────────────────────────────────
@@ -86,6 +88,8 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	r.Handle("/metrics", promhttp.Handler())
+
 	// Auth routes (public)
 	r.Post("/auth/login", h.Login)
 	r.Post("/auth/register", h.Register)
@@ -100,22 +104,45 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(cfg.JWTSecret))
 
+		r.Post("/auth/logout", h.Logout)
+
 		// Dashboard (all authenticated users)
 		r.Get("/dashboard/summary", h.GetDashboardSummary)
 		r.Get("/system/health", h.GetSystemHealth)
 		r.Get("/dashboard/history", h.GetStatusHistory)
 		r.Get("/websites/{id}/logs", h.GetWebsiteLogs)
+		r.Post("/websites/{id}/chat", h.ChatWithWebsiteAI)
+		r.Get("/websites/{id}/sla", h.GetWebsiteSLA)
 		r.Get("/websites/{id}/events", h.GetWebsiteEvents)
 		r.Get("/dashboard/events", h.GetAllStatusEvents)
 		r.Get("/websites", h.GetWebsites)
 		r.Post("/websites/recheck", h.RecheckWebsites)
 
-		// Website management (admin + superadmin)
+		// Incidents & Maintenance (all authenticated users)
+		r.Get("/incidents", h.GetIncidents)
+		r.Get("/incidents/{id}", h.GetIncident)
+		r.Get("/incidents/{id}/comments", h.GetIncidentComments)
+		r.Post("/incidents/{id}/comments", h.AddIncidentComment)
+		r.Get("/incidents/{id}/history", h.GetIncidentHistory)
+		r.Get("/maintenance-windows", h.GetMaintenanceWindows)
+
+		// Website management & Incident operations (admin + superadmin)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireRole(model.RoleAdmin, model.RoleAdminPelindo, model.RoleSuperAdmin))
 			r.Post("/websites", h.CreateWebsite)
 			r.Put("/websites/{id}", h.UpdateWebsite)
 			r.Delete("/websites/{id}", h.DeleteWebsite)
+
+			// Incident actions
+			r.Post("/incidents/{id}/acknowledge", h.AcknowledgeIncident)
+			r.Post("/incidents/{id}/assign", h.AssignIncident)
+			r.Post("/incidents/{id}/resolve", h.ResolveIncident)
+			r.Post("/incidents/{id}/reopen", h.ReopenIncident)
+			r.Post("/incidents/{id}/close", h.CloseIncident)
+
+			// Maintenance windows actions
+			r.Post("/maintenance-windows", h.CreateMaintenanceWindow)
+			r.Delete("/maintenance-windows/{id}", h.DeleteMaintenanceWindow)
 		})
 
 		// Notifications (all authenticated users)

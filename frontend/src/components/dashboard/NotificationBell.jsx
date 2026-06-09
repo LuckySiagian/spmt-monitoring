@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { notificationAPI } from '../../services/api'
 
-const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#64748b' }
+const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#eab308', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
 const SI = { ONLINE: '🟢', WARNING: '🟡', DEGRADED: '🟠', CRITICAL: '🔴', OFFLINE: '🔴', UNKNOWN: '⚪' }
 const DD_ID = 'spmt-notif-dd'
 const getDomain = url => { try { return new URL(url).hostname } catch { return null } }
@@ -12,19 +12,19 @@ function NotifDetailModal({ n, onClose }) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 14, width: 400, maxWidth: '92vw', boxShadow: '0 16px 48px rgba(99,102,241,0.2)', animation: 'fadeIn 0.15s ease' }}>
+      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 14, width: 400, maxWidth: '92vw', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {domain && <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={18} height={18} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 4 }} />}
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.name}</span>
-            <span style={{ background: (SC[n.type] || '#64748b') + '18', color: SC[n.type] || '#64748b', border: `1px solid ${SC[n.type] || '#64748b'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
+            <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '6px 18px 18px' }}>
-          {[['Status Change', <><span style={{ color: SC[n.oldStatus] || '#64748b', fontWeight: 600 }}>{n.oldStatus || '—'}</span><span style={{ color: '#cbd5e1', margin: '0 8px' }}>→</span><span style={{ color: SC[n.type] || 'var(--text)', fontWeight: 700 }}>{n.type}</span></>],
+          {[['Status Change', <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)', fontWeight: 600 }}>{n.oldStatus || '—'}</span><span style={{ color: 'var(--text-sub)', margin: '0 8px' }}>→</span><span style={{ color: SC[n.type] || 'var(--text)', fontWeight: 700 }}>{n.type}</span></>],
           ['Root Cause', <span style={{ color: '#d97706' }}>{n.reason || '—'}</span>],
-          n.ip && ['IP', <span style={{ color: '#64748b' }}>{n.ip}</span>],
+          n.ip && ['IP', <span style={{ color: 'var(--text-muted)' }}>{n.ip}</span>],
           n.responseTime != null && ['Response', <span style={{ color: n.responseTime > 3000 ? '#d97706' : '#059669' }}>{n.responseTime}ms</span>],
           n.url && ['URL', <span style={{ color: '#4f46e5', fontSize: 11, wordBreak: 'break-all' }}>{n.url}</span>],
           ['Time', <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{new Date(n.ts).toLocaleString('id-ID', { hour12: false })}</span>],
@@ -47,12 +47,12 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
   if (!rect) return null
   const fmt = ts => new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   return createPortal(
-    <div id={DD_ID} style={{ position: 'fixed', top: rect.bottom + 6, right: window.innerWidth - rect.right, width: 340, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(20px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, boxShadow: '0 8px 32px rgba(99,102,241,0.18)', zIndex: 99990, overflow: 'hidden', animation: 'fadeIn 0.15s ease' }}>
+    <div id={DD_ID} style={{ position: 'fixed', top: rect.bottom + 6, right: window.innerWidth - rect.right, width: 340, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 99990, overflow: 'hidden', animation: 'fadeIn 0.15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'var(--bg-card)' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>🔔 Notifications</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {unread > 0 && <button style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)', color: '#4f46e5', borderRadius: 4, padding: '2px 8px', fontSize: 9, fontWeight: 700, cursor: 'pointer' }} onClick={onMarkAll}>Mark all read</button>}
-          <span style={{ fontSize: 10, color: '#64748b' }}>{unread > 0 ? `${unread} unread` : 'All read'}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{unread > 0 ? `${unread} unread` : 'All read'}</span>
         </div>
       </div>
       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
@@ -70,11 +70,10 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
                     {n.name}{!n.read && <span style={{ fontSize: 8, background: '#f0ededff', color: 'var(--text)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>NEW</span>}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {n.oldStatus && <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)' }}>{n.oldStatus}</span><span style={{ color: '#000000ff', margin: '0 4px' }}>→</span></>}
+                    {n.oldStatus && <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)' }}>{n.oldStatus}</span><span style={{ color: 'var(--text-sub)', margin: '0 4px' }}>→</span></>}
                     <span style={{ color: SC[n.type] || 'var(--text-muted)', fontWeight: 600 }}>{n.type}</span>
                   </div>
-                  {n.reason && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{n.reason}</div>}
-                  <div style={{ fontSize: 10, color: '#cbd5e1', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{fmt(n.ts)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{fmt(n.ts)}</div>
                 </div>
                 <span style={{ color: '#cbd5e1', fontSize: 12, flexShrink: 0 }}>›</span>
               </div>
@@ -90,10 +89,11 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
 }
 
 export default function NotificationBell({ notifications = [], onMarkRead, onMarkAllRead, onNavigate }) {
+  const filteredNotifs = notifications.filter(n => n.type === 'ONLINE' || n.type === 'OFFLINE')
   const [open, setOpen] = useState(false)
   const [detail, setDetail] = useState(null)
   const bellRef = useRef(null)
-  const unread = notifications.filter(n => !n.read).length
+  const unread = filteredNotifs.filter(n => !n.read).length
 
   const [isHovered, setIsHovered] = useState(false)
 
@@ -144,7 +144,7 @@ export default function NotificationBell({ notifications = [], onMarkRead, onMar
           )}
         </button>
       </div>
-      {open && <NotifDropdown notifications={notifications} unread={unread} bellRef={bellRef} onMarkAll={handleMarkAll} onItemClick={handleItemClick} onViewAll={handleViewAll} />}
+      {open && <NotifDropdown notifications={filteredNotifs} unread={unread} bellRef={bellRef} onMarkAll={handleMarkAll} onItemClick={handleItemClick} onViewAll={handleViewAll} />}
       {detail && <NotifDetailModal n={detail} onClose={() => setDetail(null)} />}
     </>
   )

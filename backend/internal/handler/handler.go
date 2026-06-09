@@ -52,6 +52,24 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
+
+	// Write audit log for login
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+	h.svc.WriteAuditLog(r.Context(), &model.AuditLog{
+		UserID:    &resp.User.ID,
+		Username:  resp.User.Username,
+		Action:    "LOGIN",
+		Target:    "self",
+		Details:   "User logged in successfully",
+		IPAddress: ip,
+	})
+
 	respond(w, http.StatusOK, resp)
 }
 
@@ -150,6 +168,9 @@ func (h *Handler) PromoteUser(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.writeAuditLog(r, "PROMOTE_USER", req.UserID, "Promoted user to admin")
+
 	respond(w, http.StatusOK, map[string]string{"message": "user promoted to admin"})
 }
 
@@ -164,6 +185,9 @@ func (h *Handler) DemoteUser(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.writeAuditLog(r, "DEMOTE_USER", req.UserID, "Demoted user to viewer")
+
 	respond(w, http.StatusOK, map[string]string{"message": "user demoted to viewer"})
 }
 
@@ -225,6 +249,25 @@ func (h *Handler) RecheckWebsites(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, map[string]string{"message": "recheck triggered for all websites"})
 }
 
+func (h *Handler) RecheckOneWebsite(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid website id")
+		return
+	}
+
+	site, err := h.svc.GetWebsiteByID(r.Context(), id)
+	if err != nil || site == nil {
+		respondError(w, http.StatusNotFound, "website not found")
+		return
+	}
+
+	log.Printf("[Handler] Manual single recheck triggered for website: %s (%s)", site.Name, site.ID)
+	go h.pool.TriggerManualCheck(*site)
+	respond(w, http.StatusOK, map[string]string{"message": "recheck triggered for " + site.Name})
+}
+
 func (h *Handler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 	var req model.CreateWebsiteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -240,6 +283,8 @@ func (h *Handler) CreateWebsite(w http.ResponseWriter, r *http.Request) {
 
 	// Trigger immediate check and start ticker for new website
 	go h.pool.RestartWebsite(*site)
+
+	h.writeAuditLog(r, "CREATE_WEBSITE", site.ID.String(), "Created website: "+site.Name+" ("+site.URL+")")
 
 	respond(w, http.StatusCreated, site)
 }
@@ -265,6 +310,9 @@ func (h *Handler) UpdateWebsite(w http.ResponseWriter, r *http.Request) {
 	}
 	// BUG FIX #10: restart worker agar monitoring pakai URL/config terbaru
 	go h.pool.RestartWebsite(*site)
+
+	h.writeAuditLog(r, "UPDATE_WEBSITE", site.ID.String(), "Updated website: "+site.Name+" ("+site.URL+")")
+
 	respond(w, http.StatusOK, site)
 }
 
@@ -280,8 +328,29 @@ func (h *Handler) DeleteWebsite(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	h.writeAuditLog(r, "DELETE_WEBSITE", idStr, "Deleted website ID: "+idStr)
+
 	respond(w, http.StatusOK, map[string]string{"message": "website deleted"})
 }
+
+func (h *Handler) GetWebsiteSLA(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid website id")
+		return
+	}
+
+	sla, err := h.svc.GetWebsiteSLA(r.Context(), id)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respond(w, http.StatusOK, sla)
+}
+
 
 // ─── DASHBOARD ───────────────────────────────────────────────
 
@@ -322,6 +391,35 @@ func (h *Handler) GetWebsiteLogs(w http.ResponseWriter, r *http.Request) {
 		logs = []*model.MonitoringLog{}
 	}
 	respond(w, http.StatusOK, logs)
+}
+
+func (h *Handler) ChatWithWebsiteAI(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid website id")
+		return
+	}
+
+	var req model.AIChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Message == "" {
+		respondError(w, http.StatusBadRequest, "message cannot be empty")
+		return
+	}
+
+	response, err := h.svc.ChatWithWebsiteAI(r.Context(), id, req)
+	if err != nil {
+		log.Printf("[Handler] ChatWithWebsiteAI Error: %v", err)
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respond(w, http.StatusOK, map[string]string{"response": response})
 }
 
 // ─── WEBSOCKET ───────────────────────────────────────────────
@@ -412,6 +510,9 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.writeAuditLog(r, "CREATE_USER", user.ID.String(), "Created user: "+user.Username+" with role "+string(user.Role))
+
 	respond(w, http.StatusCreated, user)
 }
 
@@ -422,6 +523,9 @@ func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	h.writeAuditLog(r, "DELETE_USER", idStr, "Deleted user ID: "+idStr)
+
 	respond(w, http.StatusOK, map[string]string{"message": "user deleted"})
 }
 
@@ -468,4 +572,39 @@ func (h *Handler) GetStatusDistribution(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	respond(w, http.StatusOK, dist)
+}
+
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	h.writeAuditLog(r, "LOGOUT", "self", "User logged out successfully")
+	respond(w, http.StatusOK, map[string]string{"message": "logged out successfully"})
+}
+
+func (h *Handler) writeAuditLog(r *http.Request, action, target, details string) {
+	ctx := r.Context()
+	userID := middleware.GetUserID(ctx)
+	username := middleware.GetUsername(ctx)
+
+	var uID *uuid.UUID
+	if userID != uuid.Nil {
+		uID = &userID
+	}
+
+	ip := r.Header.Get("X-Forwarded-For")
+	if ip == "" {
+		ip = r.Header.Get("X-Real-IP")
+	}
+	if ip == "" {
+		ip = r.RemoteAddr
+	}
+
+	audit := &model.AuditLog{
+		UserID:    uID,
+		Username:  username,
+		Action:    action,
+		Target:    target,
+		Details:   details,
+		IPAddress: ip,
+	}
+
+	h.svc.WriteAuditLog(ctx, audit)
 }
