@@ -264,7 +264,7 @@ func (h *Handler) RecheckOneWebsite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[Handler] Manual single recheck triggered for website: %s (%s)", site.Name, site.ID)
-	go h.pool.TriggerManualCheck(*site)
+	go h.pool.TriggerCheck(*site)
 	respond(w, http.StatusOK, map[string]string{"message": "recheck triggered for " + site.Name})
 }
 

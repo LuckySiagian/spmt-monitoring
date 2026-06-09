@@ -134,9 +134,6 @@ func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Servi
 func (p *Pool) Start() {
 	// Increased worker size for production scalability (handled up to 500 sites)
 	size := p.workerSize
-	if size < 50 {
-		size = 50
-	}
 
 	slog.Info("Starting lightweight workers", slog.Int("size", size))
 	if os.Getenv("DISABLE_CHROME_DIAGNOSTIC") == "true" {
@@ -665,6 +662,13 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	req.Header.Set("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7,ms;q=0.6")
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("Sec-Fetch-Dest", "document")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	req.Header.Set("Sec-Fetch-Site", "none")
+	req.Header.Set("Sec-Fetch-User", "?1")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	req.Header.Set("Priority", "u=0, i")
 
 	var tDnsStart, tTlsStart, tTcpStart time.Time
 	var tDnsEnd, tTlsEnd, tTcpEnd, tTtfbEnd time.Time
@@ -791,8 +795,8 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	shouldRunHeadless := false
 	if os.Getenv("DISABLE_CHROME_DIAGNOSTIC") == "true" {
 		// Headless Chrome is disabled to save memory / CPU locally
-	} else if w.SaveScreenshot {
-		// If save_screenshot is enabled, we always run Chrome to capture the screenshot on every check
+	} else {
+		// Chrome always runs as the decision maker (screenshot only captured when enabled)
 		shouldRunHeadless = true
 	}
 
@@ -1143,6 +1147,9 @@ func (p *Pool) correlateInvestigation(l *model.MonitoringLog, w model.Website, e
 				rtVal = *l.ResponseTimeMs
 			}
 			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Pemantau kami berhasil memuat halaman website dengan judul \"%s\" menggunakan browser Chrome. Semua parameter terpantau normal: HTTP Code %d OK, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s. Semua layanan tampak berjalan dengan baik dan dapat diakses oleh pengguna.", w.Name, titleText, httpCode, rtVal, sslStr, pingStr)
+			if httpCode == 400 || httpCode == 403 || httpCode == 401 {
+				interpretation += fmt.Sprintf(" — Catatan: **%s** memblokir alat pemantau otomatis kami (HTTP %d), namun Chrome bot berhasil memverifikasi bahwa website berjalan normal. Status ini sudah ditentukan berdasarkan hasil Chrome bot sebagai sumber kebenaran utama.", w.Name, httpCode)
+			}
 			recommendedAction = append(recommendedAction, "Tidak ada tindakan diperlukan.")
 		}
 	} else {
