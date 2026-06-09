@@ -36,7 +36,9 @@ export const websiteAPI = {
   update: (id, d, c)=>api.put(`/websites/${id}`, d, c), 
   delete: (id, c)=>api.delete(`/websites/${id}`, c), 
   getLogs: (id, l=100, c)=>api.get(`/websites/${id}/logs?limit=${l}`, c),
-  recheck: (c)=>api.post('/websites/recheck', {}, c)
+  getSLA: (id, c)=>api.get(`/websites/${id}/sla`, c),
+  recheck: (c)=>api.post('/websites/recheck', {}, c),
+  chatAI: (id, message, history=[], c)=>api.post(`/websites/${id}/chat`, { message, history }, c)
 }
 export const dashboardAPI = { getSummary: (c)=>api.get('/dashboard/summary', c) }
 export const systemAPI = { getHealth: (c)=>api.get('/system/health', c) }
@@ -52,3 +54,23 @@ export const historyAPI = {
 export const eventsAPI       = { getAll: (l=100, c)=>api.get(`/dashboard/events?limit=${l}`, c), getByWebsite: (id, l=50, c)=>api.get(`/websites/${id}/events?limit=${l}`, c) }
 export const notificationAPI = { getUnreadCount: (c)=>api.get('/notifications/unread-count', c), markAllRead: (c)=>api.post('/notifications/mark-all-read', {}, c) }
 export const userAdminAPI    = { create: (d, c)=>api.post('/users/create', d, c), delete: (id, c)=>api.delete(`/users/${id}`, c) }
+
+export const incidentAPI = {
+  getAll: (c) => api.get('/incidents', c),
+  getByID: (id, c) => api.get(`/incidents/${id}`, c),
+  acknowledge: (id, c) => api.post(`/incidents/${id}/acknowledge`, {}, c),
+  assign: (id, targetUserId, c) => api.post(`/incidents/${id}/assign`, { user_id: targetUserId }, c),
+  resolve: (id, c) => api.post(`/incidents/${id}/resolve`, {}, c),
+  reopen: (id, c) => api.post(`/incidents/${id}/reopen`, {}, c),
+  close: (id, c) => api.post(`/incidents/${id}/close`, {}, c),
+  getComments: (id, c) => api.get(`/incidents/${id}/comments`, c),
+  addComment: (id, text, c) => api.post(`/incidents/${id}/comments`, { comment: text }, c),
+  getHistory: (id, c) => api.get(`/incidents/${id}/history`, c)
+}
+
+export const maintenanceAPI = {
+  getAll: (c) => api.get('/maintenance-windows', c),
+  create: (d, c) => api.post('/maintenance-windows', d, c),
+  delete: (id, c) => api.delete(`/maintenance-windows/${id}`, c)
+}
+

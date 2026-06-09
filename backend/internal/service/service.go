@@ -441,3 +441,12 @@ func (s *Service) GetStatusDistribution(ctx context.Context) (map[string]float64
 	}
 	return dist, nil
 }
+
+func (s *Service) WriteAuditLog(ctx context.Context, log *model.AuditLog) error {
+	return s.repo.InsertAuditLog(ctx, log)
+}
+
+func (s *Service) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*model.WebsiteSLA, error) {
+	return s.repo.GetWebsiteSLA(ctx, websiteID)
+}
+

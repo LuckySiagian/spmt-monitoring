@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spmt/monitoring/internal/config"
+	"github.com/spmt/monitoring/internal/model"
 	"github.com/spmt/monitoring/internal/repository"
 )
 
@@ -29,9 +30,131 @@ func (s *Service) NotifyStatusChange(websiteName, oldStatus, newStatus, rootCaus
 	// 1. Send to Telegram (Global Group)
 	s.sendTelegram(websiteName, oldStatus, newStatus, rootCause)
 
-	// 2. Send to Emails (All Registered Users) - TEMPORARILY DISABLED DUE TO LIMITS
+	// 2. Send to Emails (All Registered Users) - TEMPORARILY DISABLED FOR REVISION
 	// s.sendEmails(websiteName, oldStatus, newStatus, rootCause)
 }
+
+func (s *Service) NotifyEscalation(inc *model.Incident) {
+	message := fmt.Sprintf(
+		"🚨 *ALERT ESCALATION* 🚨\n\n"+
+			"*Incident:* %s\n"+
+			"*Severity:* %s\n"+
+			"*Triggered At:* %s\n\n"+
+			"⚠️ This incident has been unacknowledged for more than 5 minutes! Please assign or acknowledge immediately.",
+		inc.Title, inc.Severity, inc.CreatedAt.Format("2006-01-02 15:04:05 MST"),
+	)
+	s.sendTelegramCustom(message)
+
+	// TEMPORARILY DISABLED FOR REVISION
+	// s.sendEmailCustom("Incident Escalation Alert: "+inc.Title, message)
+}
+
+func (s *Service) sendTelegramCustom(message string) {
+	if s.cfg.TelegramToken == "" {
+		return
+	}
+
+	var chatIDs []string
+	if s.cfg.TelegramChatID != "" {
+		chatIDs = append(chatIDs, s.cfg.TelegramChatID)
+	}
+
+	// Fetch all users to get their telegram IDs
+	users, err := s.repo.GetAllUsers(context.Background())
+	if err == nil {
+		for _, u := range users {
+			if u.TelegramID != nil && *u.TelegramID != "" {
+				chatIDs = append(chatIDs, *u.TelegramID)
+			}
+		}
+	}
+
+	if len(chatIDs) == 0 {
+		return
+	}
+
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", s.cfg.TelegramToken)
+	sent := make(map[string]bool)
+
+	for _, chatID := range chatIDs {
+		if sent[chatID] {
+			continue
+		}
+		data := url.Values{}
+		data.Set("chat_id", chatID)
+		data.Set("text", message)
+		data.Set("parse_mode", "Markdown")
+
+		resp, err := http.PostForm(apiURL, data)
+		if err == nil {
+			resp.Body.Close()
+		}
+		sent[chatID] = true
+	}
+}
+
+func (s *Service) sendEmailCustom(subject string, plainBody string) {
+	if s.cfg.SMTPHost == "" || s.cfg.SMTPUser == "" {
+		return
+	}
+
+	users, err := s.repo.GetAllUsers(context.Background())
+	if err != nil {
+		return
+	}
+
+	var recipients []string
+	for _, u := range users {
+		if u.Email != "" {
+			recipients = append(recipients, u.Email)
+		}
+	}
+
+	if len(recipients) == 0 {
+		return
+	}
+
+	fromAddr := s.cfg.SMTPFrom
+	if strings.Contains(fromAddr, "<") {
+		start := strings.Index(fromAddr, "<")
+		end := strings.Index(fromAddr, ">")
+		if start != -1 && end != -1 {
+			fromAddr = fromAddr[start+1 : end]
+		}
+	}
+
+	subjectHeader := fmt.Sprintf("Subject: [SPMT] %s\r\n", subject)
+	fromHeader := fmt.Sprintf("From: %s\r\n", s.cfg.SMTPFrom)
+	mime := "MIME-version: 1.0\r\nContent-Type: text/html; charset=\"UTF-8\"\r\n\r\n"
+
+	body := fmt.Sprintf(`
+		<html>
+		<body style="font-family: sans-serif; line-height: 1.6; color: #333;">
+			<div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+				<div style="background: #ef4444; padding: 20px; text-align: center; color: white;">
+					<h2 style="margin: 0;">Escalation Alert</h2>
+				</div>
+				<div style="padding: 24px;">
+					<p>%s</p>
+					<p>Please check the <a href="%s" style="color: #3b82f6;">Monitoring Dashboard</a> for details.</p>
+				</div>
+				<div style="background: #f1f5f9; padding: 12px; text-align: center; font-size: 12px; color: #64748b;">
+					&copy; 2026 SPMT Monitoring System · NOC Control Panel
+				</div>
+			</div>
+		</body>
+		</html>
+	`, plainBody, s.cfg.FrontendURL)
+
+	msg := []byte(fromHeader + subjectHeader + mime + body)
+	auth := smtp.PlainAuth("", s.cfg.SMTPUser, s.cfg.SMTPPass, s.cfg.SMTPHost)
+	addr := fmt.Sprintf("%s:%d", s.cfg.SMTPHost, s.cfg.SMTPPort)
+
+	for _, to := range recipients {
+		_ = smtp.SendMail(addr, auth, fromAddr, []string{to}, msg)
+	}
+}
+
 
 func (s *Service) sendTelegram(websiteName, oldStatus, newStatus, rootCause string) {
 	if s.cfg.TelegramToken == "" {

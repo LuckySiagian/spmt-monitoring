@@ -37,19 +37,23 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
       </div>
 
       <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>CHOSE THEME</div>
-
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>Themes</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {lightThemes.map(t => (
-              <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
-                style={{ width: 24, height: 24, borderRadius: '50%', background: t.color, border: themeId === t.id ? '2px solid var(--text)' : '2px solid transparent', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
-            ))}
-          </div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>CHOOSE THEME</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {THEME_OPTIONS.map(t => (
+            <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 8px',
+                background: themeId === t.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.02)',
+                border: `1px solid ${themeId === t.id ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 8, cursor: 'pointer', color: 'var(--text)', fontSize: 11, fontWeight: 700, transition: 'all 0.2s',
+                boxShadow: themeId === t.id ? `0 0 8px ${t.color}20` : 'none'
+              }}
+            >
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap' }}>{t.name}</span>
+            </button>
+          ))}
         </div>
-
-
       </div>
 
       <div style={{ padding: '4px' }}>
@@ -135,6 +139,7 @@ export default function TopBar({
   const navIcon = tab => {
     if (tab === 'dashboard') return '📊'
     if (tab === 'websites') return '🌐'
+    if (tab === 'incidents') return '🚨'
     if (tab === 'activity-log') return '📋'
     if (tab === 'notifications') return '🔔'
     if (tab === 'users') return '👥'
@@ -143,6 +148,7 @@ export default function TopBar({
   const navTitle = tab => {
     if (tab === 'dashboard') return t?.dashboard || 'Dashboard'
     if (tab === 'websites') return t?.websites || 'Websites'
+    if (tab === 'incidents') return t?.incidents || 'Incident Center'
     if (tab === 'activity-log') return t?.activity || 'Activity'
     if (tab === 'notifications') return t?.notifications || 'Notifications'
     if (tab === 'users') return t?.users || 'Users'
@@ -180,6 +186,7 @@ export default function TopBar({
           {metrics.map(m => {
             const active = activeMetric === m.label
             const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
+            const isDark = themeId === 'theme-dark'
 
             // Generate clean class names for each metric type
             const labelKey = m.label.toUpperCase().replace(/\s+/g, '-');
@@ -201,14 +208,14 @@ export default function TopBar({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  background: active ? `${m.color}55` : `${m.color}44`,
+                  background: active ? m.color : (isDark ? m.color : `${m.color}22`),
                   borderColor: m.color,
                   borderWidth: '1px',
                   borderStyle: 'solid',
                   minWidth: 0,
                   width: '100%',
-                  color: m.color,
+                  color: isDark ? '#000000' : (active ? '#ffffff' : m.color),
+                  textShadow: 'none',
                   borderRadius: 8,
                   transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                   position: 'relative',

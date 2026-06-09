@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -58,7 +59,7 @@ func (s *NetworkService) updateContext() {
 	s.mu.Lock()
 	changed := s.isChanged(s.currentCtx, newCtx)
 	if changed {
-		log.Printf("[Network] CONTEXT CHANGED: %s -> %s", s.currentCtx.NetworkType, newCtx.NetworkType)
+		log.Printf("[Network] CONTEXT CHANGED: %s (%s) -> %s (%s)", s.currentCtx.NetworkType, s.currentCtx.ConnectionName, newCtx.NetworkType, newCtx.ConnectionName)
 		s.currentCtx = newCtx
 		s.mu.Unlock()
 		
@@ -81,7 +82,9 @@ func (s *NetworkService) isChanged(old, new model.NetworkContext) bool {
 	if old.PublicIP == "" { return false } // First run
 	return old.PublicIP != new.PublicIP || 
 		   old.LocalGateway != new.LocalGateway || 
-		   old.DNSResolver != new.DNSResolver
+		   old.DNSResolver != new.DNSResolver ||
+		   old.ConnectionName != new.ConnectionName ||
+		   old.InterfaceAlias != new.InterfaceAlias
 }
 
 func (s *NetworkService) probeNetwork() model.NetworkContext {
@@ -112,25 +115,32 @@ func (s *NetworkService) probeNetwork() model.NetworkContext {
 	// 3. DNS Resolver
 	ctx.DNSResolver = s.getDNSResolver()
 
-	// 4. Network Type Logic
-	ctx.NetworkType = "UNKNOWN"
-	
-	prov := strings.ToLower(ctx.Provider)
-	if strings.Contains(prov, "pelindo") || strings.Contains(prov, "telkom") && ctx.LocalGateway != "" {
-		// Example heuristic: if provider is company ISP or specific gateway pattern
-		ctx.NetworkType = "OFFICE"
-	} else if strings.Contains(prov, "mobile") || strings.Contains(prov, "hotspot") {
-		ctx.NetworkType = "PUBLIC"
-	} else if ctx.PublicIP != "" {
-		// Check for VPN signatures (usually via local interface names which we'd need more OS calls for)
-		// For now, if we have public IP but it's not the usual ones
-		ctx.NetworkType = "PUBLIC"
+	// 4. Connection profile info (Windows specific)
+	var interfaceAlias, connectionName string
+	if runtime.GOOS == "windows" {
+		interfaceAlias, connectionName = s.getWindowsConnectionProfile()
 	}
 
-	// Heuristic for Pelindo (Office)
-	// If Local Gateway is in a specific range or ASN matches
-	if strings.Contains(ctx.ASN, "AS136502") { // Pelindo ASN example
-		ctx.NetworkType = "OFFICE"
+	ctx.InterfaceAlias = interfaceAlias
+	ctx.ConnectionName = connectionName
+
+	// 5. Network Type Logic
+	ctx.NetworkType = "UNKNOWN"
+	if interfaceAlias != "" {
+		ctx.NetworkType = interfaceAlias
+	} else {
+		prov := strings.ToLower(ctx.Provider)
+		if strings.Contains(prov, "pelindo") || strings.Contains(prov, "telkom") && ctx.LocalGateway != "" {
+			ctx.NetworkType = "OFFICE"
+		} else if strings.Contains(prov, "mobile") || strings.Contains(prov, "hotspot") {
+			ctx.NetworkType = "PUBLIC"
+		} else if ctx.PublicIP != "" {
+			ctx.NetworkType = "PUBLIC"
+		}
+
+		if strings.Contains(ctx.ASN, "AS136502") {
+			ctx.NetworkType = "OFFICE"
+		}
 	}
 
 	return ctx
@@ -157,4 +167,18 @@ func (s *NetworkService) getDNSResolver() string {
 		return strings.TrimSpace(string(out))
 	}
 	return "8.8.8.8" // Fallback
+}
+
+func (s *NetworkService) getWindowsConnectionProfile() (string, string) {
+	out, err := exec.Command("powershell", "-Command", "(Get-NetConnectionProfile | Select-Object -First 1) | ForEach-Object { $_.InterfaceAlias + '|' + $_.Name }").Output()
+	if err != nil {
+		return "", ""
+	}
+	parts := strings.Split(strings.TrimSpace(string(out)), "|")
+	if len(parts) >= 2 {
+		return parts[0], parts[1]
+	} else if len(parts) == 1 && parts[0] != "" {
+		return parts[0], parts[0]
+	}
+	return "", ""
 }

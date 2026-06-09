@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 
 const STATUS_COLORS = {
   ONLINE: '#10b981',
-  CRITICAL: '#f59e0b',
+  WARNING: '#10b981',
+  DEGRADED: '#10b981',
+  CRITICAL: '#eab308',
   OFFLINE: '#ef4444',
+  UNKNOWN: '#64748b'
 }
 
 // Mini sparkline for a website
@@ -79,8 +82,8 @@ const UptimeBar = ({ website, logs }) => {
             key={i}
             style={{
               ...styles.block,
-              background: status === 'ONLINE' ? '#10b981'
-                : status === 'CRITICAL' ? '#f59e0b'
+              background: (status === 'ONLINE' || status === 'WARNING' || status === 'DEGRADED') ? '#10b981'
+                : status === 'CRITICAL' ? '#eab308'
                 : status === 'OFFLINE' ? '#ef4444'
                 : 'var(--border)',
               opacity: status === 'empty' ? 0.3 : 1,
@@ -105,13 +108,13 @@ const AlertTicker = ({ websites }) => {
 
   const messages = alerts.length
     ? alerts.map(w => `⚠ ${w.name.toUpperCase()} IS ${w.status}  ·  ${w.url}`)
-    : ['✓ ALL SYSTEMS OPERATIONAL  ·  NO ALERTS DETECTED']
+    : ['✓ ALL SYSTEMS OPERATIONAL  ·  NO ISSUES DETECTED']
 
   const text = messages.join('     ·     ')
 
   return (
     <div style={styles.ticker}>
-      <div style={styles.tickerLabel}>ALERTS</div>
+      <div style={styles.tickerLabel}>STATUS FEED</div>
       <div style={styles.tickerTrack}>
         <div
           style={{
