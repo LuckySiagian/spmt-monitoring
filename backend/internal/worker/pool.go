@@ -67,6 +67,8 @@ type Pool struct {
 	websiteStates        map[uuid.UUID]*websiteState
 	health               model.SystemHealth
 	recentFails          []time.Time
+	batchSize            int
+	batchInterval        time.Duration
 	muFails              sync.Mutex
 	monitorBaselineLatMs int
 	netReader            NetworkContextReader
@@ -114,6 +116,21 @@ type probeExtras struct {
 
 func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Service, workerSize int) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	batchSize := 10
+	batchInterval := 2 * time.Second
+
+	if b := os.Getenv("RECHECK_BATCH_SIZE"); b != "" {
+		if v, err := strconv.Atoi(b); err == nil && v > 0 {
+			batchSize = v
+		}
+	}
+	if d := os.Getenv("RECHECK_BATCH_INTERVAL"); d != "" {
+		if v, err := time.ParseDuration(d); err == nil && v > 0 {
+			batchInterval = v
+		}
+	}
+
 	return &Pool{
 		repo:          repo,
 		hub:           hub,
@@ -126,6 +143,8 @@ func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Servi
 		localNet:      true,
 		websiteStates: make(map[uuid.UUID]*websiteState),
 		recentFails:   []time.Time{},
+		batchSize:     batchSize,
+		batchInterval: batchInterval,
 		asnCache:      NewASNCache(24*time.Hour, 5000),
 		chromeSem:     make(chan struct{}, 3),
 	}
@@ -249,8 +268,31 @@ func (p *Pool) RevalidateAll() {
 	p.websiteStates = make(map[uuid.UUID]*websiteState)
 	p.mu.Unlock()
 
-	for _, w := range websites {
-		p.jobs <- MonitorJob{Website: *w, Manual: true}
+	batchSize := p.batchSize
+	if batchSize <= 0 {
+		batchSize = 10
+	}
+	interval := p.batchInterval
+	if interval <= 0 {
+		interval = 2 * time.Second
+	}
+
+	total := len(websites)
+	for i := 0; i < total; i += batchSize {
+		end := i + batchSize
+		if end > total {
+			end = total
+		}
+		batch := websites[i:end]
+
+		for _, w := range batch {
+			p.jobs <- MonitorJob{Website: *w, Manual: true}
+		}
+
+		// Delay antar batch — kasih napas biar server & network gak kaget
+		if end < total {
+			time.Sleep(interval)
+		}
 	}
 }
 
@@ -463,7 +505,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		IsBrowserAccessible: true, // Start as accessible, prove otherwise
 	}
 
-	if !p.isLocalNetworkOK() {
+	if !manual && !p.isLocalNetworkOK() {
 		slog.Warn("Skip checking website: local network has no internet (quorum failure)",
 			slog.String("website_name", w.Name),
 			slog.String("website_id", w.ID.String()),
@@ -612,6 +654,18 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		return
 	}
 
+	// Network latency compensation — naikkan timeout proporsional biar gak false alarm pas jaringan lelet
+	p.mu.Lock()
+	baseline := p.monitorBaselineLatMs
+	p.mu.Unlock()
+	dialTimeout := 10 * time.Second
+	httpTimeout := 30 * time.Second
+	if baseline > 200 {
+		extra := time.Duration(baseline*3/1000) * time.Second
+		dialTimeout += extra
+		httpTimeout += extra
+	}
+
 	jar, _ := cookiejar.New(nil)
 	var redirectChain []string
 	transport := &http.Transport{
@@ -630,7 +684,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 				targetAddr = net.JoinHostPort(l.IPAddress, port)
 			}
 			dialer := &net.Dialer{
-				Timeout:   10 * time.Second,
+				Timeout:   dialTimeout,
 				KeepAlive: 30 * time.Second,
 			}
 			return dialer.DialContext(ctx, network, targetAddr)
@@ -639,7 +693,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	_ = http2.ConfigureTransport(transport)
 
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: httpTimeout,
 		Jar:     jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			redirectChain = append(redirectChain, req.URL.String())
