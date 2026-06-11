@@ -68,6 +68,17 @@ type Website struct {
 	FinalReason         string     `json:"final_reason,omitempty"`
 	FinalDecisionSource string     `json:"final_decision_source,omitempty"`
 	ResolverStage       string     `json:"resolver_stage,omitempty"`
+
+	// Core Simplified Fields (4 Core Parameters)
+	LastCheckedAt    *time.Time `json:"last_checked_at,omitempty"`
+	ICMPStatus       bool       `json:"icmp_status,omitempty"`
+	HTTPStatusCode   *int       `json:"http_status_code,omitempty"`
+	HTTPErrorMessage *string    `json:"http_error_message,omitempty"`
+	IsOnline         bool       `json:"is_online,omitempty"`
+}
+
+func (w *Website) ComputeIsOnline() bool {
+	return w.DNSResolved && w.ICMPStatus && w.HTTPStatusCode != nil && *w.HTTPStatusCode >= 200 && *w.HTTPStatusCode < 400
 }
 
 type CreateWebsiteRequest struct {
@@ -124,6 +135,15 @@ type MonitoringLog struct {
 	FinalReason         string     `json:"final_reason" db:"final_reason"`
 	FinalDecisionSource string     `json:"final_decision_source" db:"final_decision_source"`
 	ResolverStage       string     `json:"resolver_stage" db:"resolver_stage"`
+
+	// Core Simplified Fields (4 Core Parameters)
+	HTTPStatusCode   *int       `json:"http_status_code" db:"http_status_code"`
+	HTTPErrorMessage *string    `json:"http_error_message" db:"http_error_message"`
+	IsOnline         bool       `json:"is_online" db:"is_online"`
+}
+
+func (l *MonitoringLog) ComputeIsOnline() bool {
+	return l.DNSResolved && l.ICMPStatus && l.HTTPStatusCode != nil && *l.HTTPStatusCode >= 200 && *l.HTTPStatusCode < 400
 }
 
 // ─── Status Events ───────────────────────────────────────────

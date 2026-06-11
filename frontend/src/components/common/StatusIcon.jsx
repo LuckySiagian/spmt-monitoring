@@ -11,7 +11,7 @@ const StatusIcon = ({ status, size = 20, className = '' }) => {
       case 'DEGRADED':
         return <AlertTriangle size={size} className={`status-icon-glow-degraded ${className}`} style={{ color: '#f97316' }} />;
       case 'CRITICAL':
-        return <AlertCircle size={size} className={`status-icon-glow-critical ${className}`} style={{ color: '#eab308' }} />;
+        return <AlertCircle size={size} className={`status-icon-glow-critical ${className}`} style={{ color: '#ef4444' }} />;
       case 'OFFLINE':
         return <XCircle size={size} className={`status-icon-glow-offline ${className}`} style={{ color: '#dc2626' }} />;
       default:

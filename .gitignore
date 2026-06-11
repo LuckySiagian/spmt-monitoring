@@ -12,6 +12,15 @@ frontend/.env.local
 backend/spmt.exe
 backend/spmt
 backend/vendor/
+*.exe
+backend/tmp/
+backend/scratch/
+backend/.env
+
+# Dev scratch / diff dumps
+tmp/
+*_diff.txt
+git_diff*.txt
 
 # OS/Editor
 .DS_Store

@@ -1,6 +1,6 @@
 import { useTheme } from '../store/theme'
 
-const SC = { ONLINE:'#10b981', WARNING: '#10b981', DEGRADED: '#10b981', CRITICAL: '#eab308', OFFLINE:'#dc2626', SERVER_DOWN:'#dc2626', WEB_DOWN:'#f97316', DNS_ERROR:'#8b5cf6', SSL_INVALID:'#ec4899', SLOW:'#eab308' }
+const SC = { ONLINE:'#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE:'#dc2626', SERVER_DOWN:'#dc2626', WEB_DOWN:'#f97316', DNS_ERROR:'#8b5cf6', SSL_INVALID:'#ec4899', SLOW:'#eab308' }
 const SB = { ONLINE:'rgba(16,185,129,0.12)', WARNING:'rgba(16,185,129,0.12)', DEGRADED:'rgba(16,185,129,0.12)', CRITICAL:'rgba(234,179,8,0.12)', OFFLINE:'rgba(220,38,38,0.12)' }
 
 import StatusBadgeIcon from '../components/common/StatusBadgeIcon'

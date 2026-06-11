@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptrace"
-	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -24,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chromedp/chromedp"
-	"github.com/chromedp/cdproto/page"
 	"github.com/google/uuid"
 	"github.com/spmt/monitoring/internal/metrics"
 	"github.com/spmt/monitoring/internal/model"
@@ -67,8 +63,6 @@ type Pool struct {
 	websiteStates        map[uuid.UUID]*websiteState
 	health               model.SystemHealth
 	recentFails          []time.Time
-	batchSize            int
-	batchInterval        time.Duration
 	muFails              sync.Mutex
 	monitorBaselineLatMs int
 	netReader            NetworkContextReader
@@ -106,7 +100,6 @@ type probeExtras struct {
 	SSLIssuer      string     // SSL certificate issuer (from strict SSL check)
 	SSLExpiry      *time.Time // SSL certificate expiry date
 	WAFDetected    string     // Name of WAF if detected, or "Not Detected"
-	HostingASN     string     // ASN information (e.g. Google Cloud, AS13335)
 	DynamicIsMigrated  bool
 	DynamicMigrationHint string
 	Screenshot     string     // Base64 screenshot image if taken during headless check
@@ -116,21 +109,6 @@ type probeExtras struct {
 
 func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Service, workerSize int) *Pool {
 	ctx, cancel := context.WithCancel(context.Background())
-
-	batchSize := 10
-	batchInterval := 2 * time.Second
-
-	if b := os.Getenv("RECHECK_BATCH_SIZE"); b != "" {
-		if v, err := strconv.Atoi(b); err == nil && v > 0 {
-			batchSize = v
-		}
-	}
-	if d := os.Getenv("RECHECK_BATCH_INTERVAL"); d != "" {
-		if v, err := time.ParseDuration(d); err == nil && v > 0 {
-			batchInterval = v
-		}
-	}
-
 	return &Pool{
 		repo:          repo,
 		hub:           hub,
@@ -143,8 +121,6 @@ func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Servi
 		localNet:      true,
 		websiteStates: make(map[uuid.UUID]*websiteState),
 		recentFails:   []time.Time{},
-		batchSize:     batchSize,
-		batchInterval: batchInterval,
 		asnCache:      NewASNCache(24*time.Hour, 5000),
 		chromeSem:     make(chan struct{}, 3),
 	}
@@ -268,31 +244,8 @@ func (p *Pool) RevalidateAll() {
 	p.websiteStates = make(map[uuid.UUID]*websiteState)
 	p.mu.Unlock()
 
-	batchSize := p.batchSize
-	if batchSize <= 0 {
-		batchSize = 10
-	}
-	interval := p.batchInterval
-	if interval <= 0 {
-		interval = 2 * time.Second
-	}
-
-	total := len(websites)
-	for i := 0; i < total; i += batchSize {
-		end := i + batchSize
-		if end > total {
-			end = total
-		}
-		batch := websites[i:end]
-
-		for _, w := range batch {
-			p.jobs <- MonitorJob{Website: *w, Manual: true}
-		}
-
-		// Delay antar batch — kasih napas biar server & network gak kaget
-		if end < total {
-			time.Sleep(interval)
-		}
+	for _, w := range websites {
+		p.jobs <- MonitorJob{Website: *w, Manual: true}
 	}
 }
 
@@ -404,16 +357,6 @@ func (p *Pool) checkSSL(host string, ip string) (bool, *time.Time, string, strin
 	return false, nil, "SSL_NO_CERTIFICATE", "Sertifikat tidak ditemukan pada host tujuan.", ""
 }
 
-func getRandomUserAgent() string {
-	agents := []string{
-		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-		"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
-	}
-	return agents[rand.Intn(len(agents))]
-}
-
 func (p *Pool) isLocalNetworkOK() bool {
 	p.mu.Lock()
 	// Cache for 10 seconds to avoid excessive pinging
@@ -505,7 +448,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		IsBrowserAccessible: true, // Start as accessible, prove otherwise
 	}
 
-	if !manual && !p.isLocalNetworkOK() {
+	if !p.isLocalNetworkOK() {
 		slog.Warn("Skip checking website: local network has no internet (quorum failure)",
 			slog.String("website_name", w.Name),
 			slog.String("website_id", w.ID.String()),
@@ -619,7 +562,6 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	l.DNSResolved = true
 	l.IPAddress = addrs[0]
 	extras.AllResolvedIPs = addrs
-	extras.HostingASN = p.getASN(l.IPAddress)
 
 	// 2. SSL/TLS Validation (Source of Truth — strict check, no InsecureSkipVerify)
 	isHTTPS := strings.HasPrefix(w.URL, "https://")
@@ -654,18 +596,6 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		return
 	}
 
-	// Network latency compensation — naikkan timeout proporsional biar gak false alarm pas jaringan lelet
-	p.mu.Lock()
-	baseline := p.monitorBaselineLatMs
-	p.mu.Unlock()
-	dialTimeout := 10 * time.Second
-	httpTimeout := 30 * time.Second
-	if baseline > 200 {
-		extra := time.Duration(baseline*3/1000) * time.Second
-		dialTimeout += extra
-		httpTimeout += extra
-	}
-
 	jar, _ := cookiejar.New(nil)
 	var redirectChain []string
 	transport := &http.Transport{
@@ -684,7 +614,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 				targetAddr = net.JoinHostPort(l.IPAddress, port)
 			}
 			dialer := &net.Dialer{
-				Timeout:   dialTimeout,
+				Timeout:   10 * time.Second,
 				KeepAlive: 30 * time.Second,
 			}
 			return dialer.DialContext(ctx, network, targetAddr)
@@ -693,7 +623,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	_ = http2.ConfigureTransport(transport)
 
 	client := &http.Client{
-		Timeout: httpTimeout,
+		Timeout: 30 * time.Second,
 		Jar:     jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			redirectChain = append(redirectChain, req.URL.String())
@@ -801,14 +731,11 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		l.ResponseTimeMs = &rt
 	} else {
 		defer resp.Body.Close()
-		body, _ = io.ReadAll(resp.Body)
+		// Limit body read to 1MB to protect the monitor from oversized responses.
+		body, _ = io.ReadAll(io.LimitReader(resp.Body, 1*1024*1024))
 
-		if len(body) > 0 {
-			if ok, hint := p.scanForDynamicAlerts(p.ctx, client, w.URL, body); ok {
-				extras.DynamicIsMigrated = true
-				extras.DynamicMigrationHint = hint
-			}
-		}
+		// Dynamic alert / migration scanning DISABLED: content-based heuristics must
+		// not influence status determination. Status is DNS + HTTP only.
 
 		rt := int(time.Since(httpStart).Milliseconds())
 		l.ResponseTimeMs = &rt
@@ -843,68 +770,15 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		}
 	}
 
-	// ─── Headless Chrome Diagnostic (Rate-limited / Cached) ──────
-	state := p.getWebsiteState(w.ID)
-
-	shouldRunHeadless := false
-	if os.Getenv("DISABLE_CHROME_DIAGNOSTIC") == "true" {
-		// Headless Chrome is disabled to save memory / CPU locally
-	} else {
-		// Chrome always runs as the decision maker (screenshot only captured when enabled)
-		shouldRunHeadless = true
-	}
-
-	if shouldRunHeadless {
-		state.mu.Lock()
-		state.lastHeadlessCheck = time.Now()
-		state.mu.Unlock()
-
-		slog.Info("[Headless] Launching Chrome diagnostic check", "website", w.Name, "url", w.URL)
-		screenshot, pageText, pageTitle, err := p.runHeadlessDiagnostic(p.ctx, w.URL, w.SaveScreenshot)
-		if err == nil {
-			extras.Screenshot = screenshot
-			extras.PageTitle = pageTitle
-			extras.PageText = pageText
-			
-			// Update cache
-			state.mu.Lock()
-			state.lastChromeSuccess = true
-			state.lastChromeTitle = pageTitle
-			state.lastChromeScreenshot = screenshot
-			state.lastChromePageText = pageText
-			state.mu.Unlock()
-			
-			// Dynamic visual DOM text scanner for migrations
-			textLower := strings.ToLower(pageText)
-			migrationKeywords := []string{
-				"migrated", "moved", "dialihkan", "akses melalui",
-				"please access via", "gunakan alamat baru", "landing page",
-				"telah dipindah", "silakan kunjungi", "has been moved", "has moved to", "please visit",
-			}
-			for _, kw := range migrationKeywords {
-				if strings.Contains(textLower, kw) {
-					extras.DynamicIsMigrated = true
-					extras.DynamicMigrationHint = cleanPageTextExcerpt(pageText, kw)
-					break
-				}
-			}
-			slog.Info("[Headless] Chrome diagnostic success", "website", w.Name, "title", pageTitle, "screenshot_len", len(screenshot))
-		} else {
-			state.mu.Lock()
-			state.lastChromeSuccess = false
-			state.lastChromeTitle = ""
-			state.lastChromeScreenshot = ""
-			state.lastChromePageText = ""
-			state.mu.Unlock()
-			slog.Error("[Headless] Chrome diagnostic failed", "website", w.Name, "error", err)
-		}
-	} else {
-		// If shouldRunHeadless is false, we do NOT run Chrome and we do NOT use cached values.
-		// Pengecekan murni murni berdasarkan parameter jaringan.
-		extras.Screenshot = ""
-		extras.PageTitle = ""
-		extras.PageText = ""
-	}
+	// ─── Headless Chrome Diagnostic: DISABLED ────────────────────
+	// Chrome, screenshots, DOM/keyword content analysis, and migration detection are
+	// intentionally removed from the status path. They were the primary source of
+	// false positives (a Chrome OOM/timeout marked every site OFFLINE; a single
+	// keyword like "iag"/"error"/"forbidden" in page text flipped healthy sites to
+	// OFFLINE/CRITICAL). Status is now decided purely from DNS + HTTP telemetry.
+	extras.Screenshot = ""
+	extras.PageTitle = ""
+	extras.PageText = ""
 
 	icmpOk, icmpLat := PingHost(host)
 	l.ICMPStatus = icmpOk
@@ -922,418 +796,6 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	}
 
 	p.saveAndBroadcast(w, l, workerID)
-}
-
-func (p *Pool) correlateInvestigation(l *model.MonitoringLog, w model.Website, ev map[string]interface{}, isMigrated bool, migrationHint string) (map[string]interface{}, string, int, string) {
-	evidence := []string{}
-	primaryKey := "UNKNOWN_ERROR"
-	recommendedAction := []string{}
-	confidence := 100
-	status := ""
-	healthScore := 100
-
-	isPrivate := false
-	if ipClass, ok := ev["ip_classification"].(string); ok && ipClass == "PRIVATE" {
-		isPrivate = true
-	}
-	tcpOk := false
-	if t, ok := ev["tcp_connected"].(bool); ok {
-		tcpOk = t
-	}
-	dnsOk := false
-	if d, ok := ev["dns_resolved"].(bool); ok {
-		dnsOk = d
-	}
-	tlsOk := false
-	if t, ok := ev["tls_handshake_ok"].(bool); ok {
-		tlsOk = t
-	}
-	var httpCode int
-	if c, ok := ev["http_status_code"].(int); ok {
-		httpCode = c
-	} else if cFloat, ok := ev["http_status_code"].(float64); ok {
-		httpCode = int(cFloat)
-	}
-
-	isSSO := false
-	if chain, ok := ev["redirect_chain"].([]string); ok && len(chain) > 0 {
-		lastUrl := chain[len(chain)-1]
-		if strings.Contains(strings.ToLower(lastUrl), "login") || strings.Contains(strings.ToLower(lastUrl), "sso") {
-			isSSO = true
-		}
-	}
-	wafDetected, _ := ev["waf_detected"].(string)
-
-	// 1. Evidence Collection
-	if dnsOk {
-		evidence = append(evidence, "✓ DNS resolved")
-	} else {
-		evidence = append(evidence, "✗ DNS failed")
-	}
-	if isPrivate {
-		evidence = append(evidence, "✓ Private IP detected")
-	}
-	if tcpOk {
-		evidence = append(evidence, "✓ TCP connected")
-	} else {
-		evidence = append(evidence, "✗ TCP failed")
-	}
-	if strings.HasPrefix(w.URL, "https://") {
-		if tlsOk {
-			evidence = append(evidence, "✓ TLS handshake OK")
-		} else {
-			errStr, _ := ev["tls_error"].(string)
-			evidence = append(evidence, "✗ TLS failed ("+errStr+")")
-		}
-	}
-	if wafDetected != "" && wafDetected != "Not Detected" {
-		evidence = append(evidence, "✓ WAF Challenge / Interception detected ("+wafDetected+")")
-	}
-	if httpCode > 0 {
-		evidence = append(evidence, "✓ HTTP "+fmt.Sprint(httpCode))
-	} else {
-		evidence = append(evidence, "✗ No HTTP Response")
-	}
-
-	// 2. Correlation & Status Decision
-	screenshot, _ := ev["screenshot"].(string)
-	pageTitle, _ := ev["page_title"].(string)
-	pageText, _ := ev["page_text_preview"].(string)
-	pageTitleLower := strings.ToLower(pageTitle)
-	pageTextLower := strings.ToLower(pageText)
-
-	// Check if Chrome Bot was active and loaded the page successfully without browser errors
-	isChromeOk := false
-	if screenshot != "" {
-		isChromeOk = true
-		browserErrorKeywords := []string{
-			"site can't be reached", "err_", "connection refused", "connection timed out",
-			"dns_probe_finished", "404 not found", "access denied", "blocked", "error",
-		}
-		for _, kw := range browserErrorKeywords {
-			if pageTitle != "" && strings.Contains(pageTitleLower, kw) {
-				isChromeOk = false
-				break
-			}
-		}
-	}
-
-	var interpretation string
-
-	if screenshot != "" {
-		// Chrome Bot-First Status Determination (Absolute Decision Maker)
-
-		// --- Deteksi Jaringan Corporate / Terbatas ---
-		// Cek apakah halaman yang diload adalah halaman portal login jaringan kantor
-		// atau gateway perusahaan (Sangfor IAG, Fortinet, Cisco, dll)
-		isCorporateNetwork := false
-		corporateNetworkName := ""
-		corporateNetworkKeywords := [][]string{
-			// Sangfor IAG (banyak dipakai di kampus/kantor Indonesia)
-			{"sangfor", "Sangfor Internet Access Gateway"},
-			{"internet access gateway", "Sangfor Internet Access Gateway"},
-			{"iag", "Sangfor Internet Access Gateway"},
-			// Fortinet / FortiGate
-			{"fortigate", "Fortinet FortiGate"},
-			{"fortinet", "Fortinet FortiGate"},
-			{"fortios", "Fortinet FortiGate"},
-			// Cisco Umbrella / ISE
-			{"cisco umbrella", "Cisco Umbrella"},
-			{"cisco ise", "Cisco ISE"},
-			{"openroaming", "Cisco OpenRoaming"},
-			// Bluecoat / Symantec Proxy
-			{"bluecoat", "BlueCoat Proxy"},
-			{"symantec proxy", "Symantec Web Gateway"},
-			// Forcepoint
-			{"forcepoint", "Forcepoint Web Security"},
-			{"websense", "Forcepoint/Websense"},
-			// Palo Alto
-			{"palo alto", "Palo Alto Network Gateway"},
-			{"globalprotect", "Palo Alto GlobalProtect"},
-			// Generic captive portal / corporate block page
-			{"captive portal", "Corporate Captive Portal"},
-			{"network login", "Corporate Network Login"},
-			{"acceptable use policy", "Corporate AUP Page"},
-			{"internet usage policy", "Corporate Internet Policy"},
-			{"block-sosmed", "Corporate Firewall (Blokir Media Sosial)"},
-			{"block-game", "Corporate Firewall (Blokir Game)"},
-			{"plc_name=block", "Corporate Firewall"},
-			{"disable.htm", "Corporate Internet Gateway"},
-		}
-		for _, kw := range corporateNetworkKeywords {
-			if strings.Contains(pageTitleLower, kw[0]) || strings.Contains(pageTextLower, kw[0]) {
-				isCorporateNetwork = true
-				corporateNetworkName = kw[1]
-				break
-			}
-		}
-
-		hasBlockIndicator := false
-		blockIndicatorKeyword := ""
-		blockKeywords := []string{
-			"internet positif", "internet-positif", "mercusuar", "blokir", "aduan", 
-			"akses diblokir", "access denied", "access_denied", "blocked", "forbidden", "403 forbidden",
-		}
-		for _, kw := range blockKeywords {
-			if strings.Contains(pageTitleLower, kw) || strings.Contains(pageTextLower, kw) {
-				hasBlockIndicator = true
-				blockIndicatorKeyword = kw
-				break
-			}
-		}
-
-		hasServerErrorIndicator := false
-		errorKeywords := []string{
-			"500 internal server error", "502 bad gateway", "503 service unavailable", "504 gateway timeout",
-			"database error", "system error", "error 500", "error 502", "error 503", "error 504",
-		}
-		for _, kw := range errorKeywords {
-			if strings.Contains(pageTitleLower, kw) || strings.Contains(pageTextLower, kw) {
-				hasServerErrorIndicator = true
-				break
-			}
-		}
-
-		if !isChromeOk {
-			status = string(model.StatusOffline)
-			healthScore = 0
-			primaryKey = "BROWSER_LOAD_FAILED"
-			errDetail := pageTitle
-			if errDetail == "" {
-				errDetail = "halaman tidak dapat dibuka"
-			}
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini tidak dapat diakses 🔴. Sistem pemantau kami sudah mencoba membuka website ini seperti layaknya pengguna biasa, namun gagal — halaman tidak mau terbuka sama sekali (browser menampilkan pesan: \"%s\"). Kemungkinan besar server website sedang mati atau ada gangguan jaringan di sisi server.", w.Name, errDetail)
-			recommendedAction = append(recommendedAction, "Coba akses website secara manual. Jika memang tidak bisa dibuka, hubungi tim pengelola server.")
-		} else if isCorporateNetwork {
-			// Jaringan corporate terdeteksi — website mungkin sebenarnya normal,
-			// tapi pemantau kita tertahan di portal/gateway jaringan kantor
-			status = string(model.StatusOffline)
-			healthScore = 10
-			primaryKey = "CORPORATE_NETWORK_RESTRICTED"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini terpantau **tidak dapat diakses dari jaringan ini** 🏢🔒. Pemantau kami mendeteksi bahwa jaringan yang sedang digunakan adalah **jaringan kantor atau kampus yang dibatasi** (teridentifikasi: %s). Jaringan tersebut memiliki aturan yang menghalangi akses ke website tertentu — seperti media sosial, game, atau website luar yang dianggap tidak termasuk dalam kategori kerja.\n\n💡 **Ini bukan berarti website-nya mati.** Website tersebut kemungkinan besar tetap bisa diakses dari jaringan internet biasa (misalnya lewat hotspot pribadi). Namun dari jaringan kantor ini, akses ke website tersebut sengaja dibatasi oleh kebijakan IT kantor/kampus.", w.Name, corporateNetworkName)
-			recommendedAction = append(recommendedAction, "Hasil pemantauan dari jaringan kantor ini mungkin tidak mencerminkan kondisi sebenarnya. Coba verifikasi akses website dari jaringan internet biasa (hotspot/ISP rumah).")
-		} else if hasBlockIndicator {
-			status = string(model.StatusOffline)
-			healthScore = 0
-			primaryKey = "BLOCKED"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini terdeteksi **diblokir** 🚫. Pemantau kami berhasil terhubung ke internet, namun halaman yang tampil bukan website aslinya — melainkan halaman peringatan bahwa akses ke website ini diblokir oleh sistem keamanan atau peraturan internet di Indonesia (terdeteksi kata kunci: \"%s\").", w.Name, blockIndicatorKeyword)
-			recommendedAction = append(recommendedAction, "Website mungkin diblokir oleh ISP atau Kominfo. Coba verifikasi menggunakan koneksi internet berbeda.")
-		} else if hasServerErrorIndicator {
-			status = string(model.StatusCritical)
-			healthScore = 20
-			primaryKey = "APPLICATION_ERROR"
-			pingStr := "gagal"
-			if l.ICMPStatus && l.ICMPLatencyMs != nil {
-				pingStr = fmt.Sprintf("sukses (%d ms)", *l.ICMPLatencyMs)
-			}
-			rtVal := 0
-			if l.ResponseTimeMs != nil {
-				rtVal = *l.ResponseTimeMs
-			}
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **gangguan serius** ⚠️. Pemantau kami berhasil membuka halaman websitenya (HTTP Code: %d, Waktu Respon: %d ms, ICMP Ping: %s), namun isi halaman menampilkan pesan error dari server — artinya sistem di balik website ini sedang mengalami masalah internal. Pengguna yang mencoba mengakses website ini kemungkinan akan melihat halaman error juga.", w.Name, httpCode, rtVal, pingStr)
-			recommendedAction = append(recommendedAction, "Tim teknis perlu segera memeriksa kondisi server dan database aplikasi.")
-		} else if isMigrated {
-			status = string(model.StatusOnline)
-			healthScore = 100
-			primaryKey = "SERVICE_MIGRATED"
-			pingStr := "gagal"
-			if l.ICMPStatus && l.ICMPLatencyMs != nil {
-				pingStr = fmt.Sprintf("sukses (%d ms)", *l.ICMPLatencyMs)
-			}
-			sslStr := "tidak aktif (HTTP)"
-			if strings.HasPrefix(w.URL, "https://") {
-				if l.SSLValid {
-					sslStr = "aktif & valid"
-				} else {
-					sslStr = "tidak valid"
-				}
-			}
-			rtVal := 0
-			if l.ResponseTimeMs != nil {
-				rtVal = *l.ResponseTimeMs
-			}
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online - Migrasi)** ✅. Pemantau kami berhasil membuka halaman dengan judul \"%s\". Terdeteksi bahwa website ini telah **berpindah alamat** ke lokasi baru (%s). Parameter jaringan terpantau normal: HTTP Code %d, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s.", w.Name, pageTitle, migrationHint, httpCode, rtVal, sslStr, pingStr)
-			recommendedAction = append(recommendedAction, "Perbarui URL di sistem monitoring ke alamat yang baru.")
-		} else if isSSO || strings.Contains(pageTitleLower, "login") || strings.Contains(pageTitleLower, "sso") || strings.Contains(pageTitleLower, "auth") {
-			status = string(model.StatusOnline)
-			healthScore = 100
-			primaryKey = "AUTH_REQUIRED"
-			pingStr := "gagal"
-			if l.ICMPStatus && l.ICMPLatencyMs != nil {
-				pingStr = fmt.Sprintf("sukses (%d ms)", *l.ICMPLatencyMs)
-			}
-			sslStr := "tidak aktif (HTTP)"
-			if strings.HasPrefix(w.URL, "https://") {
-				if l.SSLValid {
-					sslStr = "aktif & valid"
-				} else {
-					sslStr = "tidak valid"
-				}
-			}
-			rtVal := 0
-			if l.ResponseTimeMs != nil {
-				rtVal = *l.ResponseTimeMs
-			}
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Pemantau kami berhasil membuka halaman dengan judul \"%s\" menggunakan browser Chrome. Halaman ini adalah halaman login — artinya website aktif dan berjalan dengan parameter: HTTP Code %d, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s. Pengguna perlu login terlebih dahulu untuk masuk.", w.Name, pageTitle, httpCode, rtVal, sslStr, pingStr)
-			recommendedAction = append(recommendedAction, "Tidak ada tindakan diperlukan. Layanan berjalan normal.")
-		} else {
-			status = string(model.StatusOnline)
-			healthScore = 100
-			primaryKey = "OK"
-			titleText := pageTitle
-			if titleText == "" {
-				titleText = "halaman berhasil dimuat"
-			}
-			pingStr := "gagal"
-			if l.ICMPStatus && l.ICMPLatencyMs != nil {
-				pingStr = fmt.Sprintf("sukses (%d ms)", *l.ICMPLatencyMs)
-			}
-			sslStr := "tidak aktif (HTTP)"
-			if strings.HasPrefix(w.URL, "https://") {
-				if l.SSLValid {
-					sslStr = "aktif & valid"
-				} else {
-					sslStr = "tidak valid"
-				}
-			}
-			rtVal := 0
-			if l.ResponseTimeMs != nil {
-				rtVal = *l.ResponseTimeMs
-			}
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Pemantau kami berhasil memuat halaman website dengan judul \"%s\" menggunakan browser Chrome. Semua parameter terpantau normal: HTTP Code %d OK, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s. Semua layanan tampak berjalan dengan baik dan dapat diakses oleh pengguna.", w.Name, titleText, httpCode, rtVal, sslStr, pingStr)
-			if httpCode == 400 || httpCode == 403 || httpCode == 401 {
-				interpretation += fmt.Sprintf(" — Catatan: **%s** memblokir alat pemantau otomatis kami (HTTP %d), namun Chrome bot berhasil memverifikasi bahwa website berjalan normal. Status ini sudah ditentukan berdasarkan hasil Chrome bot sebagai sumber kebenaran utama.", w.Name, httpCode)
-			}
-			recommendedAction = append(recommendedAction, "Tidak ada tindakan diperlukan.")
-		}
-	} else {
-		// Chrome Bot did NOT run (Safety Fallback to direct Go network prober metrics)
-		confidence = 60
-		pingStr := "gagal"
-		if l.ICMPStatus && l.ICMPLatencyMs != nil {
-			pingStr = fmt.Sprintf("sukses (%d ms)", *l.ICMPLatencyMs)
-		}
-		sslStr := "tidak aktif (HTTP)"
-		if strings.HasPrefix(w.URL, "https://") {
-			if l.SSLValid {
-				sslStr = "aktif & valid"
-			} else {
-				sslStr = "tidak valid"
-			}
-		}
-		rtVal := 0
-		if l.ResponseTimeMs != nil {
-			rtVal = *l.ResponseTimeMs
-		}
-
-		if !dnsOk {
-			status = string(model.StatusOffline)
-			healthScore = 0
-			primaryKey = "DNS_RESOLUTION_FAILED"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini **tidak dapat diakses** 🔴. Sistem pemantau kami tidak bisa menemukan alamat server dari nama domain website ini. Ini biasanya terjadi karena domain sudah tidak aktif, atau ada gangguan pada sistem penamaan domain (DNS).", w.Name)
-			recommendedAction = append(recommendedAction, "Periksa apakah domain masih aktif dan terdaftar dengan benar.")
-		} else if isPrivate && !tcpOk {
-			status = string(model.StatusOffline)
-			healthScore = 0
-			primaryKey = "PRIVATE_IP_UNREACHABLE"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini **tidak dapat dijangkau** 🔴. Website ini berada di jaringan internal/privat, namun pemantau kami tidak dapat terhubung ke server tersebut. Kemungkinan server sedang mati atau ada pemisahan jaringan.", w.Name)
-			recommendedAction = append(recommendedAction, "Periksa kondisi server dari jaringan lokal secara langsung.")
-		} else if dnsOk && !tcpOk {
-			status = string(model.StatusOffline)
-			healthScore = 0
-			primaryKey = "CONNECTION_REFUSED"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini **tidak merespons** 🔴. Alamat server berhasil ditemukan (IP: %s), namun ketika pemantau mencoba mengetuk pintu server tersebut, tidak ada jawaban. Server mungkin sedang mati atau memblokir koneksi dari luar.", w.Name, l.IPAddress)
-			recommendedAction = append(recommendedAction, "Periksa apakah layanan web server masih berjalan dan tidak diblokir oleh firewall.")
-		} else if !tcpOk {
-			status = string(model.StatusOffline)
-			healthScore = 0
-			primaryKey = "NETWORK_UNREACHABLE"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini **tidak dapat dijangkau** 🔴. Pemantau kami tidak bisa menjangkau server website ini sama sekali — seperti mencoba menelepon tapi nomornya tidak dapat dihubungi. Ini biasanya tanda server sedang mati total atau ada gangguan jaringan besar.", w.Name)
-			recommendedAction = append(recommendedAction, "Periksa kondisi server dan koneksi jaringan hosting.")
-		} else if !tlsOk && strings.HasPrefix(w.URL, "https://") {
-			status = string(model.StatusCritical)
-			healthScore = 40
-			errStr, _ := ev["tls_error"].(string)
-			if strings.Contains(strings.ToLower(errStr), "expired") {
-				primaryKey = "TLS_CERTIFICATE_EXPIRED"
-				interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **masalah keamanan** ⚠️. Server berhasil ditemukan dan dijangkau, namun sertifikat keamanan (SSL) website ini sudah **kedaluwarsa**. Akibatnya, browser pengguna akan menampilkan peringatan \"Koneksi tidak aman\" dan sebagian besar pengguna tidak bisa masuk ke website ini.", w.Name)
-			} else {
-				primaryKey = "TLS_HOSTNAME_MISMATCH"
-				interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **masalah keamanan** ⚠️. Server berhasil dijangkau, namun sertifikat keamanan (SSL) website ini **tidak valid atau tidak cocok** dengan nama domain yang diakses. Pengguna yang mencoba membuka website ini akan melihat peringatan keamanan dari browser mereka.", w.Name)
-			}
-			recommendedAction = append(recommendedAction, "Tim teknis perlu memperbarui atau memperbaiki sertifikat SSL website.")
-		} else if isMigrated {
-			status = string(model.StatusOnline)
-			healthScore = 100
-			primaryKey = "SERVICE_MIGRATED"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online - Migrasi)** ✅. Terdeteksi bahwa website ini telah **berpindah ke alamat baru** (%s). Parameter jaringan terpantau normal: HTTP Code %d, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s.", w.Name, migrationHint, httpCode, rtVal, sslStr, pingStr)
-			recommendedAction = append(recommendedAction, "Perbarui URL di sistem monitoring ke alamat yang baru.")
-		} else if isSSO && httpCode >= 200 && httpCode < 400 {
-			status = string(model.StatusOnline)
-			healthScore = 100
-			primaryKey = "OK"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Website aktif dan mengarahkan pengguna ke halaman login untuk masuk. Parameter jaringan terpantau normal: HTTP Code %d, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s.", w.Name, httpCode, rtVal, sslStr, pingStr)
-		} else if httpCode >= 200 && httpCode < 400 {
-			status = string(model.StatusOnline)
-			healthScore = 100
-			primaryKey = "OK"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Pemantau kami berhasil memverifikasi website dengan parameter jaringan: HTTP Code %d OK, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s. Semua layanan berjalan dengan baik.", w.Name, httpCode, rtVal, sslStr, pingStr)
-		} else if httpCode >= 400 && httpCode < 500 {
-			if httpCode == 401 {
-				status = string(model.StatusOnline)
-				healthScore = 100
-				primaryKey = "AUTH_REQUIRED"
-				interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Website aktif namun memerlukan login untuk bisa diakses. Parameter jaringan terpantau normal: HTTP Code %d, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s.", w.Name, httpCode, rtVal, sslStr, pingStr)
-			} else if httpCode == 403 || wafDetected != "Not Detected" {
-				status = string(model.StatusOnline)
-				healthScore = 100
-				primaryKey = "WAF_PROTECTED"
-				interpretation = fmt.Sprintf("Halo! Website **%s** saat ini berstatus **Normal (Online)** ✅. Website aktif dan terlindungi oleh sistem keamanan (%s) yang membatasi akses dari bot/pemantau otomatis. Parameter jaringan terpantau normal: HTTP Code %d, Waktu Respon %d ms, SSL %s, dan ICMP Ping %s.", w.Name, wafDetected, httpCode, rtVal, sslStr, pingStr)
-			} else if httpCode == 404 {
-				status = string(model.StatusCritical)
-				healthScore = 40
-				primaryKey = "PAGE_NOT_FOUND"
-				interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **gangguan** ⚠️. Server aktif, namun halaman utama website tidak ditemukan (HTTP Code %d, Waktu Respon %d ms, SSL %s, ICMP Ping %s). Kemungkinan ada perubahan konfigurasi atau file website yang bermasalah.", w.Name, httpCode, rtVal, sslStr, pingStr)
-			} else {
-				status = string(model.StatusCritical)
-				healthScore = 50
-				primaryKey = "APPLICATION_ERROR"
-				interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **gangguan** ⚠️. Server merespons, namun memberikan kode error (HTTP Code %d, Waktu Respon %d ms, SSL %s, ICMP Ping %s).", w.Name, httpCode, rtVal, sslStr, pingStr)
-			}
-		} else if httpCode >= 500 {
-			status = string(model.StatusCritical)
-			healthScore = 20
-			primaryKey = "APPLICATION_ERROR"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **gangguan serius** ⚠️. Server memang aktif dan bisa dihubungi, namun sistem di dalamnya sedang mengalami error berat (HTTP Code %d, Waktu Respon %d ms, SSL %s, ICMP Ping %s). Pengguna yang mencoba membuka website ini kemungkinan akan menemui halaman error.", w.Name, httpCode, rtVal, sslStr, pingStr)
-		} else {
-			status = string(model.StatusCritical)
-			healthScore = 10
-			primaryKey = "UNKNOWN_ERROR"
-			interpretation = fmt.Sprintf("Halo! Website **%s** saat ini mengalami **kondisi tidak diketahui** ⚠️. Pemantau kami tidak bisa menentukan kondisi pastinya — semua indikator memberikan hasil yang tidak jelas. Disarankan untuk memeriksa langsung kondisi website.", w.Name)
-		}
-	}
-
-	confidenceLabel := ""
-	if confidence >= 95 {
-		confidenceLabel = "Hampir Pasti"
-	} else if confidence >= 80 {
-		confidenceLabel = "Sangat Mungkin"
-	} else if confidence >= 60 {
-		confidenceLabel = "Kemungkinan"
-	} else {
-		confidenceLabel = "Insufficient Evidence"
-	}
-
-	report := map[string]interface{}{
-		"primary_key":        primaryKey,
-		"evidence":           evidence,
-		"interpretation":     interpretation,
-		"confidence_score":   confidence,
-		"confidence_label":   confidenceLabel,
-		"recommended_action": recommendedAction,
-	}
-
-	return report, status, healthScore, interpretation
 }
 
 func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body []byte, extras probeExtras) {
@@ -1481,8 +943,6 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 		"http_error":       httpErrVal,
 		// ── Fingerprint ──────────────────────────
 		"waf_detected":     extras.WAFDetected,
-		"hosting_asn":      extras.HostingASN,
-		"hosting_provider": extractHostingProvider(extras.HostingASN),
 
 		// ── Body ─────────────────────────────
 		"response_body_preview": bodyPreview,
@@ -1499,7 +959,19 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 		}(),
 	}
 
-	report, correlatedStatus, correlatedHealth, correlatedRecommendation := p.correlateInvestigation(l, w, evidence, isMigrated, migrationHint)
+	// ─── Deterministic Status Classification (DNS + HTTP only) ───
+	// Chrome, screenshots, keyword/content analysis, ASN, migration, AI, and WAF
+	// detection no longer participate in status determination.
+	newStatus, healthScore, interpretation, recommendation := classifyStatus(l)
+
+	report := map[string]interface{}{
+		"primary_key":        string(newStatus),
+		"evidence":           buildEvidenceList(l),
+		"interpretation":     interpretation,
+		"confidence_score":   100,
+		"confidence_label":   "Deterministik (DNS + HTTP)",
+		"recommended_action": recommendation,
+	}
 	evidence["investigation_report"] = report
 
 	jsonBytes, jerr := json.MarshalIndent(evidence, "", "  ")
@@ -1508,23 +980,31 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 	} else {
 		l.RootCause = `{"error":"failed to marshal evidence"}`
 	}
-	l.Recommendation = correlatedRecommendation
-	l.FinalReason = "Evidence Collected"
-	l.FinalDecisionSource = "EVIDENCE_COLLECTION_V2"
-
-	// 4. Status Classification based on correlation
-	l.Status = model.LogStatus(correlatedStatus)
-	l.HealthScore = correlatedHealth
-	if l.Status == model.StatusOffline || l.Status == model.StatusCritical {
-		l.IsBrowserAccessible = false
+	if len(recommendation) > 0 {
+		l.Recommendation = recommendation[0]
 	}
+	l.FinalReason = interpretation
+	l.FinalDecisionSource = "DETERMINISTIC_DNS_HTTP"
 
-	// Anti-Flapping (2-failure rule)
-	if l.Status != model.StatusOnline && l.Status != model.StatusWarning { // Warning (like Intranet unreachable) is allowed to flap instantly or stay warning
+	l.Status = newStatus
+	l.HealthScore = healthScore
+	l.IsBrowserAccessible = (newStatus == model.StatusOnline || newStatus == model.StatusWarning)
+
+	// Anti-Flapping: require failConfirmThreshold consecutive hard-down samples
+	// (OFFLINE/CRITICAL) before reporting one, so a single transient blip — a momentary
+	// timeout or a one-off 5xx during a deploy — cannot raise a false incident.
+	isDown := newStatus == model.StatusOffline || newStatus == model.StatusCritical
+	if isDown {
 		state.consecutiveFailures++
-		if state.consecutiveFailures < 2 && state.lastStatus == model.StatusOnline {
-			l.Status = model.StatusOnline
-			l.FinalDecisionSource += "_FLAPPING_PENDING"
+		if state.consecutiveFailures < failConfirmThreshold &&
+			(state.lastStatus == model.StatusOnline || state.lastStatus == model.StatusWarning) {
+			// Not yet confirmed: hold the previous healthy-ish status.
+			l.Status = state.lastStatus
+			if l.Status == "" {
+				l.Status = model.StatusOnline
+			}
+			l.HealthScore = 100
+			l.FinalDecisionSource += "_DEBOUNCE_PENDING"
 			return
 		}
 	} else {
@@ -1535,6 +1015,108 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 		state.lastStatus = l.Status
 		state.statusStartTime = time.Now()
 	}
+}
+
+// ─── Deterministic status classification (DNS + HTTP only) ──────
+const (
+	// warningResponseThresholdMs: a 2xx/3xx response slower than this is reported as
+	// WARNING (slow) instead of HEALTHY.
+	warningResponseThresholdMs = 3000
+	// failConfirmThreshold: consecutive hard-down samples required before a site is
+	// reported OFFLINE/CRITICAL (debounce against transient blips).
+	failConfirmThreshold = 2
+)
+
+// classifyStatus decides status purely from DNS resolution + HTTP outcome.
+//
+//	HEALTHY  (ONLINE)  = DNS OK + HTTP 200-399 within the latency budget
+//	WARNING            = HTTP 200-399 but slow, or any 4xx (server up, page not OK)
+//	CRITICAL           = HTTP 5xx (500/502/503/504/…)
+//	OFFLINE            = DNS failure, timeout, connection refused/reset, or no response
+func classifyStatus(l *model.MonitoringLog) (model.LogStatus, int, string, []string) {
+	// 1. DNS gate.
+	if !l.DNSResolved {
+		return model.StatusOffline, 0,
+			"OFFLINE: domain tidak dapat di-resolve (DNS gagal).",
+			[]string{"Periksa pendaftaran domain dan konfigurasi DNS."}
+	}
+
+	// 2. Transport error after DNS success = timeout / connection refused / reset.
+	if l.ErrorMessage != nil && *l.ErrorMessage != "" {
+		es := strings.ToLower(*l.ErrorMessage)
+		reason := "koneksi ke server gagal"
+		switch {
+		case strings.Contains(es, "timeout") || strings.Contains(es, "deadline") || strings.Contains(es, "timed out"):
+			reason = "timeout (server tidak merespons tepat waktu)"
+		case strings.Contains(es, "refused"):
+			reason = "connection refused (port tertutup / layanan mati)"
+		case strings.Contains(es, "reset"):
+			reason = "connection reset oleh server/jaringan"
+		case strings.Contains(es, "no such host") || strings.Contains(es, "no route"):
+			reason = "host tidak dapat dijangkau"
+		}
+		return model.StatusOffline, 0,
+			"OFFLINE: " + reason + ".",
+			[]string{"Pastikan web server hidup dan dapat dijangkau dari jaringan."}
+	}
+
+	// 3. HTTP status code.
+	code := 0
+	if l.StatusCode != nil {
+		code = *l.StatusCode
+	}
+	rt := 0
+	if l.ResponseTimeMs != nil {
+		rt = *l.ResponseTimeMs
+	}
+
+	switch {
+	case code >= 500:
+		return model.StatusCritical, 20,
+			fmt.Sprintf("CRITICAL: server mengembalikan HTTP %d (server error).", code),
+			[]string{"Periksa aplikasi dan layanan backend (error 5xx)."}
+	case code >= 400:
+		return model.StatusWarning, 60,
+			fmt.Sprintf("WARNING: server merespons HTTP %d (client error).", code),
+			[]string{"Periksa konfigurasi rute/otorisasi halaman."}
+	case code >= 200 && code < 400:
+		if rt > warningResponseThresholdMs {
+			return model.StatusWarning, 70,
+				fmt.Sprintf("WARNING: respons lambat (%d ms, HTTP %d).", rt, code),
+				[]string{"Periksa beban server dan latensi jaringan."}
+		}
+		return model.StatusOnline, 100,
+			fmt.Sprintf("HEALTHY: HTTP %d, waktu respons %d ms.", code, rt),
+			[]string{"Tidak ada tindakan diperlukan."}
+	default:
+		return model.StatusOffline, 0,
+			"OFFLINE: tidak ada respons HTTP yang valid.",
+			[]string{"Periksa kondisi server dan jaringan."}
+	}
+}
+
+// buildEvidenceList produces the human-readable evidence shown on the dashboard.
+func buildEvidenceList(l *model.MonitoringLog) []string {
+	ev := []string{}
+	if l.DNSResolved {
+		ev = append(ev, "✓ DNS resolved")
+	} else {
+		ev = append(ev, "✗ DNS failed")
+	}
+	if l.StatusCode != nil {
+		ev = append(ev, fmt.Sprintf("✓ HTTP %d", *l.StatusCode))
+	} else if l.ErrorMessage != nil && *l.ErrorMessage != "" {
+		ev = append(ev, "✗ HTTP error: "+*l.ErrorMessage)
+	} else {
+		ev = append(ev, "✗ No HTTP response")
+	}
+	if l.ResponseTimeMs != nil {
+		ev = append(ev, fmt.Sprintf("Response time: %d ms", *l.ResponseTimeMs))
+	}
+	if l.ICMPStatus {
+		ev = append(ev, "✓ ICMP reachable")
+	}
+	return ev
 }
 
 func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog, workerID int) {
@@ -1703,42 +1285,6 @@ func extractHost(rawURL string) string {
 	return rawURL
 }
 
-func (p *Pool) getASN(ip string) string {
-	if ip == "" {
-		return ""
-	}
-	if val, ok := p.asnCache.Get(ip); ok {
-		return val
-	}
-
-	// External Lookup to ip-api.com
-	client := http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get("http://ip-api.com/json/" + ip)
-	if err != nil {
-		return "Unknown"
-	}
-	defer resp.Body.Close()
-
-	var data struct {
-		As  string `json:"as"`
-		Org string `json:"org"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "Unknown"
-	}
-
-	val := data.As
-	if data.Org != "" && !strings.Contains(data.As, data.Org) {
-		val = data.As + " (" + data.Org + ")"
-	}
-	if val == "" {
-		val = "Unknown"
-	}
-
-	p.asnCache.Set(ip, val)
-	return val
-}
-
 func (p *Pool) healthMonitor() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -1837,390 +1383,6 @@ func (p *Pool) trackFailure() {
 	}
 }
 
-func (p *Pool) scanForDynamicAlerts(ctx context.Context, client *http.Client, baseURL string, body []byte) (bool, string) {
-	bodyStr := string(body)
-
-	// Regex to find endpoints in script files or body
-	// Matching: url: '...' or url: "..." or url:"..." or url : '...'
-	re := regexp.MustCompile(`(?i)(?:url|href)\s*:\s*['"]([^'"]*(?:alert|announcement|migration|pemberitahuan|notice)[^'"]*)['"]`)
-	matches := re.FindAllStringSubmatch(bodyStr, -1)
-
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
-		}
-		endpoint := match[1]
-
-		// Resolve relative URL
-		absoluteURL := endpoint
-		if !strings.HasPrefix(endpoint, "http://") && !strings.HasPrefix(endpoint, "https://") {
-			base, err := url.Parse(baseURL)
-			if err != nil {
-				continue
-			}
-			rel, err := url.Parse(endpoint)
-			if err != nil {
-				continue
-			}
-			absoluteURL = base.ResolveReference(rel).String()
-		}
-
-		// Try POST with Content-Length 0 (needed by Peluit)
-		reqPost, err := http.NewRequestWithContext(ctx, "POST", absoluteURL, nil)
-		if err == nil {
-			reqPost.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
-			reqPost.Header.Set("Content-Length", "0")
-			respPost, errPost := client.Do(reqPost)
-			if errPost == nil {
-				bodyPost, _ := io.ReadAll(respPost.Body)
-				respPost.Body.Close()
-				if isMigrated, hint := analyzeAlertBody(bodyPost); isMigrated {
-					return true, hint
-				}
-			}
-		}
-
-		// Try GET as fallback
-		reqGet, err := http.NewRequestWithContext(ctx, "GET", absoluteURL, nil)
-		if err == nil {
-			reqGet.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
-			respGet, errGet := client.Do(reqGet)
-			if errGet == nil {
-				bodyGet, _ := io.ReadAll(respGet.Body)
-				respGet.Body.Close()
-				if isMigrated, hint := analyzeAlertBody(bodyGet); isMigrated {
-					return true, hint
-				}
-			}
-		}
-	}
-
-	return false, ""
-}
-
-func analyzeAlertBody(body []byte) (bool, string) {
-	if len(body) == 0 {
-		return false, ""
-	}
-
-	// Try JSON parsing
-	var jsonMap map[string]interface{}
-	if err := json.Unmarshal(body, &jsonMap); err == nil {
-		for _, key := range []string{"MESSAGE", "message", "text", "content", "msg"} {
-			if val, ok := jsonMap[key].(string); ok && val != "" {
-				valLower := strings.ToLower(val)
-				migrationKeywords := []string{
-					"migrated", "moved", "dialihkan", "akses melalui",
-					"please access via", "gunakan alamat baru", "landing page",
-					"telah dipindah", "silakan kunjungi", "has been moved", "has moved to", "please visit",
-				}
-				for _, kw := range migrationKeywords {
-					if strings.Contains(valLower, kw) {
-						return true, stripHTML(val)
-					}
-				}
-			}
-		}
-	}
-
-	// Plain text fallback
-	bodyStr := string(body)
-	bodyLower := strings.ToLower(bodyStr)
-	migrationKeywords := []string{
-		"migrated", "moved", "dialihkan", "akses melalui",
-		"please access via", "gunakan alamat baru", "landing page",
-		"telah dipindah", "silakan kunjungi", "has been moved", "has moved to", "please visit",
-	}
-	for _, kw := range migrationKeywords {
-		if strings.Contains(bodyLower, kw) {
-			return true, stripHTML(bodyStr)
-		}
-	}
-
-	return false, ""
-}
-
-func stripHTML(s string) string {
-	re := regexp.MustCompile(`<[^>]*>`)
-	return strings.TrimSpace(re.ReplaceAllString(s, ""))
-}
-
-func (p *Pool) runHeadlessDiagnostic(ctx context.Context, targetURL string, saveScreenshot bool) (string, string, string, error) {
-	// Concurrency control: acquire semaphore slot
-	select {
-	case p.chromeSem <- struct{}{}:
-		defer func() { <-p.chromeSem }()
-	case <-ctx.Done():
-		return "", "", "", ctx.Err()
-	}
-
-	onDemand := os.Getenv("CHROME_ON_DEMAND") == "true"
-
-	var chromeCtx context.Context
-	var cancelChrome context.CancelFunc
-	var allocCancel context.CancelFunc
-
-	if onDemand {
-		slog.Info("[Headless] Launching fresh Chrome on-demand instance", "url", targetURL)
-		opts := getChromeOpts()
-		var allocCtx context.Context
-		allocCtx, allocCancel = chromedp.NewExecAllocator(ctx, opts...)
-		
-		var cancel context.CancelFunc
-		chromeCtx, cancel = chromedp.NewContext(allocCtx)
-		cancelChrome = func() {
-			cancel()
-			allocCancel()
-		}
-	} else {
-		if err := p.ensureBrowser(); err != nil {
-			return "", "", "", fmt.Errorf("chrome not available: %w", err)
-		}
-		// Create a context with timeout derived from the shared browser context
-		tabCtx, cancelTab := context.WithTimeout(p.browserCtx, 40*time.Second)
-		
-		var cancel context.CancelFunc
-		chromeCtx, cancel = chromedp.NewContext(tabCtx)
-		cancelChrome = func() {
-			cancel()
-			cancelTab()
-		}
-	}
-	defer cancelChrome()
-
-	var pageText string
-	var pageTitle string
-	var buf []byte
-
-	// Construct actions list dynamically
-	actions := []chromedp.Action{
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			_, err := page.AddScriptToEvaluateOnNewDocument(`
-				// 1. Overwrite navigator.webdriver to undefined
-				Object.defineProperty(navigator, 'webdriver', {
-					get: () => undefined
-				});
-
-				// 2. Mock navigator.plugins to be non-empty
-				if (typeof PluginArray !== 'undefined') {
-					const mockPlugins = [
-						{ name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-						{ name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' }
-					];
-					const pluginList = [];
-					for (let i = 0; i < mockPlugins.length; i++) {
-						const p = mockPlugins[i];
-						const plugin = Object.create(Plugin.prototype);
-						Object.defineProperties(plugin, {
-							name: { get: () => p.name },
-							filename: { get: () => p.filename },
-							description: { get: () => p.description },
-							length: { get: () => 0 }
-						});
-						pluginList.push(plugin);
-					}
-					Object.defineProperty(navigator, 'plugins', {
-						get: () => {
-							const list = [...pluginList];
-							Object.defineProperty(list, 'length', { get: () => mockPlugins.length });
-							list.item = (index) => list[index];
-							list.namedItem = (name) => list.find(p => p.name === name);
-							return list;
-						}
-					});
-				}
-
-				// 3. Mock languages
-				Object.defineProperty(navigator, 'languages', {
-					get: () => ['en-US', 'en']
-				});
-
-				// 4. Mock window.chrome
-				window.chrome = {
-					app: {
-						isInstalled: false,
-						InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
-						RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
-					},
-					runtime: {
-						OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
-						OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
-						PlatformArch: { ARM: 'arm', ARM64: 'arm64', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
-						PlatformNaclArch: { ARM: 'arm', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
-						PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
-						RequestUpdateCheckStatus: { NO_UPDATE: 'no_update', THROTTLED: 'throttled', UPDATE_AVAILABLE: 'update_available' }
-					}
-				};
-
-				// 5. Mock WebGL vendor/renderer
-				if (typeof WebGLRenderingContext !== 'undefined') {
-					const getParameter = WebGLRenderingContext.prototype.getParameter;
-					WebGLRenderingContext.prototype.getParameter = function(parameter) {
-						// UNMASKED_VENDOR_WEBGL = 0x9245, UNMASKED_RENDERER_WEBGL = 0x9246
-						if (parameter === 0x9245) {
-							return 'Intel Inc.';
-						}
-						if (parameter === 0x9246) {
-							return 'Intel(R) UHD Graphics 620';
-						}
-						return getParameter.apply(this, arguments);
-					};
-				}
-
-				// 6. Spoof navigator.userAgentData to match Chrome 148
-				if (navigator.userAgentData) {
-					const mockData = {
-						brands: [
-							{ brand: 'Google Chrome', version: '148' },
-							{ brand: 'Not(A:Brand', version: '8' },
-							{ brand: 'Chromium', version: '148' }
-						],
-						mobile: false,
-						platform: 'Windows'
-					};
-					Object.defineProperty(navigator, 'userAgentData', {
-						get: () => mockData
-					});
-				}
-			`).Do(ctx)
-			return err
-		}),
-		chromedp.Navigate(targetURL),
-		chromedp.Sleep(3 * time.Second), // Let Javascript/SPA load
-		chromedp.Title(&pageTitle),
-		chromedp.Evaluate(`document.body.innerText`, &pageText),
-	}
-
-	if saveScreenshot && os.Getenv("SAVE_SCREENSHOT") != "false" {
-		actions = append(actions, chromedp.CaptureScreenshot(&buf))
-	}
-
-	err := chromedp.Run(chromeCtx, actions...)
-
-	if err != nil {
-		if !onDemand {
-			// If the error indicates browser connection was lost, cancel browser to force re-init next time
-			errStr := err.Error()
-			if strings.Contains(errStr, "channel is closed") || strings.Contains(errStr, "connection refused") || strings.Contains(errStr, "invalid session") {
-				p.mu.Lock()
-				if p.browserCancel != nil {
-					p.browserCancel()
-				}
-				p.mu.Unlock()
-			}
-		}
-		return "", "", "", err
-	}
-
-	base64Str := ""
-	if len(buf) > 0 {
-		base64Str = base64.StdEncoding.EncodeToString(buf)
-	}
-
-	if onDemand {
-		slog.Info("[Headless] Closed on-demand Chrome instance cleanly", "url", targetURL)
-	}
-	return base64Str, pageText, pageTitle, nil
-}
-
-func getChromeOpts() []chromedp.ExecAllocatorOption {
-	return []chromedp.ExecAllocatorOption{
-		chromedp.NoSandbox,
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-		chromedp.Flag("headless", "new"), // Use newer headless engine
-		chromedp.Flag("disable-background-networking", true),
-		chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
-		chromedp.Flag("disable-background-timer-throttling", true),
-		chromedp.Flag("disable-backgrounding-occluded-windows", true),
-		chromedp.Flag("disable-breakpad", true),
-		chromedp.Flag("disable-client-side-phishing-detection", true),
-		chromedp.Flag("disable-default-apps", true),
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disable-extensions", true),
-		chromedp.Flag("disable-features", "site-per-process,Translate,BlinkGenPropertyTrees"),
-		chromedp.Flag("disable-hang-monitor", true),
-		chromedp.Flag("disable-ipc-flooding-protection", true),
-		chromedp.Flag("disable-popup-blocking", true),
-		chromedp.Flag("disable-prompt-on-repost", true),
-		chromedp.Flag("disable-renderer-backgrounding", true),
-		chromedp.Flag("disable-sync", true),
-		chromedp.Flag("force-color-profile", "srgb"),
-		chromedp.Flag("metrics-recording-only", true),
-		chromedp.Flag("safebrowsing-disable-auto-update", true),
-		chromedp.Flag("password-store", "basic"),
-		chromedp.Flag("use-mock-keychain", true),
-
-		chromedp.Flag("ignore-certificate-errors", "true"),
-		chromedp.Flag("disable-web-security", "true"),
-		chromedp.Flag("disable-blink-features", "AutomationControlled"),
-		chromedp.Flag("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.217 Safari/537.36"),
-		chromedp.Flag("window-size", "1920,1080"),
-	}
-}
-
-func (p *Pool) ensureBrowser() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.browserCtx == nil || p.browserCtx.Err() != nil {
-		slog.Warn("Shared Chrome browser not running or crashed. Re-initializing...")
-		if p.browserCancel != nil {
-			p.browserCancel()
-		}
-		if p.allocCancel != nil {
-			p.allocCancel()
-		}
-
-		opts := getChromeOpts()
-		allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), opts...)
-		browserCtx, browserCancel := chromedp.NewContext(allocCtx)
-
-		// Run an empty action to spawn the process
-		if err := chromedp.Run(browserCtx); err != nil {
-			allocCancel()
-			return fmt.Errorf("failed to start Chrome: %w", err)
-		}
-
-		p.allocCancel = allocCancel
-		p.browserCtx = browserCtx
-		p.browserCancel = browserCancel
-		slog.Info("Shared Chrome browser initialized/re-initialized successfully")
-	}
-	return nil
-}
-
-func cleanPageTextExcerpt(text string, keyword string) string {
-	text = strings.ReplaceAll(text, "\n", " ")
-	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
-	
-	idx := strings.Index(strings.ToLower(text), strings.ToLower(keyword))
-	if idx == -1 {
-		if len(text) > 150 {
-			return text[:150] + "..."
-		}
-		return text
-	}
-	
-	start := idx - 50
-	if start < 0 {
-		start = 0
-	}
-	end := idx + 100
-	if end > len(text) {
-		end = len(text)
-	}
-	
-	excerpt := text[start:end]
-	if start > 0 {
-		excerpt = "..." + excerpt
-	}
-	if end < len(text) {
-		excerpt = excerpt + "..."
-	}
-	return strings.TrimSpace(excerpt)
-}
-
 func PingHost(host string) (bool, int) {
 	if host == "" {
 		return false, 0
@@ -2254,24 +1416,6 @@ func PingHost(host string) (bool, int) {
 	}
 
 	return false, 0
-}
-
-func extractHostingProvider(asnStr string) string {
-	if asnStr == "" || asnStr == "Unknown" {
-		return "Unknown"
-	}
-	if strings.Contains(asnStr, "(") && strings.Contains(asnStr, ")") {
-		start := strings.Index(asnStr, "(")
-		end := strings.Index(asnStr, ")")
-		if start < end {
-			return asnStr[start+1 : end]
-		}
-	}
-	parts := strings.Fields(asnStr)
-	if len(parts) > 1 && strings.HasPrefix(strings.ToUpper(parts[0]), "AS") {
-		return strings.Join(parts[1:], " ")
-	}
-	return asnStr
 }
 
 func isPrivateIPAddress(ipStr string) bool {
