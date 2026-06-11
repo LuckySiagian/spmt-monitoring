@@ -16,7 +16,7 @@ import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './service
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
-  const SC = { ONLINE: '#10b981', WARNING: '#10b981', DEGRADED: '#10b981', CRITICAL: '#10b981', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
+  const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
   const fmtTime = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
 
   return createPortal(

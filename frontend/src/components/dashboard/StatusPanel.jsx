@@ -24,7 +24,7 @@ function InfoModal({ onClose }) {
                 { s: 'ONLINE', c: '#10b981', t: 'HTTP 200-399 + RT ≤ 5.000ms', d: 'Website sehat, responsif, dan seluruh parameter valid.' },
                 { s: 'WARNING', c: '#f59e0b', t: 'Slow / WAF / Intercept', d: 'Website bisa diakses tetapi mengalami perlambatan atau pembatasan ringan.' },
                 { s: 'DEGRADED', c: '#f97316', t: 'Error / HTTP 5xx / SSL Invalid', d: 'Website masih merespon tetapi mengalami masalah yang mengganggu (misal 503, sertifikat SSL invalid).' },
-                { s: 'CRITICAL', c: '#eab308', t: 'Severe Timeout / WAF Block', d: 'Sangat sulit diakses, sebagian besar request gagal atau diblokir.' },
+                { s: 'CRITICAL', c: '#ef4444', t: 'Severe Timeout / WAF Block', d: 'Sangat sulit diakses, sebagian besar request gagal atau diblokir.' },
                 { s: 'OFFLINE', c: '#dc2626', t: 'Down / Timeout Total / TCP Fail', d: 'Website sama sekali tidak dapat dijangkau oleh sistem.' }
               ].map(item => (
                 <div key={item.s} style={{ display: 'flex', gap: 16, padding: 14, background: 'var(--bg-main)', borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -63,7 +63,7 @@ const BADGE = {
   ONLINE: { color: '#10b981', glow: 'rgba(16,185,129,0.15)' },
   WARNING: { color: '#f59e0b', glow: 'rgba(245,158,11,0.15)' },
   DEGRADED: { color: '#f97316', glow: 'rgba(249,115,22,0.15)' },
-  CRITICAL: { color: '#eab308', glow: 'rgba(234,179,8,0.15)' },
+  CRITICAL: { color: '#ef4444', glow: 'rgba(239,68,68,0.15)' },
   OFFLINE: { color: '#dc2626', glow: 'rgba(220,38,38,0.15)' },
   UNKNOWN: { color: '#94a3b8', glow: 'none' },
 }

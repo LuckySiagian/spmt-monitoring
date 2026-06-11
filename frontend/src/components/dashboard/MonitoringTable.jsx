@@ -7,9 +7,9 @@ import StatusBadgeIcon from '../common/StatusBadgeIcon'
 const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { color: '#10b981', border: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.1)' },
-    WARNING: { color: '#10b981', border: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.1)' },
-    DEGRADED: { color: '#10b981', border: 'rgba(249,115,22,0.3)', bg: 'rgba(249,115,22,0.1)' },
-    CRITICAL: { color: '#eab308', border: 'rgba(234,179,8,0.3)', bg: 'rgba(234,179,8,0.1)' },
+    WARNING: { color: '#f59e0b', border: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.1)' },
+    DEGRADED: { color: '#f97316', border: 'rgba(249,115,22,0.3)', bg: 'rgba(249,115,22,0.1)' },
+    CRITICAL: { color: '#ef4444', border: 'rgba(239,68,68,0.3)', bg: 'rgba(239,68,68,0.1)' },
     OFFLINE: { color: '#dc2626', border: 'rgba(220,38,38,0.3)', bg: 'rgba(220,38,38,0.1)' },
   }[status] || { color: '#4a5568', border: 'rgba(74,85,104,0.3)', bg: 'rgba(74,85,104,0.1)' }
   return (
@@ -40,9 +40,9 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
   const filterColors = {
     ALL: '#4a6fa5',
     ONLINE: '#10b981',
-    WARNING: '#10b981',
-    DEGRADED: '#10b981',
-    CRITICAL: '#eab308',
+    WARNING: '#f59e0b',
+    DEGRADED: '#f97316',
+    CRITICAL: '#ef4444',
     OFFLINE: '#dc2626',
   }
 

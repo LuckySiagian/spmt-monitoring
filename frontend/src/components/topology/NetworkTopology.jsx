@@ -8,7 +8,7 @@ const STATUS_COLORS = {
   ONLINE: '#10b981',
   WARNING: '#f59e0b',
   DEGRADED: '#f97316',
-  CRITICAL: '#eab308',
+  CRITICAL: '#ef4444',
   OFFLINE: '#ef4444',
   UNKNOWN: '#64748b'
 }

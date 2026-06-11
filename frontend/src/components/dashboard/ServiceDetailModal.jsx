@@ -6,9 +6,9 @@ import { Copy, Check } from 'lucide-react'
 
 const STATUS_COLORS = {
   ONLINE: '#10b981',
-  WARNING: '#10b981',
-  DEGRADED: '#10b981',
-  CRITICAL: '#eab308',
+  WARNING: '#f59e0b',
+  DEGRADED: '#f97316',
+  CRITICAL: '#ef4444',
   OFFLINE: '#dc2626',
   UNKNOWN: '#64748b'
 }
@@ -19,9 +19,9 @@ import StatusBadgeIcon from '../common/StatusBadgeIcon'
 const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    WARNING: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    DEGRADED: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
-    CRITICAL: { bg: 'rgba(234,179,8,0.15)', color: '#eab308', border: 'rgba(234,179,8,0.3)' },
+    WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
+    DEGRADED: { bg: 'rgba(249,115,22,0.15)', color: '#f97316', border: 'rgba(249,115,22,0.3)' },
+    CRITICAL: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
     OFFLINE: { bg: 'rgba(220,38,38,0.15)', color: '#dc2626', border: 'rgba(220,38,38,0.3)' },
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
   return (
@@ -292,22 +292,6 @@ const isPrivateIP = (ip) => {
   // 127.x.x.x (loopback)
   if (/^127\./.test(ip)) return true
   return false
-}
-
-const extractHostingProvider = (asnStr) => {
-  if (!asnStr || asnStr === 'Unknown') return 'Unknown'
-  if (asnStr.includes('(') && asnStr.includes(')')) {
-    const start = asnStr.indexOf('(')
-    const end = asnStr.indexOf(')')
-    if (start < end) {
-      return asnStr.substring(start + 1, end)
-    }
-  }
-  const parts = asnStr.split(/\s+/)
-  if (parts.length > 1 && parts[0].toUpperCase().startsWith('AS')) {
-    return parts.slice(1).join(' ')
-  }
-  return asnStr
 }
 
 function AnalisisKondisi({ website, sysHealth }) {
@@ -589,7 +573,7 @@ export default function ServiceDetailModal({ website, onClose }) {
             const CardRow = ({ label, value, valueColor, desc }) => (
               <div style={{
                 padding: '6px 0',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+                borderBottom: '1px solid var(--border)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 3
@@ -605,14 +589,14 @@ export default function ServiceDetailModal({ website, onClose }) {
                 </div>
                 {desc && (
                   <div style={{
-                    fontSize: 9.5,
-                    color: 'rgba(156, 163, 175, 0.85)',
-                    lineHeight: 1.35,
-                    background: 'rgba(30, 41, 59, 0.15)',
-                    padding: '4px 8px',
-                    borderRadius: 4,
-                    borderLeft: '2px solid rgba(99, 102, 241, 0.4)',
-                    marginTop: 2,
+                    fontSize: 10.5,
+                    color: 'var(--text-sub)',
+                    lineHeight: 1.5,
+                    background: 'var(--accent-light)',
+                    padding: '5px 9px',
+                    borderRadius: 5,
+                    borderLeft: '2px solid var(--accent)',
+                    marginTop: 3,
                     textAlign: 'left'
                   }}>
                     {desc}
@@ -623,43 +607,90 @@ export default function ServiceDetailModal({ website, onClose }) {
 
             const status = latestLog?.status || website.status || 'UNKNOWN';
             const isOnline = status === 'ONLINE';
+            const isWarn = status === 'WARNING' || status === 'DEGRADED';
             const isCrit = status === 'CRITICAL';
-            const isMigrated = !!ev?.is_migrated;
 
-            const boxBg = isMigrated
-              ? 'rgba(245, 158, 11, 0.05)'
-              : isOnline 
-                ? 'rgba(16, 185, 129, 0.05)' 
-                : isCrit 
-                  ? 'rgba(234, 179, 8, 0.05)' 
-                  : 'rgba(239, 68, 68, 0.05)';
+            const boxColor = isOnline
+              ? '#10b981'
+              : isWarn
+                ? '#f59e0b'
+                : isCrit
+                  ? '#ef4444'
+                  : '#dc2626';
 
-            const boxBorder = isMigrated
-              ? 'rgba(245, 158, 11, 0.18)'
-              : isOnline 
-                ? 'rgba(16, 185, 129, 0.15)' 
-                : isCrit 
-                  ? 'rgba(234, 179, 8, 0.15)' 
-                  : 'rgba(239, 68, 68, 0.15)';
-
-            const boxColor = isMigrated
-              ? '#f59e0b'
-              : isOnline 
-                ? '#10b981' 
-                : isCrit 
-                  ? '#eab308' 
-                  : '#ef4444';
+            // Derive translucent bg/border from the chosen status color.
+            const boxBg = boxColor + '0d';     // ~5% alpha
+            const boxBorder = boxColor + '26'; // ~15% alpha
 
             let statusText = 'ONLINE (Normal)';
-            if (isMigrated) statusText = 'ONLINE (Migrasi)';
+            if (isWarn) statusText = status === 'DEGRADED' ? 'DEGRADED (Menurun)' : 'WARNING (Perlu Perhatian)';
             else if (isCrit) statusText = 'CRITICAL (Bermasalah)';
             else if (status === 'OFFLINE') statusText = 'OFFLINE (Terputus)';
 
             const getStatusDesc = (status) => {
               if (status === 'ONLINE') return 'Website berjalan normal dan dapat diakses publik dengan lancar.'
-              if (status === 'CRITICAL') return 'Website mengalami gangguan serius (seperti respon lambat atau SSL tidak valid).'
-              if (status === 'OFFLINE') return 'Website terputus sepenuhnya. Server tidak merespon koneksi atau mati.'
+              if (status === 'WARNING' || status === 'DEGRADED') return 'Website masih dapat diakses, namun responnya lambat atau mengembalikan kode 4xx (client error).'
+              if (status === 'CRITICAL') return 'Server mengembalikan error 5xx (gangguan di sisi aplikasi/server).'
+              if (status === 'OFFLINE') return 'Website terputus: DNS gagal, timeout, atau koneksi ditolak.'
               return 'Kondisi operasional website belum dapat ditentukan.'
+            }
+
+            // Narasi lengkap kondisi website. PENTING: setiap baris detail di
+            // sini memakai fungsi penjelasan yang SAMA PERSIS dengan yang dipakai
+            // di kartu masing-masing parameter (getStatusDesc, getDnsDesc,
+            // getPingDesc, getHttpDesc, getResponseTimeDesc, getSslDesc). Dengan
+            // begitu penjelasan di atas dan di bawah parameter dijamin sejalan /
+            // tidak berbeda-beda. Tidak ada logika penentuan status yang diubah.
+            const getKondisiNarasi = () => {
+              const nama = website?.name || 'Website ini'
+              const st = latestLog?.status || website.status
+              const dnsVal = ev?.dns_resolved
+              const pingStatus = latestLog?.icmp_status ?? ev?.icmp_status
+              const pingLat = latestLog?.icmp_latency_ms ?? ev?.icmp_latency_ms
+              const tcpLat = ev?.tcp_latency_ms
+              const sslVal = ev?.tls_handshake_ok
+
+              const garis = '──────────────────────────────'
+
+              // Kalimat pembuka = ringkasan status keseluruhan (teks status sama
+              // persis dengan kartu "Status").
+              const pembuka = `${nama} saat ini berstatus ${statusText}. ${getStatusDesc(st)}`
+
+              // Rincian per parameter — teks diambil dari fungsi yang sama dengan
+              // yang tampil di bawah tiap parameter, jadi pasti konsisten.
+              const detail = [
+                `• Domain (DNS): ${getDnsDesc(dnsVal)}`,
+                `• Ping ke server: ${getPingDesc(pingStatus, pingLat, tcpLat)}`,
+                `• Respon server (HTTP): ${getHttpDesc(code, ev?.http_error, nama)}`,
+                `• Kecepatan respon: ${getResponseTimeDesc(rt)}`,
+                `• Keamanan (SSL): ${getSslDesc(sslVal)}`,
+              ]
+
+              // Penutup naratif sesuai status.
+              let penutup
+              if (isOnline) {
+                penutup = `Kesimpulannya, semua indikator dalam kondisi normal sehingga ${nama} dapat diakses pengunjung dengan lancar. Tidak ada tindakan yang perlu dilakukan.`
+              } else if (isCrit) {
+                penutup = `Kesimpulannya, server dapat dihubungi namun aplikasi di dalamnya mengembalikan error, sehingga halaman gagal ditampilkan dengan benar. Masalah berada di sisi server/aplikasi dan perlu ditangani oleh tim teknis pemilik website.`
+              } else if (st === 'OFFLINE') {
+                penutup = dnsVal === false
+                  ? `Kesimpulannya, ${nama} terputus karena domainnya tidak bisa diterjemahkan ke alamat IP (DNS gagal). Pastikan domain masih aktif dan konfigurasi DNS benar.`
+                  : `Kesimpulannya, ${nama} terputus karena server tidak menjawab sama sekali (timeout atau koneksi ditolak). Pastikan server dalam keadaan menyala dan jaringannya normal.`
+              } else if (isWarn) {
+                penutup = `Kesimpulannya, ${nama} masih dapat diakses namun ada indikator yang kurang optimal (respon lambat atau mengembalikan kode 4xx). Sebaiknya dipantau agar gangguannya tidak bertambah parah.`
+              } else {
+                penutup = `Sistem masih mengumpulkan data pemeriksaan untuk ${nama}. Mohon tunggu sejenak hingga pengecekan pertama selesai.`
+              }
+
+              return [
+                pembuka,
+                '',
+                garis,
+                'Rincian hasil pemeriksaan:',
+                ...detail,
+                '',
+                penutup,
+              ].join('\n')
             }
 
             const getHttpDesc = (code, error, websiteName) => {
@@ -754,11 +785,6 @@ export default function ServiceDetailModal({ website, onClose }) {
               return `Website dilayani oleh aplikasi web server ${server}.`
             }
 
-            const getProviderDesc = (provider) => {
-              if (!provider || provider === 'Unknown') return 'Nama penyedia hosting/jaringan tidak dapat diidentifikasi.'
-              return `Server website diletakkan di infrastruktur milik perusahaan ${provider}.`
-            }
-
             return (
               <div>
                 {/* 1. KONDISI WEBSITE */}
@@ -790,6 +816,20 @@ export default function ServiceDetailModal({ website, onClose }) {
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                     {latestLog?.recommendation || website.recommendation || 'Halo! Sistem sedang menyiapkan penjelasan kondisi website Anda. Mohon tunggu sejenak.'}
+                  </div>
+
+                  {/* Penjelasan "mengapa" status seperti ini + analogi toko (untuk awam) */}
+                  <div style={{
+                    marginTop: 14,
+                    paddingTop: 14,
+                    borderTop: `1px dashed ${boxBorder}`,
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: 'var(--text)',
+                    lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap'
+                  }}>
+                    {getKondisiNarasi()}
                   </div>
                   {screenshot && code && (code === 400 || code === 403 || code === 401) ? (
                     <div style={{
@@ -900,7 +940,6 @@ export default function ServiceDetailModal({ website, onClose }) {
 
                   <CardBox title="INFRASTRUCTURE">
                     <CardRow label="Server" value={ev?.server_header || 'Unknown'} desc={getServerDesc(ev?.server_header)} />
-                    <CardRow label="Hosting Provider" value={ev?.hosting_provider || (ev?.hosting_asn ? extractHostingProvider(ev.hosting_asn) : 'Unknown')} desc={getProviderDesc(ev?.hosting_provider || (ev?.hosting_asn ? extractHostingProvider(ev.hosting_asn) : 'Unknown'))} />
                   </CardBox>
                 </div>
 
@@ -960,7 +999,6 @@ export default function ServiceDetailModal({ website, onClose }) {
                         <strong style={{ color: 'var(--accent)' }}>Infrastructure (Infrastruktur):</strong>
                         <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                           <li><strong>Server:</strong> Perangkat lunak web server yang memproses website (misal: Nginx, Apache, IIS).</li>
-                          <li><strong>Hosting Provider:</strong> Perusahaan penyedia server fisik tempat website diletakkan.</li>
                         </ul>
                       </div>
                     </div>

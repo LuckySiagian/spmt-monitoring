@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight } from 'lucide-react'
 import Badge from '../components/common/Badge'
 
-const SC = { ONLINE: '#10b981', WARNING: '#10b981', DEGRADED: '#10b981', CRITICAL: '#eab308', OFFLINE: '#dc2626', SERVER_DOWN: '#dc2626', WEB_DOWN: '#f97316', DNS_ERROR: '#8b5cf6', SSL_INVALID: '#ec4899', SLOW: '#eab308' }
+const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', SERVER_DOWN: '#dc2626', WEB_DOWN: '#f97316', DNS_ERROR: '#8b5cf6', SSL_INVALID: '#ec4899', SLOW: '#eab308' }
 // SB removed in favor of common Badge
 const FILTERS = ['ALL', 'ONLINE', 'CRITICAL', 'OFFLINE']
 
