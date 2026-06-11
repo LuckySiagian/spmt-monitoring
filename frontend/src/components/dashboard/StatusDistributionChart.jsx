@@ -68,7 +68,7 @@ export default function StatusDistributionChart({ websites }) {
           <>
             {/* Rose / Radial chart */}
             <div style={styles.chartWrap}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <RadialBarChart
                   cx="50%"
                   cy="50%"
@@ -157,7 +157,7 @@ const styles = {
   chartWrap: {
     position: 'relative',
     width: '100%', flex: 1,
-    minHeight: 0,
+    minHeight: 180, // lantai tinggi: cegah ResponsiveContainer mengukur 0 di render pertama
   },
   centerLabel: {
     position: 'absolute', top: '50%', left: '50%',

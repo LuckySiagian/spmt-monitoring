@@ -81,6 +81,16 @@ export default function LoginPage({ onLogin }) {
           0%, 100% { box-shadow: 0 0 10px rgba(37, 99, 235, 0.2); }
           50% { box-shadow: 0 0 20px rgba(37, 99, 235, 0.5); }
         }
+
+        /* RESPONSIVE: di layar kecil video berat dimatikan,
+           background fallback gambar (diset di style root) yang tampil. */
+        @media (max-width: 768px) {
+          .login-video { display: none; }
+        }
+        /* Turnstile (~300px) diperkecil agar tidak overflow di layar sangat sempit */
+        @media (max-width: 360px) {
+          .login-turnstile { transform: scale(0.82); transform-origin: center; }
+        }
       `}</style>
 
       {/* BACK BUTTON REMOVED FROM TOP */}
@@ -91,7 +101,7 @@ export default function LoginPage({ onLogin }) {
         muted
         playsInline
         onEnded={handleVideoEnd}
-        className="night-port-video"
+        className="night-port-video login-video"
         style={s.video}
         src={videos[videoIndex]}
       />
@@ -119,6 +129,9 @@ export default function LoginPage({ onLogin }) {
         <form onSubmit={handleSubmit} style={s.form}>
 
           <input
+            id="username"
+            name="username"
+            autoComplete="username"
             style={s.input}
             type="text"
             value={form.username}
@@ -130,6 +143,9 @@ export default function LoginPage({ onLogin }) {
           {isRegister && (
             <>
               <input
+                id="email"
+                name="email"
+                autoComplete="email"
                 style={s.input}
                 type="email"
                 value={form.email}
@@ -138,6 +154,9 @@ export default function LoginPage({ onLogin }) {
                 required
               />
               <input
+                id="telegram_id"
+                name="telegram_id"
+                autoComplete="off"
                 style={s.input}
                 type="text"
                 value={form.telegram_id}
@@ -148,6 +167,9 @@ export default function LoginPage({ onLogin }) {
           )}
 
           <input
+            id="password"
+            name="password"
+            autoComplete={isRegister ? "new-password" : "current-password"}
             style={s.input}
             type="password"
             value={form.password}
@@ -156,8 +178,8 @@ export default function LoginPage({ onLogin }) {
             required
           />
 
-          <div style={{ alignSelf: 'center', margin: '10px 0' }}>
-            <Turnstile 
+          <div className="login-turnstile" style={{ alignSelf: 'center', margin: '10px 0', maxWidth: '100%' }}>
+            <Turnstile
               siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '3x00000000000000000000FF'} 
               onSuccess={(token) => setTurnstileToken(token)}
             />
@@ -194,13 +216,15 @@ const s = {
 
   root: {
     width: '100%',
-    height: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    overflowY: 'auto',
+    padding: 'clamp(16px, 4vw, 32px)',
     position: 'relative',
-    background: '#e7e9ebff'
+    // Fallback background (tampil di HP saat video dimatikan via .login-video)
+    background: '#e7e9ebff url(/images/background/login-bg.jpg) center/cover no-repeat'
   },
   backBtn: {
     position: 'absolute',
@@ -223,7 +247,7 @@ const s = {
   },
 
 video:{
-position:'absolute',
+position:'fixed',
 top:0,
 left:0,
 width:'100%',
@@ -233,7 +257,7 @@ zIndex:0
 },
 
   overlay:{
-    position:'absolute',
+    position:'fixed',
     inset:0,
     background:'linear-gradient(135deg, rgba(209, 213, 223, 0.33) 0%, rgba(60, 88, 122, 0.3) 100%)',
     zIndex:1
@@ -242,9 +266,9 @@ zIndex:0
 card:{
 position:'relative',
 zIndex:2,
-width:'400px',
+width:'min(400px, 92vw)',
 maxWidth:'90%',
-padding:'40px',
+padding:'clamp(24px, 5vw, 40px)',
 borderRadius:'14px',
 background:'rgba(255, 255, 255, 0.95)',
 backdropFilter:'blur(15px)',
@@ -260,7 +284,7 @@ marginBottom:'20px'
 },
 
 logo:{
-height:'90px',
+height:'clamp(64px, 18vw, 90px)',
 background:'#fdfefeff',
 padding: '10px 20px',
 borderRadius: '12px',
@@ -270,7 +294,7 @@ objectFit:'contain'
 },
 
 welcomeText:{
-fontSize:'24px',
+fontSize:'clamp(20px, 5vw, 24px)',
 fontWeight:700,
 color:'var(--text)'
 },
@@ -295,9 +319,10 @@ borderRadius:'12px',
 border:'1px solid var(--border)',
 background:'#ffffff',
 color:'var(--text)',
-fontSize: '14px',
+fontSize: '16px', // >=16px agar iOS tidak auto-zoom saat input difokus
 outline:'none',
-transition: 'all 0.2s'
+transition: 'all 0.2s',
+boxSizing: 'border-box'
 },
 
 btn:{

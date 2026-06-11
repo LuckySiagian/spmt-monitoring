@@ -146,7 +146,7 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
       </div>
 
       {/* Chart */}
-      <div style={{ flex:1, padding:'8px 4px 4px', minHeight:0 }}>
+      <div style={{ flex:1, padding:'8px 4px 4px', minHeight:160 }}>
         {data.length===0 && !loading ? (
           <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:8, color:'var(--text-muted)' }}>
             <span style={{ fontSize:24 }}>📊</span>
