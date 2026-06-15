@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Zap, AlertTriangle, Activity, Globe, Shield, Clock, RefreshCw, 
-  Terminal, BarChart3, PieChart, ShieldAlert, WifiOff 
+import {
+  Zap, AlertTriangle, Activity, Globe, Shield, Clock, RefreshCw,
+  Terminal, BarChart3, PieChart, ShieldAlert, WifiOff, Mail, Send, CheckCircle
 } from 'lucide-react';
 
 const AdminToolsPage = () => {
@@ -17,6 +17,26 @@ const AdminToolsPage = () => {
   const [loading, setLoading] = useState({});
   const [distribution, setDistribution] = useState(null);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [reportState, setReportState] = useState('idle'); // idle | sending | sent | error
+  const [reportMsg, setReportMsg] = useState('');
+
+  const sendWeeklyReport = async () => {
+    setReportState('sending');
+    setReportMsg('');
+    try {
+      const token = localStorage.getItem('spmt_token');
+      const res = await axios.post('http://localhost:8080/reports/weekly/send', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setReportState('sent');
+      setReportMsg(res.data?.message || 'Laporan terkirim ke semua email terdaftar.');
+      setTimeout(() => setReportState('idle'), 5000);
+    } catch (err) {
+      console.error('Failed to send weekly report:', err);
+      setReportState('error');
+      setReportMsg(err.response?.data?.error || 'Gagal mengirim laporan. Pastikan SMTP terkonfigurasi & Anda SuperAdmin.');
+    }
+  };
 
   const toggleChaos = async (mode) => {
     setLoading(prev => ({ ...prev, [mode]: true }));
@@ -168,6 +188,53 @@ const AdminToolsPage = () => {
             <span>Target: Maintain ONLINE > 90% in healthy environment.</span>
           </div>
         </div>
+
+        {/* NOTIFICATION TOOLS CARD */}
+        <div style={styles.card}>
+          <div style={styles.cardHeader}>
+            <div style={styles.cardIconGroup}>
+              <Mail size={20} color="var(--primary)" />
+              <h2 style={styles.cardTitle}>Notification Tools</h2>
+            </div>
+            <span style={styles.badge}>Email</span>
+          </div>
+          <p style={styles.cardDesc}>
+            Laporan uptime otomatis dikirim ke seluruh email terdaftar setiap Senin 08:00.
+            Gunakan tombol di bawah untuk mengirim laporan saat ini juga (tanpa menunggu jadwal).
+          </p>
+
+          <button
+            onClick={sendWeeklyReport}
+            disabled={reportState === 'sending'}
+            style={{
+              ...styles.reportBtn,
+              opacity: reportState === 'sending' ? 0.6 : 1,
+              cursor: reportState === 'sending' ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {reportState === 'sending'
+              ? <><RefreshCw size={16} className="spin" /> Mengirim...</>
+              : reportState === 'sent'
+                ? <><CheckCircle size={16} /> Terkirim</>
+                : <><Send size={16} /> Kirim Laporan Sekarang</>}
+          </button>
+
+          {reportMsg && (
+            <div style={{
+              ...styles.reportMsg,
+              color: reportState === 'error' ? '#ef4444' : '#10b981',
+              background: reportState === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
+            }}>
+              {reportState === 'error' ? <AlertTriangle size={14} /> : <CheckCircle size={14} />}
+              <span>{reportMsg}</span>
+            </div>
+          )}
+
+          <div style={styles.auditNote}>
+            <Clock size={14} />
+            <span>Jadwal: Senin 08:00 (atur via REPORT_WEEKDAY / REPORT_HOUR).</span>
+          </div>
+        </div>
       </div>
       
       <div style={styles.footerNote}>
@@ -233,6 +300,16 @@ const styles = {
   progressBarFill: { height: '100%', borderRadius: '10px', transition: 'width 1s ease-in-out' },
   loadingState: { color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center', width: '100%' },
   refreshBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' },
+  reportBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    padding: '12px 18px', borderRadius: '12px', border: 'none',
+    background: 'var(--primary)', color: '#fff', fontSize: '14px', fontWeight: 800,
+    width: '100%', transition: 'all 0.2s ease'
+  },
+  reportMsg: {
+    marginTop: '14px', padding: '12px', borderRadius: '10px', fontSize: '13px',
+    fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px'
+  },
   auditNote: { 
     marginTop: '25px', 
     padding: '12px', 

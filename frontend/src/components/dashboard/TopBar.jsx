@@ -7,10 +7,11 @@ import MetricDetailModal from './MetricDetailModal'
 
 const fmtSLA = v => v == null ? '0.00' : Number(v).toFixed(2)
 const DROPDOWN_ID = 'profile-dd'
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
 function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbout, onClose, rect }) {
   if (!rect) return null
-  const { themeId, setTheme, THEME_OPTIONS } = useTheme()
+  const { themeId, setTheme, THEME_OPTIONS, t } = useTheme()
   const rc = { superadmin: '#7c3aed', admin: '#3b82f6', viewer: '#64748b' }[user?.role] || '#64748b'
   const rl = { superadmin: 'SuperAdmin', admin: 'Admin', viewer: 'Viewer' }[user?.role] || 'User'
 
@@ -37,27 +38,27 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
       </div>
 
       <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>CHOOSE THEME</div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>{t.chooseTheme}</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {THEME_OPTIONS.map(t => (
-            <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
+          {THEME_OPTIONS.map(opt => (
+            <button key={opt.id} onClick={() => setTheme(opt.id)} title={opt.dark ? t.darkMode : t.lightMode}
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 8px',
-                background: themeId === t.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.02)',
-                border: `1px solid ${themeId === t.id ? 'var(--accent)' : 'var(--border)'}`,
+                background: themeId === opt.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.02)',
+                border: `1px solid ${themeId === opt.id ? 'var(--accent)' : 'var(--border)'}`,
                 borderRadius: 8, cursor: 'pointer', color: 'var(--text)', fontSize: 11, fontWeight: 700, transition: 'all 0.2s',
-                boxShadow: themeId === t.id ? `0 0 8px ${t.color}20` : 'none'
+                boxShadow: themeId === opt.id ? `0 0 8px ${opt.color}20` : 'none'
               }}
             >
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
-              <span style={{ whiteSpace: 'nowrap' }}>{t.name}</span>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap' }}>{opt.dark ? t.darkMode : t.lightMode}</span>
             </button>
           ))}
         </div>
       </div>
 
       <div style={{ padding: '4px' }}>
-        {[{ icon: '👤', label: 'Profile', action: onProfile }, { icon: '⚙️', label: 'Settings', action: onSettings }, { icon: 'ℹ️', label: 'About', action: onAbout }].map(item => (
+        {[{ icon: '👤', label: t.profile, action: onProfile }, { icon: '⚙️', label: t.settings, action: onSettings }, { icon: 'ℹ️', label: t.about, action: onAbout }].map(item => (
           <button key={item.label} onClick={() => { item.action(); onClose() }}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--text)', fontSize: 14, fontWeight: 600, borderRadius: 8, transition: 'all 0.2s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-light)'}
@@ -70,7 +71,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
           style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'var(--offline)', fontSize: 14, fontWeight: 700, borderRadius: 8, transition: 'all 0.2s' }}
           onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-          <span style={{ fontSize: 16 }}>🚪</span>Logout
+          <span style={{ fontSize: 16 }}>🚪</span>{t.logout}
         </button>
       </div>
     </div>,
@@ -84,7 +85,8 @@ export default function TopBar({
   isTvMode, onToggleTvMode, onProfile, onSettings, onAbout, onOpenDetail
 }) {
   const { user } = useAuth()
-  const { themeId, setTheme, t } = useTheme()
+  const { themeId, setTheme, t, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const [clock, setClock] = useState(new Date())
   const [showLogout, setShowLogout] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
@@ -124,12 +126,12 @@ export default function TopBar({
   const totalCount = websites.length
 
   const metrics = [
-    { label: t?.online || 'ONLINE', value: onlineCount, color: '#10b981' },
-    { label: t?.critical || 'CRITICAL', value: criticalCount + degradedCount + warningCount, color: '#d97706' },
-    { label: t?.offline || 'OFFLINE', value: offlineCount, color: '#ef4444' },
-    { label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#0ea5e9' },
-    { label: t?.total || 'TOTAL', value: totalCount, color: '#64748b' },
-    { label: 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#8b5cf6' },
+    { id: 'online', label: t?.online || 'ONLINE', value: onlineCount, color: '#10b981' },
+    { id: 'critical', label: t?.critical || 'CRITICAL', value: criticalCount + degradedCount + warningCount, color: '#d97706' },
+    { id: 'offline', label: t?.offline || 'OFFLINE', value: offlineCount, color: '#ef4444' },
+    { id: 'sla', label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#0ea5e9' },
+    { id: 'total', label: t?.total || 'TOTAL', value: totalCount, color: '#64748b' },
+    { id: 'avg-rt', label: t?.avgRt || 'AVG RT', value: `${Math.round(summary?.avg_response_time ?? 0)}ms`, color: '#8b5cf6' },
   ]
 
   const slaPct = Number(summary?.sla_percent || 100);
@@ -184,24 +186,17 @@ export default function TopBar({
           gap: '8px'
         }}>
           {metrics.map(m => {
-            const active = activeMetric === m.label
-            const isAlert = (m.label === 'ALERTS' || m.label === t?.alerts) && m.value > 0
+            const active = activeMetric === m.id
+            const isAlert = (m.id === 'alerts') && m.value > 0
             const isDark = themeId === 'theme-dark'
 
-            // Generate clean class names for each metric type
-            const labelKey = m.label.toUpperCase().replace(/\s+/g, '-');
-            const statusClass = labelKey.includes('ONLINE') ? 'online' :
-              labelKey.includes('CRITICAL') ? 'critical' :
-                labelKey.includes('OFFLINE') ? 'offline' :
-                  labelKey.includes('SLA') ? 'sla' :
-                    labelKey.includes('TOTAL') ? 'total' :
-                      labelKey.includes('AVG-RT') ? 'avg-rt' :
-                        labelKey.includes('ALERTS') ? 'alerts' : 'unknown';
+            // Generate clean class names for each metric type using the stable id
+            const statusClass = m.id;
 
             return (
-              <div key={m.label} title={`Detail ${m.label}`}
+              <div key={m.id} title={`${t?.detail || 'Detail'} ${m.label}`}
                 className={`metric-card m-${statusClass} hover-float`}
-                onMouseEnter={() => setHoveredMetric(m.label)}
+                onMouseEnter={() => setHoveredMetric(m.id)}
                 onMouseLeave={() => setHoveredMetric(null)}
                 style={{
                   cursor: 'pointer', userSelect: 'none',
@@ -219,12 +214,12 @@ export default function TopBar({
                   borderRadius: 8,
                   transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                   position: 'relative',
-                  zIndex: hoveredMetric === m.label ? 100 : 1
+                  zIndex: hoveredMetric === m.id ? 100 : 1
                 }}
-                onClick={() => setActiveMetric(active ? null : m.label)}>
+                onClick={() => setActiveMetric(active ? null : m.id)}>
 
                 {/* Bubble Animation */}
-                {hoveredMetric === m.label && (
+                {hoveredMetric === m.id && (
                   <div className="bubble-wrap">
                     {[...Array(6)].map((_, i) => (
                       <div key={i} className="bubble-anim" style={{
@@ -280,7 +275,7 @@ export default function TopBar({
 
         {/* Actions */}
         <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button onClick={onToggleTvMode} title={isTvMode ? "Exit Full Screen" : "Enter Full Screen"}
+          <button onClick={onToggleTvMode} title={isTvMode ? t.exitFullScreen : t.enterFullScreen}
             onMouseEnter={e => {
               e.currentTarget.style.transform = 'scale(1.1)';
               e.currentTarget.style.boxShadow = '0 0 12px var(--accent)';
@@ -317,10 +312,10 @@ export default function TopBar({
             className="hover-float"
             style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: '160px', transition: 'all 0.3s ease' }}>
             <div className={isClockHovered ? 'rainbow-text' : ''} style={{ color: 'var(--primary)', fontSize: '32px', fontWeight: 900, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
-              {clock.toLocaleTimeString('id-ID', { hour12: false })}
+              {clock.toLocaleTimeString(locale, { hour12: false })}
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>
-              {clock.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })}
+              {clock.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}
             </div>
           </div>
 

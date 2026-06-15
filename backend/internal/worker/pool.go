@@ -227,7 +227,7 @@ func (p *Pool) RestartWebsite(w model.Website) {
 }
 
 func (p *Pool) TriggerCheck(w model.Website) {
-	p.jobs <- MonitorJob{Website: w, Manual: false}
+	go p.check(w, -1, true)
 }
 
 func (p *Pool) RevalidateAll() {
@@ -237,7 +237,7 @@ func (p *Pool) RevalidateAll() {
 		return
 	}
 
-	slog.Info("Triggering instant revalidation due to network change", slog.Int("count", len(websites)))
+	slog.Info("Triggering instant revalidation", slog.Int("count", len(websites)))
 
 	// Reset states to ensure fresh diagnosis
 	p.mu.Lock()
@@ -245,7 +245,7 @@ func (p *Pool) RevalidateAll() {
 	p.mu.Unlock()
 
 	for _, w := range websites {
-		p.jobs <- MonitorJob{Website: *w, Manual: true}
+		go p.check(*w, -1, true)
 	}
 }
 
@@ -746,27 +746,41 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		extras.ContentType = resp.Header.Get("Content-Type")
 		extras.ServerHeader = resp.Header.Get("Server")
 		
-		// WAF Detection
+		// WAF / edge detection. Used downstream to tell a genuine application
+		// 4xx apart from our monitoring agent being fingerprinted as a bot by an
+		// edge/WAF (see the bot-block refinement in evaluateFinalStatus).
 		extras.WAFDetected = "Not Detected"
 		serverLower := strings.ToLower(extras.ServerHeader)
+		viaLower := strings.ToLower(resp.Header.Get("Via"))
+		hasXCache := resp.Header.Get("X-Cache") != "" || resp.Header.Get("X-Cache-Hits") != ""
 		if resp.Header.Get("x-sucuri-id") != "" || serverLower == "sucuri/cloudproxy" {
 			extras.WAFDetected = "Sucuri WAF"
-		} else if resp.Header.Get("x-amz-cf-id") != "" || serverLower == "cloudfront" {
+		} else if resp.Header.Get("x-amz-cf-id") != "" || strings.Contains(serverLower, "cloudfront") {
 			extras.WAFDetected = "AWS WAF / CloudFront"
 		} else if resp.Header.Get("cf-ray") != "" || serverLower == "cloudflare" {
 			extras.WAFDetected = "Cloudflare"
 		} else if resp.Header.Get("x-waf-name") != "" {
 			extras.WAFDetected = resp.Header.Get("x-waf-name")
-		} else if strings.Contains(serverLower, "akamai") {
-			extras.WAFDetected = "Akamai WAF"
-		} else if strings.Contains(serverLower, "imperva") || strings.Contains(serverLower, "incapsula") {
+		} else if strings.Contains(serverLower, "akamai") || strings.Contains(viaLower, "akamai") {
+			extras.WAFDetected = "Akamai"
+		} else if strings.Contains(serverLower, "imperva") || strings.Contains(serverLower, "incapsula") || resp.Header.Get("x-iinfo") != "" {
 			extras.WAFDetected = "Imperva WAF"
+		} else if strings.Contains(serverLower, "fastly") || strings.Contains(viaLower, "varnish") {
+			extras.WAFDetected = "Fastly"
 		}
 
+		// CDN/edge presence — a broader signal than WAF, used as a secondary
+		// hint that a 403/429 is bot-fingerprinting rather than a real outage.
 		cfRay := resp.Header.Get("Cf-Ray")
 		if strings.Contains(serverLower, "cloudflare") || cfRay != "" {
 			extras.IsCDN = true
 			extras.CDNProvider = "Cloudflare"
+		} else if extras.WAFDetected != "Not Detected" {
+			extras.IsCDN = true
+			extras.CDNProvider = extras.WAFDetected
+		} else if viaLower != "" || hasXCache {
+			extras.IsCDN = true
+			extras.CDNProvider = "CDN/Edge"
 		}
 	}
 
@@ -964,6 +978,26 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 	// detection no longer participate in status determination.
 	newStatus, healthScore, interpretation, recommendation := classifyStatus(l)
 
+	// ─── WAF / human-verification refinement ─────────────────────
+	// A 403/429/503 carrying a WAF/CDN/CAPTCHA fingerprint is almost always our
+	// monitoring agent being challenged as a bot, NOT a real outage or a genuine
+	// authorization error from the application. The server clearly answered
+	// (TCP+TLS+HTTP all succeeded); only the anti-bot layer refused our agent, so
+	// for real human visitors the site works. We therefore report it ONLINE — but
+	// relabel the reason so operators know the automated check was limited and can
+	// tell this apart from a genuine application 4xx (a pure 403 stays CRITICAL).
+	botBlocked, wafName := detectHumanVerification(l, extras, body)
+	if botBlocked {
+		newStatus = model.StatusOnline
+		healthScore = 90
+		interpretation = fmt.Sprintf(
+			"ONLINE (terlindungi %s): server merespons HTTP %d untuk verifikasi manusia/anti-bot. Situs normal untuk pengunjung biasa, tetapi pengecekan otomatis tidak dapat menembus verifikasi.",
+			wafName, *l.StatusCode)
+		recommendation = []string{
+			fmt.Sprintf("Daftarkan IP server monitoring ke allowlist %s pada target agar status terverifikasi penuh.", wafName),
+		}
+	}
+
 	report := map[string]interface{}{
 		"primary_key":        string(newStatus),
 		"evidence":           buildEvidenceList(l),
@@ -971,6 +1005,8 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 		"confidence_score":   100,
 		"confidence_label":   "Deterministik (DNS + HTTP)",
 		"recommended_action": recommendation,
+		"bot_blocked":        botBlocked,
+		"waf_name":           wafName,
 	}
 	evidence["investigation_report"] = report
 
@@ -1024,8 +1060,55 @@ const (
 	warningResponseThresholdMs = 3000
 	// failConfirmThreshold: consecutive hard-down samples required before a site is
 	// reported OFFLINE/CRITICAL (debounce against transient blips).
-	failConfirmThreshold = 2
+	failConfirmThreshold = 3
 )
+
+// detectHumanVerification reports whether a 403/429/503 response is an anti-bot
+// challenge (CDN/WAF/CAPTCHA) rather than a genuine outage or authorization error.
+// It returns true plus a human-readable label for the protection layer.
+//
+// The server having answered at all (we received an HTTP status) means TCP+TLS
+// succeeded and the origin/edge is alive; only our automated agent was refused.
+// Detection uses two tiers: explicit WAF/CDN header fingerprints (strongest), and
+// challenge/CAPTCHA markers in the response body (catches cases with no CDN header).
+func detectHumanVerification(l *model.MonitoringLog, extras probeExtras, body []byte) (bool, string) {
+	if l.StatusCode == nil {
+		return false, ""
+	}
+	switch *l.StatusCode {
+	case 403, 429, 503:
+		// eligible
+	default:
+		return false, ""
+	}
+
+	// Tier 1: header-based WAF/CDN fingerprint detected during probing.
+	if extras.WAFDetected != "" && extras.WAFDetected != "Not Detected" {
+		return true, extras.WAFDetected
+	}
+	if extras.IsCDN && extras.CDNProvider != "" {
+		return true, extras.CDNProvider
+	}
+
+	// Tier 2: challenge / CAPTCHA fingerprint in the response body.
+	if len(body) > 0 {
+		b := strings.ToLower(string(body))
+		markers := []string{
+			"just a moment", "checking your browser", "checking if the site connection is secure",
+			"__cf_chl", "cf_chl_opt", "cf-challenge", "challenge-platform", "cf-mitigated",
+			"g-recaptcha", "recaptcha/api.js", "www.google.com/recaptcha",
+			"h-captcha", "hcaptcha.com", "challenges.cloudflare.com/turnstile", "cf-turnstile",
+			"verify you are human", "are you a robot", "verifikasi", "captcha",
+		}
+		for _, m := range markers {
+			if strings.Contains(b, m) {
+				return true, "Human Verification"
+			}
+		}
+	}
+
+	return false, ""
+}
 
 // classifyStatus decides status purely from DNS resolution + HTTP outcome.
 //
@@ -1075,6 +1158,13 @@ func classifyStatus(l *model.MonitoringLog) (model.LogStatus, int, string, []str
 		return model.StatusCritical, 20,
 			fmt.Sprintf("CRITICAL: server mengembalikan HTTP %d (server error).", code),
 			[]string{"Periksa aplikasi dan layanan backend (error 5xx)."}
+	case code == 403:
+		// A 403 with a WAF/CDN/CAPTCHA fingerprint is upgraded to ONLINE by the
+		// human-verification refinement after this call. A 403 WITHOUT any such
+		// signal is a genuine "Forbidden" — the site is not reachable as intended.
+		return model.StatusCritical, 20,
+			"CRITICAL: akses ditolak HTTP 403 (Forbidden) tanpa tanda verifikasi manusia.",
+			[]string{"Periksa otorisasi/izin akses atau aturan firewall pada target."}
 	case code >= 400:
 		return model.StatusWarning, 60,
 			fmt.Sprintf("WARNING: server merespons HTTP %d (client error).", code),

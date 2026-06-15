@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { systemAPI } from '../../services/api'
 import { useGlobalWebSocket } from '../../store/WebSocketContext'
+import { useTheme } from '../../store/theme'
+
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
 // ── Animated gauge bar ─────────────────────────────────────────
 function GaugeBar({ label, value, max = 100, warnAt, critAt, unit = '%', color = '#6366f1' }) {
@@ -114,6 +117,8 @@ function RecommendationCard({ cpu, ram }) {
 
 // ── Main Modal ────────────────────────────────────────────────
 export default function ServerDetailModal({ onClose }) {
+  const { t, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const [health, setHealth] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -146,8 +151,9 @@ export default function ServerDetailModal({ onClose }) {
   const ram = health?.backend_ram ?? 0
   const overallStatus = (cpu >= 80 || ram >= 85) ? 'KRITIS' : (cpu >= 60 || ram >= 70) ? 'PERINGATAN' : 'NORMAL'
   const statusColor = overallStatus === 'KRITIS' ? '#ef4444' : overallStatus === 'PERINGATAN' ? '#f59e0b' : '#10b981'
+  const overallStatusLabel = overallStatus === 'KRITIS' ? t.critical : overallStatus === 'PERINGATAN' ? t.warning : t.srvNormal
 
-  const updatedAt = health?.updated_at ? new Date(health.updated_at).toLocaleTimeString('id-ID', { hour12: false }) : null
+  const updatedAt = health?.updated_at ? new Date(health.updated_at).toLocaleTimeString(locale, { hour12: false }) : null
 
   return createPortal(
     <div
@@ -209,7 +215,7 @@ export default function ServerDetailModal({ onClose }) {
             <div>
               <div style={{ fontSize: 20, fontWeight: 1000, color: '#fff', letterSpacing: '0.04em' }}>SPMT SERVER MONITOR</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                Local System · {updatedAt ? `Updated ${updatedAt}` : 'Loading…'}
+                {t.srvLocalSystem} · {updatedAt ? `${t.srvUpdated} ${updatedAt}` : `${t.loading}`}
               </div>
             </div>
           </div>
@@ -218,7 +224,7 @@ export default function ServerDetailModal({ onClose }) {
               fontSize: 12, fontWeight: 900, color: statusColor,
               background: `${statusColor}18`, border: `1px solid ${statusColor}40`,
               padding: '6px 14px', borderRadius: 8, letterSpacing: '0.07em',
-            }}>{overallStatus}</span>
+            }}>{overallStatusLabel}</span>
             <button
               id="server-modal-close"
               onClick={onClose}
@@ -238,47 +244,47 @@ export default function ServerDetailModal({ onClose }) {
         <div className="srv-scroll" style={{ overflowY: 'auto', flex: 1 }}>
           {loading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
-              Memuat data server…
+              {t.srvLoading}
             </div>
           ) : (
             <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
               {/* ── CPU & RAM ── */}
               <section>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>RESOURCE USAGE</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>{t.srvResourceUsage}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  <GaugeBar label="CPU USAGE" value={cpu} warnAt={60} critAt={80} color="#6366f1" />
-                  <GaugeBar label="RAM USAGE" value={ram} warnAt={70} critAt={85} color="#8b5cf6" />
+                  <GaugeBar label={t.cpuUsage} value={cpu} warnAt={60} critAt={80} color="#6366f1" />
+                  <GaugeBar label={t.ramUsage} value={ram} warnAt={70} critAt={85} color="#8b5cf6" />
                 </div>
               </section>
 
               {/* ── Worker stats ── */}
               <section>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>WORKER & RUNTIME</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>{t.srvWorkerRuntime}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                  <StatChip icon="⚙️" label="ACTIVE WORKERS" value={health?.active_workers} color="#38bdf8" />
-                  <StatChip icon="📋" label="QUEUE SIZE" value={health?.worker_queue_size} color="#a78bfa" />
-                  <StatChip icon="🔀" label="GOROUTINES" value={health?.active_goroutines} color="#34d399" />
-                  <StatChip icon="🔌" label="WS CONNECTIONS" value={health?.ws_connections} color="#fb923c" />
+                  <StatChip icon="⚙️" label={t.srvActiveWorkers} value={health?.active_workers} color="#38bdf8" />
+                  <StatChip icon="📋" label={t.srvQueueSize} value={health?.worker_queue_size} color="#a78bfa" />
+                  <StatChip icon="🔀" label={t.srvGoroutines} value={health?.active_goroutines} color="#34d399" />
+                  <StatChip icon="🔌" label={t.srvWsConn} value={health?.ws_connections} color="#fb923c" />
                 </div>
               </section>
 
               {/* ── Network ── */}
               <section>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>NETWORK INFORMATION</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>{t.srvNetworkInfo}</div>
                 <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '4px 16px' }}>
-                  <NetRow label="Connection Type" value={health?.network_type} />
-                  <NetRow label="Network Name" value={health?.network_name} />
-                  <NetRow label="Interface" value={health?.interface_alias} mono />
-                  <NetRow label="IP Address" value={health?.public_ip} mono />
-                  <NetRow label="Gateway" value={health?.local_gateway} mono />
-                  <NetRow label="DNS Resolver" value={health?.dns_resolver} mono />
+                  <NetRow label={t.srvConnType} value={health?.network_type} />
+                  <NetRow label={t.srvNetName} value={health?.network_name} />
+                  <NetRow label={t.srvInterface} value={health?.interface_alias} mono />
+                  <NetRow label={t.rowIpAddress} value={health?.public_ip} mono />
+                  <NetRow label={t.srvGateway} value={health?.local_gateway} mono />
+                  <NetRow label={t.srvDnsResolver} value={health?.dns_resolver} mono />
                 </div>
               </section>
 
               {/* ── Recommendations ── */}
               <section>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>ANALISIS & REKOMENDASI</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>{t.srvAnalysis}</div>
                 <RecommendationCard cpu={cpu} ram={ram} />
               </section>
 
@@ -293,10 +299,10 @@ export default function ServerDetailModal({ onClose }) {
           flexShrink: 0,
           background: 'rgba(0,0,0,0.2)',
         }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>Auto-refresh setiap 4 detik · tekan Esc untuk tutup</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>{t.srvAutoRefresh}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981' }}>LIVE</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#10b981' }}>{t.liveCaps}</span>
           </div>
         </div>
       </div>

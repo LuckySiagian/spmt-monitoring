@@ -26,6 +26,47 @@ function hexToRgb(hex) {
   return r ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}` : '148,163,184'
 }
 
+function rgba(hex, a) { return `rgba(${hexToRgb(hex)},${a})` }
+
+// Color of the outbound probe (the "ping" SPMT server fires at a website).
+const PROBE_COLOR = '#00d1b2'
+
+// drawProbe renders one request→reply round-trip along a link.
+//   pointAt(tt): position at tt where tt=0 is the website node, tt=1 the server.
+//   t:        current head position on that path (0..1).
+//   cyclePos: phase 0..1 — first half = server→node (probe), second = node→server (reply).
+//   color:    the node's status color, used for the reply leg + arrival ripple.
+function drawProbe(ctx, pointAt, t, cyclePos, color, scale = 1) {
+  const outbound = cyclePos < 0.5
+  const c = outbound ? PROBE_COLOR : color
+  const head = pointAt(t)
+
+  // Comet trail — a few fading dots behind the head (opposite travel direction).
+  const behind = outbound ? 1 : -1
+  for (let k = 3; k >= 1; k--) {
+    const tt = Math.min(1, Math.max(0, t + behind * 0.045 * k))
+    const p = pointAt(tt)
+    ctx.beginPath(); ctx.arc(p.x, p.y, (3.4 - k * 0.6) * scale, 0, Math.PI * 2)
+    ctx.fillStyle = rgba(c, 0.28 / k); ctx.fill()
+  }
+
+  // Soft halo + bright head.
+  ctx.beginPath(); ctx.arc(head.x, head.y, 9 * scale, 0, Math.PI * 2)
+  ctx.fillStyle = rgba(c, 0.18); ctx.fill()
+  ctx.beginPath(); ctx.arc(head.x, head.y, 4.5 * scale, 0, Math.PI * 2)
+  ctx.fillStyle = c; ctx.fill()
+  ctx.beginPath(); ctx.arc(head.x, head.y, 2 * scale, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'; ctx.fill()
+
+  // Arrival ripple at the node the instant it starts replying — the "answer".
+  if (cyclePos >= 0.5 && cyclePos < 0.62) {
+    const prog = (cyclePos - 0.5) / 0.12 // 0 → 1
+    const node = pointAt(0)
+    ctx.beginPath(); ctx.arc(node.x, node.y, (5 + 16 * prog) * scale, 0, Math.PI * 2)
+    ctx.strokeStyle = rgba(color, 0.55 * (1 - prog)); ctx.lineWidth = 2 * scale; ctx.stroke()
+  }
+}
+
 function getDomain(url) {
   if (!url) return ''
   try {
@@ -156,7 +197,7 @@ function calc3dLayout(websites) {
 }
 
 export default function NetworkTopology({ websites, selectedId, onSelect, onOpenDetail, wsConnected }) {
-  const { themeId } = useTheme()
+  const { themeId, t, tStatus } = useTheme()
   const canvasRef = useRef(null)
   const animFrameRef = useRef(null)
   const timeRef = useRef(0)
@@ -263,7 +304,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       await websiteAPI.recheck()
       showToast('Recheck triggered for all websites!', 'success')
     } catch (err) {
-      showToast(err.response?.data?.error || 'Failed to trigger recheck', 'error')
+      showToast(err.response?.data?.error || t.failedRecheck, 'error')
     } finally {
       setTimeout(() => {
         setIsRefreshing(false)
@@ -445,16 +486,13 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           ctx.setLineDash([])
           ctx.stroke()
 
-          // Data packet
+          // Animated probe: server pings out (teal) then node replies (status color)
           if (item.status !== 'OFFLINE' && item.status !== 'UNKNOWN') {
-            const speed = (item.status === 'CRITICAL' || item.status === 'DEGRADED') ? 1.8 : (item.status === 'WARNING' ? 1.2 : 0.8)
-            const t2 = (timeRef.current * speed + (item.x3d + item.y3d) * 0.005) % 1
-            const px = item.nx + (cx - item.nx) * t2
-            const py = item.ny + (cy - item.ny) * t2
-            ctx.beginPath()
-            ctx.arc(px, py, 5 * item.scale, 0, Math.PI * 2)
-            ctx.fillStyle = color
-            ctx.fill()
+            const speed = (item.status === 'CRITICAL' || item.status === 'DEGRADED') ? 1.1 : (item.status === 'WARNING' ? 0.8 : 0.55)
+            const cyclePos = (timeRef.current * speed + (item.x3d + item.y3d) * 0.005) % 1
+            const t = cyclePos < 0.5 ? (1 - cyclePos * 2) : ((cyclePos - 0.5) * 2)
+            const pointAt = (tt) => ({ x: item.nx + (cx - item.nx) * tt, y: item.ny + (cy - item.ny) * tt })
+            drawProbe(ctx, pointAt, t, cyclePos, color, item.scale)
           }
 
           // Node body glow
@@ -638,25 +676,27 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         ctx.setLineDash([])
         ctx.stroke()
 
-        // Animated data packet
+        // Animated probe: SPMT server pings out to the node (teal), then the
+        // node replies back to the server (status color) — a request→reply trip.
         if (node.status !== 'OFFLINE' && node.status !== 'UNKNOWN') {
-          const speed = (node.status === 'CRITICAL' || node.status === 'DEGRADED') ? 1.8 : (node.status === 'WARNING' ? 1.2 : 0.8)
-          const t2 = (timeRef.current * speed + node.x * 3 + node.y * 2) % 1
-          let px, py
+          const speed = (node.status === 'CRITICAL' || node.status === 'DEGRADED') ? 1.1 : (node.status === 'WARNING' ? 0.8 : 0.55)
+          const cyclePos = (timeRef.current * speed + node.x * 3 + node.y * 2) % 1
+          const t = cyclePos < 0.5 ? (1 - cyclePos * 2) : ((cyclePos - 0.5) * 2)
+          let pointAt
           if (topoMode === 'tree') {
             const cpY1 = ny + (serverY - ny) * 0.4
             const cpY2 = serverY - (serverY - ny) * 0.4
-            const mt = 1 - t2
-            px = mt * mt * mt * nx + 3 * mt * mt * t2 * nx + 3 * mt * t2 * t2 * serverX + t2 * t2 * t2 * serverX
-            py = mt * mt * mt * ny + 3 * mt * mt * t2 * cpY1 + 3 * mt * t2 * t2 * cpY2 + t2 * t2 * t2 * serverY
+            pointAt = (tt) => {
+              const mt = 1 - tt
+              return {
+                x: mt * mt * mt * nx + 3 * mt * mt * tt * nx + 3 * mt * tt * tt * serverX + tt * tt * tt * serverX,
+                y: mt * mt * mt * ny + 3 * mt * mt * tt * cpY1 + 3 * mt * tt * tt * cpY2 + tt * tt * tt * serverY,
+              }
+            }
           } else {
-            px = nx + (serverX - nx) * t2
-            py = ny + (serverY - ny) * t2
+            pointAt = (tt) => ({ x: nx + (serverX - nx) * tt, y: ny + (serverY - ny) * tt })
           }
-          ctx.beginPath()
-          ctx.arc(px, py, 5, 0, Math.PI * 2)
-          ctx.fillStyle = color
-          ctx.fill()
+          drawProbe(ctx, pointAt, t, cyclePos, color)
         }
       })
 
@@ -1017,7 +1057,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               <div style={{ width: 12, height: 12, borderRadius: '50%', background: STATUS_COLORS[hoveredNodeData.status], boxShadow: `0 0 10px ${STATUS_COLORS[hoveredNodeData.status]}` }} />
               <span style={{ fontSize: 20, fontWeight: 1000, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{hoveredNodeData.name}</span>
             </div>
-            <span style={{ fontSize: 13, fontWeight: 900, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '5px 13px', borderRadius: 6 }}>{hoveredNodeData.status}</span>
+            <span style={{ fontSize: 13, fontWeight: 900, color: STATUS_COLORS[hoveredNodeData.status], background: 'rgba(0,0,0,0.3)', padding: '5px 13px', borderRadius: 6 }}>{tStatus(hoveredNodeData.status)}</span>
           </div>
 
           {hoveredNodeData.isServer ? (
@@ -1026,8 +1066,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               {/* CPU & RAM bars */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 {[
-                  { label: 'CPU USAGE', value: sysHealth?.backend_cpu ?? 0, warn: 80, color: '#6366f1' },
-                  { label: 'RAM USAGE', value: sysHealth?.backend_ram ?? 0, warn: 85, color: '#8b5cf6' },
+                  { label: t.cpuUsage, value: sysHealth?.backend_cpu ?? 0, warn: 80, color: '#6366f1' },
+                  { label: t.ramUsage, value: sysHealth?.backend_ram ?? 0, warn: 85, color: '#8b5cf6' },
                 ].map(({ label, value, warn, color }) => {
                   const pct = Math.min(100, Math.round(value))
                   const isHigh = pct >= warn
@@ -1046,14 +1086,14 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
               {/* Network info */}
               <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800, marginBottom: 2 }}>NETWORK CONNECTION</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800, marginBottom: 2 }}>{t.networkConnection}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>TYPE</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>{t.netType}</div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#00d1b2' }}>{sysHealth?.network_type || '—'}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>NETWORK NAME</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>{t.netName}</div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{sysHealth?.network_name || '—'}</div>
                   </div>
                 </div>
@@ -1072,7 +1112,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               {/* High load warning */}
               {((sysHealth?.backend_cpu ?? 0) >= 80 || (sysHealth?.backend_ram ?? 0) >= 85) && (
                 <div style={{ fontSize: 11, color: '#fbbf24', fontWeight: 800, background: 'rgba(251,191,36,0.08)', padding: '9px 13px', borderRadius: 8, border: '1px solid rgba(251,191,36,0.2)', lineHeight: 1.5 }}>
-                  ⚠️ HIGH LOAD — Click for details
+                  {t.highLoadClick}
                 </div>
               )}
             </>
@@ -1080,27 +1120,27 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             /* ── WEBSITE NODE LAYOUT ── */
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>ENDPOINT & IP ADDRESS</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>{t.endpointIpAddress}</div>
                 <div style={{ fontSize: 13, color: '#cbd5e1', wordBreak: 'break-all', fontFamily: 'monospace' }}>{hoveredNodeData.url}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>IP: {hoveredNodeData.ip_address || '---'}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: 12 }}>
                 <div>
-                  <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LATENCY</div>
+                  <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>{t.thLatency}</div>
                   <div style={{ fontSize: 24, fontWeight: 1000, color: '#fff' }}>{hoveredNodeData.response_time_ms ? `${hoveredNodeData.response_time_ms}ms` : '---'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>HTTP CODE</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>{t.httpCodeLabel}</div>
                   <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>{hoveredNodeData.status_code || '---'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>SSL STATUS</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>{t.sslStatusLabel}</div>
                   <div style={{ fontSize: 14, fontWeight: 900, color: hoveredNodeData.ssl_valid ? '#10b981' : (hoveredNodeData.ssl_valid === false ? '#ef4444' : '#64748b') }}>
-                    {hoveredNodeData.ssl_valid === true ? '✓ VALID' : (hoveredNodeData.ssl_valid === false ? '✗ INVALID' : 'PND')}
+                    {hoveredNodeData.ssl_valid === true ? `✓ ${t.validLabel}` : (hoveredNodeData.ssl_valid === false ? `✗ ${t.invalidLabel}` : 'PND')}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>LAST CHECK</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>{t.lastCheckLabel}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>
                     {hoveredNodeData.last_checked ? new Date(hoveredNodeData.last_checked).toLocaleTimeString([], { hour12: false }) : '---'}
                   </div>
@@ -1119,7 +1159,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" />
             <line x1="12" y1="2" x2="12" y2="8" /><line x1="12" y1="16" x2="12" y2="22" />
           </svg>
-          NETWORK TOPOLOGY
+          {t.networkTopologyTitle}
         </span>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1196,12 +1236,12 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             >
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
-            <span>{isRefreshing ? 'REFRESHING...' : 'REFRESH'}</span>
+            <span>{isRefreshing ? t.refreshing : t.refresh}</span>
           </button>
 
           {/* Node count */}
           <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-sub)', background: 'var(--accent-light)', padding: '2px 10px', borderRadius: 10, border: '1px solid var(--border)' }}>
-            {websites.length} nodes
+            {websites.length} {t.nodesLabel}
           </span>
 
           {/* LIVE badge */}
@@ -1214,7 +1254,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             borderRadius: 10, padding: '3px 12px',
           }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', display: 'inline-block', background: wsConnected ? '#10b981' : '#f59e0b' }} />
-            {wsConnected ? 'LIVE' : 'CONNECTING'}
+            {wsConnected ? t.liveCaps : t.connecting}
           </span>
         </div>
       </div>
@@ -1261,7 +1301,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
               onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
-              + {websites.length - 75} MORE
+              + {websites.length - 75} {t.moreLabel}
             </button>
           )}
         </div>
@@ -1278,8 +1318,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
               <div>
-                <h3 style={{ color: 'var(--text)', margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '0.02em' }}>All Monitored Nodes</h3>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Showing all {moreNodesSorted.length}/{websites.length} endpoints</div>
+                <h3 style={{ color: 'var(--text)', margin: 0, fontSize: 20, fontWeight: 900, letterSpacing: '0.02em' }}>{t.allMonitoredNodes}</h3>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{t.showingAll} {moreNodesSorted.length}/{websites.length} {t.endpointsLabel}</div>
               </div>
  
               {/* Overlay Search Bar */}
@@ -1291,7 +1331,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
                     border: '1px solid var(--border)', background: 'var(--bg-main)',
                     color: 'var(--text)', fontSize: 13, outline: 'none', transition: 'all 0.2s'
                   }}
-                  placeholder="Search node name or URL..."
+                  placeholder={t.searchNodeUrl}
                   value={moreNodesSearch}
                   onChange={(e) => setMoreNodesSearch(e.target.value)}
                 />
@@ -1312,10 +1352,10 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
                   value={moreNodesStatusFilter}
                   onChange={e => setMoreNodesStatusFilter(e.target.value)}
                 >
-                  <option value="ALL">Semua Status</option>
-                  <option value="ONLINE">🟢 Online</option>
-                  <option value="CRITICAL">🟡 Critical</option>
-                  <option value="OFFLINE">🔴 Offline</option>
+                  <option value="ALL">{t.allStatus}</option>
+                  <option value="ONLINE">🟢 {t.online}</option>
+                  <option value="CRITICAL">🟡 {t.critical}</option>
+                  <option value="OFFLINE">🔴 {t.offline}</option>
                 </select>
               </div>
 
@@ -1331,11 +1371,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
                   value={moreNodesSortBy}
                   onChange={e => setMoreNodesSortBy(e.target.value)}
                 >
-                  <option value="status">Urutkan</option>
-                  <option value="a-z">Nama (A - Z)</option>
-                  <option value="z-a">Nama (Z - A)</option>
-                  <option value="newest">Terbaru</option>
-                  <option value="oldest">Terlama</option>
+                  <option value="status">{t.sortLabel}</option>
+                  <option value="a-z">{t.sortNameAz}</option>
+                  <option value="z-a">{t.sortNameZa}</option>
+                  <option value="newest">{t.newestLabel}</option>
+                  <option value="oldest">{t.oldestLabel}</option>
                 </select>
               </div>
             </div>
@@ -1350,22 +1390,22 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             <table style={{ width: '100%', borderCollapse: 'collapse', color: 'var(--text)', fontSize: 13 }}>
               <thead style={{ background: 'var(--bg-header)', position: 'sticky', top: 0, zIndex: 2, borderBottom: '2px solid var(--border)' }}>
                 <tr>
-                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>STATUS</th>
-                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>ENDPOINT NAME</th>
-                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>URL</th>
-                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>LATENCY</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>{t.thStatus}</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>{t.thEndpointName}</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>{t.thUrl}</th>
+                  <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 700, fontSize: 11, letterSpacing: '0.05em', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' }}>{t.thLatency}</th>
                 </tr>
               </thead>
               <tbody>
                 {moreNodesSorted.length === 0 ? (
                   <tr>
                     <td colSpan={4} style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b' }}>
-                      No nodes match the selected search or filters.
-                      <button 
+                      {t.noNodesMatch}
+                      <button
                         onClick={() => { setMoreNodesSearch(''); setMoreNodesStatusFilter('ALL'); setMoreNodesSortBy('status') }}
                         style={{ display: 'inline-block', marginLeft: 8, background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: 13, fontWeight: 700, textDecoration: 'underline' }}
                       >
-                        Reset Filters
+                        {t.resetFilters}
                       </button>
                     </td>
                   </tr>
@@ -1386,7 +1426,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
                           background: `${STATUS_COLORS[w.status] || STATUS_COLORS.UNKNOWN}15`,
                           padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 800
                         }}>
-                          {w.status || 'UNKNOWN'}
+                          {tStatus(w.status || 'UNKNOWN')}
                         </span>
                       </td>
                       <td style={{ padding: '12px 20px', fontWeight: 800 }}>{w.name}</td>
@@ -1403,8 +1443,8 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
       {nodes.length === 0 && (
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>No websites monitored</div>
-          <div style={{ color: 'var(--text-sub)', fontSize: 11, marginTop: 4 }}>Add websites to begin monitoring</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>{t.noWebsitesMonitored}</div>
+          <div style={{ color: 'var(--text-sub)', fontSize: 11, marginTop: 4 }}>{t.addWebsitesToBegin}</div>
         </div>
       )}
     </div>

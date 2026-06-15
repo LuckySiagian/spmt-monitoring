@@ -2,6 +2,7 @@ import {
   RadialBarChart, RadialBar, PolarAngleAxis,
   ResponsiveContainer, Tooltip, Cell,
 } from 'recharts'
+import { useTheme } from '../../store/theme'
 
 const COLORS = {
   ONLINE:   '#10b981',
@@ -26,6 +27,7 @@ const CustomTooltip = ({ active, payload }) => {
 }
 
 export default function StatusDistributionChart({ websites }) {
+  const { t, tStatus } = useTheme()
   const total   = websites.length
   const online  = websites.filter(w => w.status === 'ONLINE').length
   const warning = websites.filter(w => w.status === 'WARNING').length
@@ -55,15 +57,15 @@ export default function StatusDistributionChart({ websites }) {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" style={{ marginRight: 6 }}>
             <circle cx="12" cy="12" r="10" /><polyline points="12 8 12 12 14 14" />
           </svg>
-          <span style={styles.title}>STATUS DISTRIBUTION</span>
+          <span style={styles.title}>{t.statusDistribution}</span>
         </div>
-        <span style={styles.totalBadge}>{total} services</span>
+        <span style={styles.totalBadge}>{total} {t.servicesLabel}</span>
       </div>
 
       {/* Chart + Legend */}
       <div style={styles.body}>
         {isEmpty ? (
-          <div style={styles.empty}>Belum ada data service</div>
+          <div style={styles.empty}>{t.noServiceData}</div>
         ) : (
           <>
             {/* Rose / Radial chart */}
@@ -101,7 +103,7 @@ export default function StatusDistributionChart({ websites }) {
               {/* Center label */}
               <div style={styles.centerLabel}>
                 <div style={styles.centerValue}>{total}</div>
-                <div style={styles.centerText}>Total</div>
+                <div style={styles.centerText}>{t.totalLabel}</div>
               </div>
             </div>
 
@@ -117,7 +119,7 @@ export default function StatusDistributionChart({ websites }) {
               ].map(item => (
                 <div key={item.label} style={styles.legendItem}>
                   <div style={{ ...styles.legendDot, background: item.color, boxShadow: `0 0 6px ${item.color}` }} />
-                  <span style={styles.legendLabel}>{item.label}</span>
+                  <span style={styles.legendLabel}>{tStatus(item.label)}</span>
                   <span style={{ ...styles.legendCount, color: item.color }}>{item.count}</span>
                   <span style={styles.legendPct}>({pct(item.count)}%)</span>
                 </div>

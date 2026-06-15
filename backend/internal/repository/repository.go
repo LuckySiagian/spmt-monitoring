@@ -558,6 +558,33 @@ func (r *Repository) InsertAuditLog(ctx context.Context, log *model.AuditLog) er
 	return err
 }
 
+// CountDownEventsByWebsite returns, per website, how many times it transitioned
+// into a DOWN state (OFFLINE or CRITICAL) since the given time. Used by the
+// weekly report to show how often each site went down during the period.
+func (r *Repository) CountDownEventsByWebsite(ctx context.Context, since time.Time) (map[uuid.UUID]int, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT website_id, COUNT(*)
+		FROM status_events
+		WHERE created_at >= $1 AND new_status IN ('OFFLINE', 'CRITICAL')
+		GROUP BY website_id
+	`, since)
+	if err != nil {
+		return nil, fmt.Errorf("count down events: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[uuid.UUID]int)
+	for rows.Next() {
+		var id uuid.UUID
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, fmt.Errorf("scan down event count: %w", err)
+		}
+		counts[id] = n
+	}
+	return counts, rows.Err()
+}
+
 func (r *Repository) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*model.WebsiteSLA, error) {
 	sla := &model.WebsiteSLA{
 		SLA24h: 100.0,

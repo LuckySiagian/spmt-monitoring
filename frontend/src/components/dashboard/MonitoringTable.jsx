@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useTheme } from '../../store/theme'
 
 const STATUS_FILTERS = ['ALL', 'ONLINE', 'WARNING', 'DEGRADED', 'CRITICAL', 'OFFLINE']
 
 import StatusBadgeIcon from '../common/StatusBadgeIcon'
 
 const StatusBadge = ({ status }) => {
+  const { tStatus } = useTheme()
   const c = {
     ONLINE: { color: '#10b981', border: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.1)' },
     WARNING: { color: '#f59e0b', border: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.1)' },
@@ -14,7 +16,7 @@ const StatusBadge = ({ status }) => {
   }[status] || { color: '#4a5568', border: 'rgba(74,85,104,0.3)', bg: 'rgba(74,85,104,0.1)' }
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 3, padding: '1px 7px', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
-      {status || 'PENDING'}
+      {tStatus(status)}
       <StatusBadgeIcon status={status} />
     </span>
   )
@@ -24,6 +26,7 @@ const fmt = (ms) => ms != null ? `${ms}ms` : '—'
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('id-ID', { hour12: false }) : '—'
 
 export default function MonitoringTable({ websites, onOpenDetail }) {
+  const { t, tStatus } = useTheme()
   const [filter, setFilter] = useState('ALL')
 
   const filtered = filter === 'ALL' ? websites : websites.filter(w => w.status === filter)
@@ -53,8 +56,8 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" style={{ marginRight: 6 }}>
             <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" />
           </svg>
-          <span style={styles.headerTitle}>MONITORING TABLE</span>
-          <span style={styles.countBadge}>{filtered.length} services</span>
+          <span style={styles.headerTitle}>{t.monitoringTable}</span>
+          <span style={styles.countBadge}>{filtered.length} {t.servicesLabel}</span>
         </div>
 
         <div style={styles.filters}>
@@ -67,7 +70,7 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
               }}
               onClick={() => setFilter(f)}
             >
-              {f} <span style={{ opacity: 0.7, marginLeft: 3 }}>{counts[f]}</span>
+              {f === 'ALL' ? t.allStatus : tStatus(f)} <span style={{ opacity: 0.7, marginLeft: 3 }}>{counts[f]}</span>
             </button>
           ))}
         </div>
@@ -77,7 +80,7 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
         <table style={styles.table}>
           <thead>
             <tr>
-              {['Website', 'URL', 'Status', 'HTTP', 'Response', 'SSL', 'Last Check'].map(h => (
+              {[t.colWebsite, t.colUrl, t.colStatus, t.colHttp, t.colResponse, t.colSsl, t.colLastCheck].map(h => (
                 <th key={h} style={styles.th}>{h}</th>
               ))}
             </tr>
@@ -86,7 +89,7 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ textAlign: 'center', padding: '16px', color: '#4a5568', fontSize: 11 }}>
-                  No services match this filter
+                  {t.noServicesMatch}
                 </td>
               </tr>
             ) : filtered.map((w, i) => {
@@ -153,7 +156,7 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
                     </div>
                   </td>
                   <td style={{ ...styles.td, color: w.ssl_valid == null ? '#4a5568' : w.ssl_valid ? '#10b981' : '#ef4444' }}>
-                    {w.ssl_valid == null ? '—' : w.ssl_valid ? '✓ Valid' : '✗ Invalid'}
+                    {w.ssl_valid == null ? '—' : w.ssl_valid ? `✓ ${t.validLabel}` : `✗ ${t.invalidLabel}`}
                   </td>
                   <td style={{ ...styles.td, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(w.last_checked)}</td>
                 </tr>

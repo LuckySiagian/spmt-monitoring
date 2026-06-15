@@ -13,11 +13,16 @@ import ServiceDetailModal from './components/dashboard/ServiceDetailModal'
 import ServerDetailModal from './components/dashboard/ServerDetailModal'
 import ToastContainer, { showToast } from './components/dashboard/Toast'
 import { dashboardAPI, websiteAPI, userAPI, eventsAPI, authAPI } from './services/api'
+import { cleanReason } from './utils/rootCause'
 
 // ── All Notifications Full Panel (rendered in portal, triggered by bell "View All")
-function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose }) {
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
+
+function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose, onOpen }) {
+  const { t, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
-  const fmtTime = d => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
+  const fmtTime = d => d ? new Date(d).toLocaleString(locale, { hour12: false }) : '—'
 
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99998, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', paddingTop: 76 }}
@@ -30,37 +35,51 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>🔔 All Notifications</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Status change events this session ({notifications.length})</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>🔔 {t.allNotifications}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t.statusChangeEventsSession} ({notifications.length})</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {notifications.length > 0 && <button onClick={onClearAll} style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', color: '#dc2626', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Clear All</button>}
+            {notifications.length > 0 && <button onClick={onClearAll} style={{ background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', color: '#dc2626', borderRadius: 6, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{t.clearAll}</button>}
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18, padding: '0 4px' }}>✕</button>
           </div>
         </div>
         {notifications.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.5 }}>🔔</div>
-            <div style={{ fontSize: 13 }}>No notifications this session</div>
+            <div style={{ fontSize: 13 }}>{t.noNotifSession}</div>
           </div>
         ) : (
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {notifications.map((n, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 18px', borderBottom: '1px solid rgba(99,102,241,0.07)', background: !n.read ? 'rgba(79,70,229,0.04)' : 'transparent', transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.05)'}
-                onMouseLeave={e => e.currentTarget.style.background = !n.read ? 'rgba(79,70,229,0.04)' : 'transparent'}>
-                {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4f46e5', flexShrink: 0, marginTop: 5 }} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>{n.name}</span>
-                    <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
+            {notifications.map((n, i) => {
+              const msg = cleanReason(n.reason)
+              const clickable = !!(onOpen && n.websiteId)
+              return (
+                <div key={i}
+                  onClick={clickable ? () => onOpen(n) : undefined}
+                  title={clickable ? 'Buka detail layanan' : undefined}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 18px', borderBottom: '1px solid rgba(99,102,241,0.07)', background: !n.read ? 'rgba(79,70,229,0.04)' : 'transparent', transition: 'background 0.15s', cursor: clickable ? 'pointer' : 'default' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = !n.read ? 'rgba(79,70,229,0.04)' : 'transparent'}>
+                  {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4f46e5', flexShrink: 0, marginTop: 6 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>{n.name}</span>
+                      {n.oldStatus && <span style={{ color: SC[n.oldStatus] || 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>{n.oldStatus} →</span>}
+                      <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
+                    </div>
+                    {msg && (
+                      <div style={{ fontSize: 12.5, color: 'var(--text-sub)', marginBottom: 6, lineHeight: 1.5 }}>{msg}</div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10, color: 'var(--text-muted)' }}>
+                      <span>{fmtTime(n.ts)}</span>
+                      {n.responseTime != null && <span>· {n.responseTime}ms</span>}
+                      {clickable && <span style={{ color: '#4f46e5', fontWeight: 600 }}>· Lihat detail</span>}
+                    </div>
                   </div>
-                  {n.reason && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3 }}>{n.reason}</div>}
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fmtTime(n.ts)}</div>
+                  <button onClick={e => { e.stopPropagation(); onDelete?.(i) }} title="Hapus" style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✕</button>
                 </div>
-                <button onClick={() => onDelete?.(i)} style={{ background: 'none', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✕</button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -69,17 +88,44 @@ function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose })
   )
 }
 
-// ── Settings Modal ──────────────────────────────────────────────
 function SettingsModal({ onClose }) {
-  const { lang, setLanguage, LANGUAGES, themeId, setTheme, THEME_OPTIONS } = useTheme()
+  const { lang, setLanguage, LANGUAGES, themeId, setTheme, THEME_OPTIONS, t } = useTheme()
   const [sound, setSound] = useState(() => localStorage.getItem('spmt_sound') !== 'off')
-  // We'll track the selected theme locally before saving so it can be previewed or just applied immediately
+  const [desktopNotif, setDesktopNotif] = useState(() => localStorage.getItem('spmt_desktop_notif') === 'on')
+  const [autoAck, setAutoAck] = useState(() => localStorage.getItem('spmt_autoack') === 'on')
+  const [langSel, setLangSel] = useState(lang)
+  const [themeSel, setThemeSel] = useState(themeId)
+
+  // Theme dipilih dulu (staged), baru diterapkan saat klik Save & Apply
   const handleThemeChange = (id) => {
-    setTheme(id)
+    setThemeSel(id)
   }
+
+  // Desktop notifications need explicit browser permission before they can be enabled.
+  const toggleDesktopNotif = async () => {
+    if (desktopNotif) { setDesktopNotif(false); return }
+    if (!('Notification' in window)) {
+      alert(t.noDesktopSupport)
+      return
+    }
+    let perm = Notification.permission
+    if (perm === 'default') perm = await Notification.requestPermission()
+    if (perm === 'granted') setDesktopNotif(true)
+    else alert(t.notifDenied)
+  }
+
+  const PREFS = [
+    { l: `🔔 ${t.notifSound}`, d: t.notifSoundDesc, s: sound, set: () => setSound(v => !v) },
+    { l: `🖥️ ${t.desktopNotif}`, d: t.desktopNotifDesc, s: desktopNotif, set: toggleDesktopNotif },
+    { l: `🎯 ${t.autoAck}`, d: t.autoAckDesc, s: autoAck, set: () => setAutoAck(v => !v) },
+  ]
 
   const save = () => {
     localStorage.setItem('spmt_sound', sound ? 'on' : 'off')
+    localStorage.setItem('spmt_desktop_notif', desktopNotif ? 'on' : 'off')
+    localStorage.setItem('spmt_autoack', autoAck ? 'on' : 'off')
+    setTheme(themeSel)
+    setLanguage(langSel)
     window.location.reload()
   }
   return createPortal(
@@ -87,12 +133,12 @@ function SettingsModal({ onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 14, width: 440, maxWidth: '94vw', boxShadow: 'var(--shadow-glow)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-header)', borderTopLeftRadius: 14, borderTopRightRadius: 14 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>⚙️ System Settings</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>⚙️ {t.systemSettings}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '18px 20px', maxHeight: '65vh', overflowY: 'auto' }}>
 
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 16 }}>🎨 SCI-FI THEME SELECTION</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 16 }}>🎨 {t.themeSelection}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10, marginBottom: 24 }}>
             {THEME_OPTIONS.map(theme => (
               <div
@@ -100,46 +146,58 @@ function SettingsModal({ onClose }) {
                 onClick={() => handleThemeChange(theme.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, padding: '10px',
-                  background: themeId === theme.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.03)',
-                  border: `1px solid ${themeId === theme.id ? 'var(--accent)' : 'var(--border)'}`,
+                  background: themeSel === theme.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.03)',
+                  border: `1px solid ${themeSel === theme.id ? 'var(--accent)' : 'var(--border)'}`,
                   borderRadius: 8, cursor: 'pointer',
                   transition: 'all 0.2s',
-                  boxShadow: themeId === theme.id ? `0 0 10px ${theme.color}20 inset` : 'none'
+                  boxShadow: themeSel === theme.id ? `0 0 10px ${theme.color}20 inset` : 'none'
                 }}
               >
                 <div style={{ width: 16, height: 16, borderRadius: '50%', background: theme.color, boxShadow: `0 0 8px ${theme.color}`, flexShrink: 0 }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: themeId === theme.id ? 'var(--text)' : 'var(--text-sub)' }}>{theme.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: themeSel === theme.id ? 'var(--text)' : 'var(--text-sub)' }}>{theme.dark ? t.darkMode : t.lightMode}</span>
               </div>
             ))}
           </div>
 
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 10 }}>⚙️ MONITORING PREFERENCES</div>
-          {[
-            { l: '🔔 Notification Sound', s: sound, set: setSound },
-            { l: '📡 Intensive Network Scan', s: localStorage.getItem('spmt_scan') === 'on', set: (v) => localStorage.setItem('spmt_scan', v ? 'on' : 'off') },
-            { l: '🎯 Auto-Acknowledge Resolved Alerts', s: localStorage.getItem('spmt_autoack') === 'on', set: (v) => localStorage.setItem('spmt_autoack', v ? 'on' : 'off') },
-            { l: '📊 Detailed Metrics Tooltips', s: localStorage.getItem('spmt_tooltips') !== 'off', set: (v) => localStorage.setItem('spmt_tooltips', v ? 'on' : 'off') },
-            { l: '🔄 Real-time Topology Sync', s: localStorage.getItem('spmt_topo_sync') !== 'off', set: (v) => localStorage.setItem('spmt_topo_sync', v ? 'on' : 'off') },
-          ].map(item => (
-            <div key={item.l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.l}</span>
-              <button
-                onClick={() => {
-                  if (typeof item.set === 'function' && item.set.length === 1) {
-                    item.set(!item.s);
-                  } else {
-                    item.set(v => !v);
-                  }
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 10 }}>🌐 {t.languageLabel}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+            {Object.values(LANGUAGES).map(L => (
+              <div
+                key={L.code}
+                onClick={() => setLangSel(L.code)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px',
+                  background: langSel === L.code ? 'var(--accent-light)' : 'rgba(0,0,0,0.03)',
+                  border: `1px solid ${langSel === L.code ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s'
                 }}
-                style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', background: item.s ? 'var(--accent)' : 'rgba(0,0,0,0.3)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}>
+              >
+                <span style={{ fontSize: 15 }}>{L.flag}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: langSel === L.code ? 'var(--text)' : 'var(--text-sub)' }}>{L.label}</span>
+              </div>
+            ))}
+          </div>
+
+
+
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 6 }}>⚙️ {t.monitoringPreferences}</div>
+          {PREFS.map(item => (
+            <div key={item.l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.l}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, lineHeight: 1.4 }}>{item.d}</div>
+              </div>
+              <button
+                onClick={item.set}
+                style={{ flexShrink: 0, width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s', background: item.s ? 'var(--accent)' : 'rgba(0,0,0,0.3)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5)' }}>
                 <span style={{ position: 'absolute', top: 2, left: item.s ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
               </button>
             </div>
           ))}
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, background: 'var(--bg-header)', borderBottomLeftRadius: 14, borderBottomRightRadius: 14 }}>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
-          <button onClick={save} style={{ background: 'var(--accent)', border: 'none', color: '#ffffffff', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)' }}>Save & Apply</button>
+          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>{t.cancel}</button>
+          <button onClick={save} style={{ background: 'var(--accent)', border: 'none', color: '#ffffffff', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)' }}>{t.saveApply}</button>
         </div>
       </div>
     </div>,
@@ -149,12 +207,13 @@ function SettingsModal({ onClose }) {
 
 // ── About Modal ─────────────────────────────────────────────────
 function AboutModal({ onClose }) {
+  const { t } = useTheme()
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 14, width: 500, maxWidth: '94vw', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(99,102,241,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>ℹ️ About SPMT Monitoring</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>ℹ️ {t.aboutTitle}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '20px' }}>
@@ -162,31 +221,31 @@ function AboutModal({ onClose }) {
             <div style={{ width: 52, height: 52, borderRadius: 12, background: 'rgba(79,70,229,0.12)', border: '1px solid rgba(79,70,229,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>📡</div>
             <div>
               <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)' }}>SPMT Monitoring System</div>
-              <div style={{ fontSize: 12, color: '#4f46e5', marginTop: 2 }}>NOC Control Panel · Pelindo Multi Terminal</div>
+              <div style={{ fontSize: 12, color: '#4f46e5', marginTop: 2 }}>{t.systemNameSub}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>v2.0.0 · 2026</div>
             </div>
           </div>
           {[
-            ['🎯 Tujuan', 'Memantau ketersediaan dan kinerja seluruh website & layanan digital Pelindo Multi Terminal secara real-time 24/7.'],
-            ['🔍 Cara Kerja', 'Backend Go melakukan pengecekan HTTP/DNS/ICMP/TCP setiap 30-120 detik (sesuai pilihan). Hasilnya dikirim via WebSocket sehingga tampil instan tanpa perlu refresh.'],
-            ['🛡️ Keamanan', 'JWT Token + role-based access: SuperAdmin (akses penuh), Admin (kelola website), Viewer (hanya baca).'],
-            ['📊 Fitur', 'Network Topology (maks. 50 website) · Monitoring Graph (100 pts) · Activity Log · Notifikasi otomatis.'],
-          ].map(([t, d]) => (
-            <div key={t} style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(99,102,241,0.03)', borderRadius: 8, border: '1px solid rgba(99,102,241,0.08)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{t}</div>
+            [`🎯 ${t.aboutPurpose}`, t.aboutPurposeDesc],
+            [`🔍 ${t.aboutHow}`, t.aboutHowDesc],
+            [`🛡️ ${t.aboutSecurity}`, t.aboutSecurityDesc],
+            [`📊 ${t.aboutFeatures}`, t.aboutFeaturesDesc],
+          ].map(([title, d]) => (
+            <div key={title} style={{ marginBottom: 10, padding: '8px 12px', background: 'rgba(99,102,241,0.03)', borderRadius: 8, border: '1px solid rgba(99,102,241,0.08)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{title}</div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6 }}>{d}</div>
             </div>
           ))}
 
           {/* Sinergi Section */}
           <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase' }}>Sinergi & Core Values</div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '0.1em', marginBottom: 12, textTransform: 'uppercase' }}>{t.sinergiCoreValues}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {[
-                { img: 'pelindo.png', title: 'PELINDO', desc: 'Integrasi layanan pelabuhan nasional.' },
-                { img: 'danan.png', title: 'DANANTARA', desc: 'Inovasi teknologi digital terintegrasi.' },
-                { img: 'bumn', title: 'BUMN', desc: 'Transformasi digital ekonomi nasional.' },
-                { img: 'akhlak', title: 'AKHLAK', desc: 'Nilai inti budaya kerja yang luhur.' }
+                { img: 'pelindo.png', title: 'PELINDO', desc: t.brandPelindoDesc },
+                { img: 'danan.png', title: 'DANANTARA', desc: t.brandDananDesc },
+                { img: 'bumn', title: 'BUMN', desc: t.brandBumnDesc },
+                { img: 'akhlak', title: 'AKHLAK', desc: t.brandAkhlakDesc }
               ].map(b => (
                 <div key={b.title} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px', background: 'var(--bg-main)', borderRadius: 8, border: '1px solid var(--border)' }}>
                   <img src={`/images/logos/${b.img}${b.img.includes('.') ? '' : '.png'}`} alt={b.title} style={{ height: 20, width: 'auto', maxWidth: 40, objectFit: 'contain' }} />
@@ -207,16 +266,17 @@ function AboutModal({ onClose }) {
 
 // ── Logout Confirm ──────────────────────────────────────────────
 function LogoutModal({ onConfirm, onCancel }) {
+  const { t } = useTheme()
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onCancel()}>
       <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: '32px', width: 320, textAlign: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>🚪</div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Logout?</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Are you sure you want to logout?</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{t.logoutQ}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>{t.logoutConfirm}</div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-          <button onClick={onCancel} style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--text-sub)', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={onConfirm} style={{ background: 'linear-gradient(135deg,#dc2626,#ef4444)', border: 'none', color: 'var(--text)', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Logout</button>
+          <button onClick={onCancel} style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--text-sub)', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{t.cancel}</button>
+          <button onClick={onConfirm} style={{ background: 'linear-gradient(135deg,#dc2626,#ef4444)', border: 'none', color: 'var(--text)', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{t.logout}</button>
         </div>
       </div>
     </div>,
@@ -227,16 +287,13 @@ function LogoutModal({ onConfirm, onCancel }) {
 // ── Profile Modal ───────────────────────────────────────────────
 function ProfileModal({ user, onClose }) {
   const { updateUser } = useAuth()
+  const { t } = useTheme()
   const [activeTab, setActiveTab] = useState('profile') // 'profile' or 'security'
   const [avatar, setAvatar] = useState(() => localStorage.getItem(`spmt_avatar_${user?.username}`) || null)
-  const [email, setEmail] = useState(() => {
-    const currentEmail = user?.email || ''
-    if (!currentEmail && (user?.role === 'superadmin' || user?.role === 'adminpelindo')) {
-      return 'situkko135@gmail.com'
-    }
-    return currentEmail
-  })
+  const [email, setEmail] = useState(user?.email || '')
   const [telegramId, setTelegramId] = useState(user?.telegram_id || '')
+  const [showPw, setShowPw] = useState(false)
+  const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 
   useEffect(() => {
     setOldPassword(''); setNewPassword(''); setConfirmPassword('')
@@ -278,6 +335,10 @@ function ProfileModal({ user, onClose }) {
     setLoading(true)
     try {
       if (type === 'profile') {
+        if (email && !isValidEmail(email)) {
+          showToast('Please enter a valid email address', 'error')
+          return
+        }
         await authAPI.updateProfile({ email, telegram_id: telegramId })
         updateUser({ email, telegram_id: telegramId })
         showToast('Profile updated successfully', 'success')
@@ -300,6 +361,10 @@ function ProfileModal({ user, onClose }) {
           showToast('New emails do not match', 'error')
           return
         }
+        if (!isValidEmail(newEmail)) {
+          showToast('Please enter a valid email address', 'error')
+          return
+        }
         await authAPI.updateProfile({ email: newEmail, telegram_id: telegramId })
         updateUser({ email: newEmail, telegram_id: telegramId })
         setEmail(newEmail)
@@ -314,8 +379,16 @@ function ProfileModal({ user, onClose }) {
           showToast('Please fill all password fields', 'error')
           return
         }
+        if (newPassword.length < 6) {
+          showToast('New password must be at least 6 characters', 'error')
+          return
+        }
         if (newPassword !== confirmPassword) {
           showToast('New passwords do not match', 'error')
+          return
+        }
+        if (newPassword === oldPassword) {
+          showToast('New password must be different from the old password', 'error')
           return
         }
         await authAPI.changePassword({ old_password: oldPassword, new_password: newPassword, confirm_password: confirmPassword })
@@ -338,8 +411,14 @@ function ProfileModal({ user, onClose }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: 14, width: 440, maxWidth: '94vw', boxShadow: 'var(--shadow)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 20, fontWeight: 900, color: 'var(--text)' }}>👤 Customization & Profile</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button onClick={onClose} title={t.back || 'Back'}
+              style={{ background: 'var(--bg-header)', border: '1px solid var(--border)', color: 'var(--text)', cursor: 'pointer', fontSize: 12, fontWeight: 700, borderRadius: 8, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              ← {t.back || 'Back'}
+            </button>
+            <span style={{ fontSize: 20, fontWeight: 900, color: 'var(--text)' }}>👤 {t.customizationProfile}</span>
+          </div>
+          <button onClick={onClose} title={t.close || 'Close'} style={{ background: 'none', border: 'none', color: 'var(--text-sub)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
@@ -352,12 +431,12 @@ function ProfileModal({ user, onClose }) {
             </div>
             <div>
               <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>{user?.username}</div>
-              <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, marginBottom: 8 }}>Role: {user?.role.toUpperCase()}</div>
+              <div style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, marginBottom: 8 }}>{t.roleLabel}: {user?.role.toUpperCase()}</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <label style={{ background: 'var(--accent)', color: '#fff', padding: '5px 14px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>
-                  Upload Photo <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+                  {t.uploadPhoto} <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
                 </label>
-                {avatar && <button onClick={handleRemove} style={{ background: 'transparent', border: '1px solid var(--offline)', color: 'var(--offline)', padding: '5px 14px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>Remove</button>}
+                {avatar && <button onClick={handleRemove} style={{ background: 'transparent', border: '1px solid var(--offline)', color: 'var(--offline)', padding: '5px 14px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>{t.remove}</button>}
               </div>
             </div>
           </div>
@@ -368,20 +447,20 @@ function ProfileModal({ user, onClose }) {
               onClick={() => setActiveTab('profile')}
               style={{ padding: '10px 4px', fontSize: 15, fontWeight: 900, color: activeTab === 'profile' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'profile' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              General Settings
+              {t.generalSettings}
             </div>
             <div
               onClick={() => setActiveTab('security')}
               style={{ padding: '10px 4px', fontSize: 15, fontWeight: 900, color: activeTab === 'security' ? 'var(--accent)' : 'var(--text-sub)', borderBottom: `2px solid ${activeTab === 'security' ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer', transition: 'all 0.2s' }}
             >
-              Security
+              {t.securityTab}
             </div>
           </div>
 
           <div style={{ background: 'var(--bg-header)', borderRadius: 12, border: '1px solid var(--border)', padding: '16px', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.1)' }}>
             {activeTab === 'profile' ? (
               <>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>PERSONAL NOTIFICATION SETTINGS</h4>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>{t.personalNotifSettings}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
                   {/* Email Section */}
@@ -389,9 +468,9 @@ function ProfileModal({ user, onClose }) {
                     <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>✉️</div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                       <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.08em' }}>
-                        CURRENT EMAIL ADDRESS
+                        {t.currentEmailAddress}
                       </div>
-                      {!user?.email && <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, padding: '2px 8px', background: 'rgba(239,68,68,0.15)', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)' }}>REQUIRED</span>}
+                      {!user?.email && <span style={{ fontSize: 9, color: '#ef4444', fontWeight: 800, padding: '2px 8px', background: 'rgba(239,68,68,0.15)', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)' }}>{t.required}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -401,7 +480,7 @@ function ProfileModal({ user, onClose }) {
                           fontWeight: 800, letterSpacing: '0.02em', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
                         }}>
                           <span style={{ position: 'absolute', left: 12, fontSize: 20, opacity: 0.7 }}>📧</span>
-                          {email || 'No email registered yet'}
+                          {email || t.noEmailYet}
                         </div>
                       </div>
                       <button
@@ -414,7 +493,7 @@ function ProfileModal({ user, onClose }) {
                           cursor: 'pointer', transition: 'all 0.2s', boxShadow: showChangeEmail ? 'none' : '0 4px 12px var(--accent-light)'
                         }}
                       >
-                        {showChangeEmail ? 'CLOSE' : (user?.email ? 'CHANGE' : 'SET EMAIL')}
+                        {showChangeEmail ? t.closeBtn : (user?.email ? t.changeBtn : t.setEmailBtn)}
                       </button>
                     </div>
 
@@ -427,7 +506,7 @@ function ProfileModal({ user, onClose }) {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                           <div style={{ width: 4, height: 16, background: 'var(--accent)', borderRadius: 2 }} />
-                          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.05em' }}>UPDATE EMAIL IDENTITY</div>
+                          <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--text)', letterSpacing: '0.05em' }}>{t.updateEmailIdentity}</div>
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -435,12 +514,12 @@ function ProfileModal({ user, onClose }) {
                             {user?.email && (
                               <>
                                 <div style={{ position: 'relative' }}>
-                                  <label style={{ display: 'block', fontSize: 9, color: 'var(--accent)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>CONFIRM CURRENT EMAIL</label>
+                                  <label style={{ display: 'block', fontSize: 9, color: 'var(--accent)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>{t.confirmCurrentEmail}</label>
                                   <input
                                     type="email"
                                     value={currentEmailConfirm}
                                     onChange={e => setCurrentEmailConfirm(e.target.value)}
-                                    placeholder="Type your existing email..."
+                                    placeholder={t.typeExistingEmail}
                                     style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none', transition: 'border 0.2s' }}
                                   />
                                 </div>
@@ -448,22 +527,22 @@ function ProfileModal({ user, onClose }) {
                               </>
                             )}
                             <div>
-                              <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>NEW EMAIL ADDRESS</label>
+                              <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>{t.newEmailAddress}</label>
                               <input
                                 type="email"
                                 value={newEmail}
                                 onChange={e => setNewEmail(e.target.value)}
-                                placeholder="Enter new email..."
+                                placeholder={t.enterNewEmail}
                                 style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
                               />
                             </div>
                             <div>
-                              <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>RE-TYPE NEW EMAIL</label>
+                              <label style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 5, fontWeight: 800, letterSpacing: '0.05em' }}>{t.retypeNewEmail}</label>
                               <input
                                 type="email"
                                 value={confirmNewEmail}
                                 onChange={e => setConfirmNewEmail(e.target.value)}
-                                placeholder="Confirm new email..."
+                                placeholder={t.confirmNewEmail}
                                 style={{ width: '100%', background: 'rgba(0,0,0,0.15)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text)', outline: 'none' }}
                               />
                             </div>
@@ -481,7 +560,7 @@ function ProfileModal({ user, onClose }) {
                               transition: 'transform 0.1s active'
                             }}
                           >
-                            {loading ? 'PROCESSING...' : 'CONFIRM IDENTITY CHANGE'}
+                            {loading ? t.processing : t.confirmIdentityChange}
                           </button>
                         </div>
                       </div>
@@ -492,7 +571,7 @@ function ProfileModal({ user, onClose }) {
                   <div style={{ background: 'rgba(70, 90, 217, 0.23)', padding: '16px', borderRadius: 12, border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: -10, right: -10, fontSize: 40, opacity: 0.05, pointerEvents: 'none' }}>📱</div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 10, fontWeight: 800, letterSpacing: '0.08em' }}>
-                      TELEGRAM INTEGRATION <span style={{ color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>(OPTIONAL)</span>
+                      {t.telegramIntegration} <span style={{ color: 'var(--text-sub)', fontWeight: 400, opacity: 0.6 }}>({t.optional})</span>
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
@@ -501,7 +580,7 @@ function ProfileModal({ user, onClose }) {
                           type="text"
                           value={telegramId}
                           onChange={e => setTelegramId(e.target.value)}
-                          placeholder="@username or Chat ID..."
+                          placeholder={t.telegramPlaceholder}
                           style={{ width: '100%', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px 10px 38px', fontSize: 13, color: 'var(--text)', outline: 'none', fontWeight: 600 }}
                         />
                       </div>
@@ -510,26 +589,26 @@ function ProfileModal({ user, onClose }) {
                         disabled={loading}
                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '0 20px', fontSize: 11, fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', opacity: loading ? 0.6 : 1 }}
                       >
-                        {user?.telegram_id ? 'UPDATE' : 'LINK'}
+                        {user?.telegram_id ? t.updateBtn : t.linkBtn}
                       </button>
                     </div>
                     <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <span style={{ fontSize: 12 }}>ℹ️</span> Used for backup alerts if primary email is unreachable.
+                      <span style={{ fontSize: 12 }}>ℹ️</span> {t.telegramHelp}
                     </div>
                   </div>
 
                   {/* Test Notification Section */}
                   <div style={{ background: 'rgba(79,70,229,0.05)', padding: '16px', borderRadius: 12, border: '1px dashed var(--accent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)' }}>TEST SYSTEM NOTIFICATIONS</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Verify your SMTP & Email settings instantly</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)' }}>{t.testSystemNotif}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>{t.testSmtpDesc}</div>
                     </div>
                     <button
                       onClick={() => handleSave('test_email')}
                       disabled={loading}
                       style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 10, fontWeight: 800, cursor: 'pointer', opacity: loading ? 0.6 : 1 }}
                     >
-                      {loading ? 'SENDING...' : 'SEND TEST EMAIL'}
+                      {loading ? t.sending : t.sendTestEmail}
                     </button>
                   </div>
 
@@ -537,36 +616,42 @@ function ProfileModal({ user, onClose }) {
               </>
             ) : (
               <>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>CHANGE ACCOUNT PASSWORD</h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 16px 0' }}>
+                  <h4 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', fontWeight: 800, letterSpacing: '0.05em' }}>{t.changeAccountPassword}</h4>
+                  <button type="button" onClick={() => setShowPw(v => !v)}
+                    style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--text-sub)', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {showPw ? '🙈' : '👁️'} {showPw ? t.hide || 'Hide' : t.show || 'Show'}
+                  </button>
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>OLD PASSWORD</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>{t.oldPassword}</div>
                     <input
-                      type="password"
+                      type={showPw ? 'text' : 'password'}
                       value={oldPassword}
                       onChange={e => setOldPassword(e.target.value)}
-                      placeholder="Enter current password"
+                      placeholder={t.enterCurrentPassword}
                       style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
                     />
                   </div>
                   <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>NEW PASSWORD</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>{t.newPassword}</div>
                     <input
-                      type="password"
+                      type={showPw ? 'text' : 'password'}
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
+                      placeholder={t.enterNewPassword}
                       style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
                     />
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>CONFIRM NEW PASSWORD</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6, fontWeight: 800 }}>{t.confirmNewPassword}</div>
                     <input
-                      type="password"
+                      type={showPw ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Repeat new password"
+                      placeholder={t.repeatNewPassword}
                       style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', fontSize: 16, color: 'var(--text)', outline: 'none' }}
                     />
                   </div>
@@ -578,14 +663,14 @@ function ProfileModal({ user, onClose }) {
               <button
                 onClick={onClose}
                 style={{ background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--text-sub)', borderRadius: 7, padding: '7px 18px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
-              >Cancel</button>
+              >{t.cancel}</button>
               {activeTab === 'security' && (
                 <button
                   onClick={() => handleSave('security')}
                   disabled={loading}
                   style={{ background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: 7, padding: '7px 20px', fontSize: 12, fontWeight: 800, cursor: 'pointer', boxShadow: '0 0 15px var(--accent-light)', opacity: loading ? 0.7 : 1 }}
                 >
-                  {loading ? 'Processing...' : 'Update Password'}
+                  {loading ? t.processing : t.updatePassword}
                 </button>
               )}
             </div>
@@ -599,6 +684,7 @@ function ProfileModal({ user, onClose }) {
 
 // ── Network Status Alert ─────────────────────────────────────────
 function NetworkAlert({ isOffline, isSlow }) {
+  const { t } = useTheme()
   if (!isOffline && !isSlow) return null
 
   return createPortal(
@@ -621,12 +707,10 @@ function NetworkAlert({ isOffline, isSlow }) {
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: '0.02em', marginBottom: 2 }}>
-          {isOffline ? 'KONEKSI TERPUTUS!' : 'KONEKSI LELET / TIDAK STABIL'}
+          {isOffline ? t.connLost : t.connSlow}
         </div>
         <div style={{ fontSize: 11, opacity: 0.9, lineHeight: 1.4, fontWeight: 600 }}>
-          {isOffline
-            ? 'Silakan cek koneksi WiFi atau data seluler di perangkat Anda segera.'
-            : 'Jaringan Anda sedang lambat. Monitoring mungkin tidak update secara real-time.'}
+          {isOffline ? t.connLostDesc : t.connSlowDesc}
         </div>
       </div>
     </div>,
@@ -641,7 +725,7 @@ function getInitialNav() {
 
 function AppInner() {
   const { user, isSuperAdmin, logout } = useAuth()
-  const { themeId } = useTheme()
+  const { themeId, t } = useTheme()
   const [loggedIn, setLoggedIn] = useState(!!user)
   const [activeNav, setActiveNav] = useState(getInitialNav)
   const [summary, setSummary] = useState(null)
@@ -743,6 +827,20 @@ function AppInner() {
     } catch (e) { }
   }, [])
 
+  // Native OS notification for critical alerts (works even when the tab is in the background)
+  const showDesktopNotif = useCallback((notif) => {
+    if (localStorage.getItem('spmt_desktop_notif') !== 'on') return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      const n = new Notification(`🚨 ${notif.name || 'Website'} — ${notif.type}`, {
+        body: notif.reason || notif.url || 'Status berubah',
+        tag: `spmt-${notif.websiteId}`,
+        icon: '/favicon.ico',
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch (e) { }
+  }, [])
+
   const loadSummary = useCallback(async (signal) => {
     if (!loggedIn) return;
     try {
@@ -801,9 +899,14 @@ function AppInner() {
     // Initial Load - Parallel
     triggerGlobalRefresh();
 
-    const ivSummary = setInterval(() => loadSummary(controller.signal), 5000);
-    const ivWebsites = setInterval(() => loadWebsites(controller.signal), 15000); // More frequent but stable
-    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, 30000);
+    // Global refresh rates: 1s for summary and websites, 2s for users/events
+    const rSummary = 1000;
+    const rWebsites = 1000;
+    const rUsersEvents = 2000;
+
+    const ivSummary = setInterval(() => loadSummary(controller.signal), rSummary);
+    const ivWebsites = setInterval(() => loadWebsites(controller.signal), rWebsites); // More frequent but stable
+    const ivUsersEvents = setInterval(() => { loadUsers(); loadEvents(); }, rUsersEvents);
 
     return () => {
       controller.abort();
@@ -822,14 +925,24 @@ function AppInner() {
   }, [isSuperAdmin, triggerGlobalRefresh])
 
   const handleNewNotification = useCallback((notif) => {
+    // Recovery event: optionally auto-acknowledge (mark read) prior alerts for this website
+    if (notif.type === 'ONLINE') {
+      if (localStorage.getItem('spmt_autoack') === 'on') {
+        setNotifications(prev => prev.some(n => n.websiteId === notif.websiteId && !n.read)
+          ? prev.map(n => n.websiteId === notif.websiteId && !n.read ? { ...n, read: true } : n)
+          : prev)
+      }
+      return
+    }
     if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL' && notif.type !== 'DEGRADED' && notif.type !== 'WARNING') return
     setNotifications(prev => {
       const dupe = prev.find(n => n.websiteId === notif.websiteId && n.type === notif.type && (Date.now() - n.ts) < 300000);
       if (dupe) return prev;
-      playAlarm(); // TRIGGER SCI-FI ALARM ON NEW ALERT
+      if (notif.type === 'OFFLINE') playAlarm(); // Sound ONLY when something goes offline
+      showDesktopNotif(notif); // OS-level popup if enabled
       return [{ ...notif, read: false }, ...prev].slice(0, 200)
     })
-  }, [playAlarm])
+  }, [playAlarm, showDesktopNotif])
 
   const handleMarkRead = useCallback((idx) => setNotifications(p => p.map((n, i) => i === idx ? { ...n, read: true } : n)), [])
   const handleMarkAllRead = useCallback(() => setNotifications(p => p.map(n => ({ ...n, read: true }))), [])
@@ -872,7 +985,7 @@ function AppInner() {
       <LoginPage
         onLogin={() => {
           setLoggedIn(true)
-          showToast('Login Successfully')
+          showToast(t.loginSuccess)
         }}
       />
     )
@@ -923,7 +1036,12 @@ function AppInner() {
           onClose={() => setDetailWebsiteId(null)} 
         />
       )}
-      {showAllNotifs && <AllNotificationsPanel notifications={notifications} onDelete={handleDelete} onClearAll={handleClearAll} onClose={() => setShowAllNotifs(false)} />}
+      {showAllNotifs && <AllNotificationsPanel notifications={notifications} onDelete={handleDelete} onClearAll={handleClearAll} onClose={() => setShowAllNotifs(false)}
+        onOpen={(n) => {
+          setNotifications(prev => prev.map(x => x === n ? { ...x, read: true } : x))
+          setDetailWebsiteId(n.websiteId)
+          setShowAllNotifs(false)
+        }} />}
       {showProfile && <ProfileModal user={user} onClose={() => setShowProfile(false)} />}
       {showLogout && <LogoutModal onConfirm={handleLogout} onCancel={() => setShowLogout(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

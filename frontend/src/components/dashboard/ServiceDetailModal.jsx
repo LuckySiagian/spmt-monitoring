@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { websiteAPI, eventsAPI } from '../../services/api'
 import { useGlobalWebSocket } from '../../store/WebSocketContext'
+import { useTheme } from '../../store/theme'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Copy, Check } from 'lucide-react'
+
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
 const STATUS_COLORS = {
   ONLINE: '#10b981',
@@ -17,6 +20,7 @@ const STATUS_COLORS = {
 import StatusBadgeIcon from '../common/StatusBadgeIcon'
 
 const StatusBadge = ({ status }) => {
+  const { tStatus } = useTheme()
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
     WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
@@ -26,7 +30,7 @@ const StatusBadge = ({ status }) => {
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-      {status || 'PENDING'}
+      {tStatus(status)}
       <StatusBadgeIcon status={status} />
     </span>
   )
@@ -42,6 +46,8 @@ const InfoRow = ({ label, value, valueColor }) => (
 // ── Availability Timeline ─────────────────────────────────────
 
 function AvailabilityTimeline({ websiteId }) {
+  const { t, tStatus, lang } = useTheme()
+  const tlLocale = LOCALE_MAP[lang] || 'en-US'
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -71,7 +77,7 @@ function AvailabilityTimeline({ websiteId }) {
     }
   }, [websiteId, fetchEvents]))
 
-  const fmtT = (d) => new Date(d).toLocaleString('id-ID', { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const fmtT = (d) => new Date(d).toLocaleString(tlLocale, { hour12: false, month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
   const fmtDuration = (fromMs, toMs) => {
     const diff = toMs - fromMs
     if (diff < 0) return '—'
@@ -83,8 +89,8 @@ function AvailabilityTimeline({ websiteId }) {
     return `${h}h ${m % 60}m`
   }
 
-  if (loading) return <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>Loading timeline...</div>
-  if (!events.length) return <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>No status change events recorded yet.</div>
+  if (loading) return <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>{t.tlLoading}</div>
+  if (!events.length) return <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>{t.tlNoEvents}</div>
 
   // Build intervals: each event marks a transition
   // events are ordered DESC (newest first), reverse for chronological
@@ -93,7 +99,7 @@ function AvailabilityTimeline({ websiteId }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: '#4a6fa5', marginBottom: 12, letterSpacing: '0.05em' }}>
-        {events.length} status change events — newest first
+        {events.length} {t.tlEventsNewest}
       </div>
 
       {/* Visual timeline */}
@@ -103,7 +109,7 @@ function AvailabilityTimeline({ websiteId }) {
 
         {[...events].slice(0, 40).map((ev, i) => {
           const prevEv = events[i + 1]
-          const duration = prevEv ? fmtDuration(new Date(prevEv.created_at).getTime(), new Date(ev.created_at).getTime()) : (i === 0 ? 'ongoing' : '—')
+          const duration = prevEv ? fmtDuration(new Date(prevEv.created_at).getTime(), new Date(ev.created_at).getTime()) : (i === 0 ? t.tlOngoing : '—')
           const color = STATUS_COLORS[ev.new_status] || '#4a5568'
 
           return (
@@ -120,13 +126,13 @@ function AvailabilityTimeline({ websiteId }) {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color }}>
-                    {ev.old_status} → {ev.new_status}
+                    {tStatus(ev.old_status)} → {tStatus(ev.new_status)}
                   </span>
                   <span style={{ fontSize: 9, background: color + '22', color, border: `1px solid ${color}44`, borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>
-                    {ev.new_status}
+                    {tStatus(ev.new_status)}
                   </span>
                   <span style={{ fontSize: 9, color: '#4a5568', marginLeft: 'auto' }}>
-                    Duration: {duration}
+                    {t.tlDuration}: {duration}
                   </span>
                 </div>
                 <div style={{ fontSize: 10, color: '#4a6fa5' }}>
@@ -140,7 +146,7 @@ function AvailabilityTimeline({ websiteId }) {
 
       {/* Status bar visual */}
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#4a6fa5', marginBottom: 6, letterSpacing: '0.05em' }}>STATUS DURATION BAR</div>
+        <div style={{ fontSize: 10, color: '#4a6fa5', marginBottom: 6, letterSpacing: '0.05em' }}>{t.tlDurationBar}</div>
         <div style={{ display: 'flex', height: 20, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
           {sorted.slice(-30).map((ev, i) => {
             const color = STATUS_COLORS[ev.new_status] || '#4a5568'
@@ -160,8 +166,8 @@ function AvailabilityTimeline({ websiteId }) {
           })}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 9, color: '#4a5568' }}>
-          <span>Oldest</span>
-          <span>Newest</span>
+          <span>{t.tlOldest}</span>
+          <span>{t.tlNewest}</span>
         </div>
       </div>
 
@@ -170,7 +176,7 @@ function AvailabilityTimeline({ websiteId }) {
         {['ONLINE', 'DEGRADED', 'WARNING', 'CRITICAL', 'OFFLINE'].map(s => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: STATUS_COLORS[s] }} />
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s}</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{tStatus(s)}</span>
           </div>
         ))}
       </div>
@@ -189,7 +195,7 @@ const getDnsStatus = (status, resolved) => {
   return '🟢 Sukses (Normal)'
 }
 
-const getHttpCodeValue = (status, code, rootCause = '') => {
+const getHttpCodeValue = (status, code, rootCause = '', botBlocked = false) => {
   const rc = String(rootCause || '').toUpperCase()
   if (rc.includes('BLOKIR') || rc.includes('POSITIF') || rc.includes('ISP') || rc.includes('ADUAN')) {
     return '— (Akses Diblokir / Koneksi Diintersepsi)'
@@ -198,6 +204,9 @@ const getHttpCodeValue = (status, code, rootCause = '') => {
     return '— (Request Time Out / Connection Refused)'
   }
   if (!code) return '— (Request Time Out / Connection Refused)'
+  if (botBlocked && (code === 403 || code === 429)) {
+    return `${code} ${code === 429 ? 'Too Many Requests' : 'Forbidden'} (Proteksi Bot/WAF)`
+  }
   if (code === 200) return '200 OK'
   if (code === 201) return '201 Created'
   if (code === 301) return '301 Moved Permanently'
@@ -314,6 +323,8 @@ function RootCauseSection({ website }) {
 // ── Main Modal ────────────────────────────────────────────────
 
 export default function ServiceDetailModal({ website, onClose }) {
+  const { t, tStatus, lang } = useTheme()
+  const mdLocale = LOCALE_MAP[lang] || 'en-US'
   const [tab, setTab] = useState('overview')
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(false)
@@ -416,7 +427,7 @@ export default function ServiceDetailModal({ website, onClose }) {
     if (ms === 0) return '< 1ms'
     return `${ms}ms`
   }
-  const fmtTime = (d) => d ? new Date(d).toLocaleString('id-ID', { hour12: false }) : '—'
+  const fmtTime = (d) => d ? new Date(d).toLocaleString(mdLocale, { hour12: false }) : '—'
 
   const { avgRT, maxRT, minRT, uptime, alerts, perfData, upLogsCount } = useMemo(() => {
     const rtSeries = logs.filter(l => l.response_time_ms != null).map(l => l.response_time_ms)
@@ -445,7 +456,12 @@ export default function ServiceDetailModal({ website, onClose }) {
   const faviconUrl = shouldSkip ? null : `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
   const initial = (website.name || 'W')[0].toUpperCase()
 
-  const TABS = ['OVERVIEW', 'PERFORMANCE', 'TIMELINE', 'HISTORY']
+  const TABS = [
+    { key: 'OVERVIEW', label: t.tabOverview },
+    { key: 'PERFORMANCE', label: t.tabPerformance },
+    { key: 'TIMELINE', label: t.tabTimeline },
+    { key: 'HISTORY', label: t.tabHistory },
+  ]
 
   return (
     <div style={st.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -479,11 +495,11 @@ export default function ServiceDetailModal({ website, onClose }) {
         <div style={st.tabs}>
           {TABS.map(tb => (
             <button
-              key={tb}
-              style={{ ...st.tabBtn, ...(tab === tb.toLowerCase() ? st.tabActive : {}) }}
-              onClick={() => setTab(tb.toLowerCase())}
+              key={tb.key}
+              style={{ ...st.tabBtn, ...(tab === tb.key.toLowerCase() ? st.tabActive : {}) }}
+              onClick={() => setTab(tb.key.toLowerCase())}
             >
-              {tb}
+              {tb.label}
             </button>
           ))}
         </div>
@@ -499,6 +515,13 @@ export default function ServiceDetailModal({ website, onClose }) {
             const sslColor = sslOk === false ? '#ef4444' : sslOk ? '#10b981' : 'var(--text-muted)'
             const code = ev?.http_status_code
             const codeColor = !code ? 'var(--text-muted)' : code >= 500 ? '#ef4444' : code >= 400 ? '#f59e0b' : '#10b981'
+            // Bot-block: a 403/429 from a site behind a WAF/CDN = our monitor
+            // fingerprinted as a bot, NOT a genuine application 4xx.
+            const wafName = (ev?.waf_detected && ev.waf_detected !== 'Not Detected')
+              ? ev.waf_detected
+              : (ev?.is_cdn ? (ev?.cdn_provider || '') : '')
+            const botBlocked = ev?.investigation_report?.bot_blocked === true
+              || ((code === 403 || code === 429) && !!wafName)
             const rt = ev?.response_time_ms ?? website.response_time_ms
             const rtColor = !rt ? 'var(--text-muted)' : rt > 5000 ? '#ef4444' : rt > 2000 ? '#f59e0b' : '#10b981'
 
@@ -536,7 +559,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                 expiry.setHours(0,0,0,0)
                 const diff = expiry - today
                 const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
-                return days > 0 ? `${days} Days` : (days === 0 ? 'Today' : 'Expired')
+                return days > 0 ? `${days} ${t.valDays}` : (days === 0 ? t.valToday : t.valExpired)
               } catch {
                 return '—'
               }
@@ -697,6 +720,9 @@ export default function ServiceDetailModal({ website, onClose }) {
               const w = websiteName || 'Website ini'
               if (error) return `Koneksi gagal dilakukan: ${error}.`
               if (!code) return 'Tidak menerima respon HTTP dari server (koneksi ditolak atau RTO).'
+              if (botBlocked && (code === 403 || code === 429)) {
+                return `HTTP ${code}: Akses bot kami diblokir oleh ${wafName || 'sistem keamanan (WAF/CDN)'} milik ${w}. Bukan gangguan situs — untuk pengunjung biasa kemungkinan tetap normal.`
+              }
               if (code >= 100 && code < 200) return `HTTP ${code}: Informasi sementara dari server ${w}. Proses permintaan masih berlangsung — ini normal dan biasanya tidak terlihat oleh pengguna biasa.`
               if (code === 200) return `HTTP 200: ${w} merespons dengan sukses. Semua berjalan lancar — halaman berhasil dimuat seperti yang diharapkan.`
               if (code === 201) return `HTTP 201: ${w} berhasil membuat data baru. Permintaan sukses diproses.`
@@ -709,7 +735,7 @@ export default function ServiceDetailModal({ website, onClose }) {
               if (code >= 300 && code < 400) return `HTTP ${code}: ${w} mengalihkan (redirect) ke halaman lain. Biasanya ini terjadi kalau website pindah alamat atau sedang mengarahkan pengguna ke versi terbaru halaman.`
               if (code === 400) return `HTTP 400: ${w} menolak permintaan alat pantau kami karena terdeteksi sebagai robot/bot. Ini bukan berarti website-nya error — server sengaja memblokir permintaan otomatis untuk keamanan. Tenang saja, Chrome bot kami akan tetap membuka langsung halaman ${w} seperti kamu buka pakai Chrome biasa — jadi kalau websitenya normal, hasilnya tetap ONLINE.`
               if (code === 401) return `HTTP 401: ${w} seperti pintu rumah yang terkunci dan kamu tidak punya kuncinya. Server bilang: 'Kamu harus login dulu, kasih tau siapa kamu, baru saya kasih lihat isinya.' Ini wajar untuk website yang punya halaman khusus anggota atau admin — artinya website hidup, cuma perlu password dulu.`
-              if (code === 403) return `HTTP 403: ${w} seperti kamu mau masuk ke gedung, tapi satpamnya bilang: 'Maaf, kamu tidak diizinkan masuk.' Berbeda dengan 401 (tidak punya kunci), 403 ini kamu sudah dikenal tapi aksesmu diblokir. Biasanya karena sistem keamanan server (WAF) menganggap alat pantau kita mencurigakan. Banyak website pakai ini untuk memblokir akses otomatis dari bot.`
+              if (code === 403) return `HTTP 403: ${w} menolak akses (Forbidden). Server mengenali permintaan tapi memblokirnya — biasanya karena hak akses atau konfigurasi rute yang dibatasi.`
               if (code === 404) return `HTTP 404: ${w} seperti kamu datang ke alamat rumah seseorang, tapi rumahnya tidak ada di sana — mungkin sudah pindah atau alamatnya salah. Server bilang: 'Maaf, halaman yang kamu cari tidak ada di sini.' Bisa karena URL-nya salah, halaman sudah dihapus, atau website belum selesai dibangun.`
               if (code === 405) return `HTTP 405: ${w} tidak mengizinkan metode permintaan yang kita gunakan. Seperti kamu mau masuk pintu tapi kamu malah coba lewat jendela — cara minta aksesnya tidak sesuai dengan yang server harapkan.`
               if (code === 408) return `HTTP 408: ${w} kehabisan waktu menunggu permintaan dari kita. Koneksi terlalu lambat atau terputus di tengah jalan — server sudah capek nunggu.`
@@ -798,7 +824,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 900, color: boxColor, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                      📋 KONDISI WEBSITE
+                      📋 {t.conditionWebsite}
                     </div>
                     <span style={{ 
                       fontSize: 10, 
@@ -866,7 +892,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                       marginBottom: 12 
                     }}>
                       <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                        📸 BOT CHROME
+                        📸 {t.botChrome}
                       </div>
                       <button
                         onClick={handleCopyScreenshot}
@@ -886,7 +912,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                         }}
                       >
                         {copied ? <Check size={12} /> : <Copy size={12} />}
-                        {copied ? 'Tersalin!' : 'Copy Screenshot'}
+                        {copied ? t.copied : t.copyScreenshot}
                       </button>
                     </div>
                     <img 
@@ -912,34 +938,37 @@ export default function ServiceDetailModal({ website, onClose }) {
 
                 {/* 3. FOUR CARDS (Service Health Overview, Connectivity, Security, Infrastructure) */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-                  <CardBox title="SERVICE HEALTH">
-                    <CardRow label="Status" value={statusText} valueColor={boxColor} desc={getStatusDesc(latestLog?.status || website.status)} />
-                    <CardRow label="HTTP Code" value={getHttpCodeValue(latestLog?.status || website.status, code, ev?.http_error)} valueColor={codeColor} desc={getHttpDesc(code, ev?.http_error, website?.name)} />
-                    <CardRow label="Response Time" value={rt ? `${rt} ms` : '—'} valueColor={rtColor} desc={getResponseTimeDesc(rt)} />
-                    <CardRow label="TTFB" value={ev?.ttfb_ms ? `${ev.ttfb_ms} ms` : (latestLog?.ttfb_latency_ms ? `${latestLog.ttfb_latency_ms} ms` : '—')} desc={getTtfbDesc(ev?.ttfb_ms || latestLog?.ttfb_latency_ms)} />
-                    <CardRow label="Last Check" value={fmtTimeOnly(latestLog?.checked_at || website.last_checked)} desc={fmtTimeOnly(latestLog?.checked_at || website.last_checked) !== '—' ? 'Waktu terakhir sistem memvalidasi keadaan website ini.' : 'Pengecekan belum dilakukan.'} />
+                  <CardBox title={t.cardServiceHealth}>
+                    <CardRow label={t.rowStatus} value={statusText} valueColor={boxColor} desc={getStatusDesc(latestLog?.status || website.status)} />
+                    <CardRow label={t.rowHttpCode} value={getHttpCodeValue(latestLog?.status || website.status, code, ev?.http_error, botBlocked)} valueColor={codeColor} desc={getHttpDesc(code, ev?.http_error, website?.name)} />
+                    <CardRow label={t.rowResponseTime} value={rt ? `${rt} ms` : '—'} valueColor={rtColor} desc={getResponseTimeDesc(rt)} />
+                    <CardRow label={t.rowTtfb} value={ev?.ttfb_ms ? `${ev.ttfb_ms} ms` : (latestLog?.ttfb_latency_ms ? `${latestLog.ttfb_latency_ms} ms` : '—')} desc={getTtfbDesc(ev?.ttfb_ms || latestLog?.ttfb_latency_ms)} />
+                    <CardRow label={t.rowLastCheck} value={fmtTimeOnly(latestLog?.checked_at || website.last_checked)} desc={fmtTimeOnly(latestLog?.checked_at || website.last_checked) !== '—' ? 'Waktu terakhir sistem memvalidasi keadaan website ini.' : 'Pengecekan belum dilakukan.'} />
                   </CardBox>
 
-                  <CardBox title="CONNECTIVITY">
-                    <CardRow 
-                      label="ICMP Ping" 
-                      value={latestLog?.icmp_status === false ? 'Failed' : (latestLog?.icmp_latency_ms ? `${latestLog.icmp_latency_ms} ms` : (ev?.icmp_latency_ms ? `${ev.icmp_latency_ms} ms` : '—'))} 
-                      valueColor={latestLog?.icmp_status === false ? '#ef4444' : '#10b981'} 
+                  <CardBox title={t.cardConnectivity}>
+                    <CardRow
+                      label={t.rowIcmpPing}
+                      value={latestLog?.icmp_status === false ? t.valFailed : (latestLog?.icmp_latency_ms ? `${latestLog.icmp_latency_ms} ms` : (ev?.icmp_latency_ms ? `${ev.icmp_latency_ms} ms` : '—'))}
+                      valueColor={latestLog?.icmp_status === false ? '#ef4444' : '#10b981'}
                       desc={getPingDesc(latestLog?.icmp_status ?? ev?.icmp_status, latestLog?.icmp_latency_ms ?? ev?.icmp_latency_ms, ev?.tcp_latency_ms)}
                     />
-                    <CardRow label="DNS Status" value={ev?.dns_resolved ? 'Resolved' : 'Failed'} valueColor={ev?.dns_resolved ? '#10b981' : '#ef4444'} desc={getDnsDesc(ev?.dns_resolved)} />
-                    <CardRow label="DNS Lookup Time" value={ev?.dns_latency_ms ? `${ev.dns_latency_ms} ms` : (latestLog?.dns_latency_ms ? `${latestLog.dns_latency_ms} ms` : '—')} desc={getDnsTimeDesc(ev?.dns_latency_ms || latestLog?.dns_latency_ms)} />
-                    <CardRow label="IP Address" value={ev?.ip_address || website.ip_address || '—'} desc={getIpDesc(ev?.ip_address || website.ip_address)} />
+                    <CardRow label={t.rowDnsStatus} value={ev?.dns_resolved ? t.valResolved : t.valFailed} valueColor={ev?.dns_resolved ? '#10b981' : '#ef4444'} desc={getDnsDesc(ev?.dns_resolved)} />
+                    <CardRow label={t.rowDnsLookup} value={ev?.dns_latency_ms ? `${ev.dns_latency_ms} ms` : (latestLog?.dns_latency_ms ? `${latestLog.dns_latency_ms} ms` : '—')} desc={getDnsTimeDesc(ev?.dns_latency_ms || latestLog?.dns_latency_ms)} />
+                    <CardRow label={t.rowIpAddress} value={ev?.ip_address || website.ip_address || '—'} desc={getIpDesc(ev?.ip_address || website.ip_address)} />
                   </CardBox>
 
-                  <CardBox title="SECURITY">
-                    <CardRow label="SSL Status" value={ev?.tls_handshake_ok ? 'Valid' : (ev?.tls_handshake_ok === false ? 'Invalid' : '—')} valueColor={sslColor} desc={getSslDesc(ev?.tls_handshake_ok)} />
-                    <CardRow label="Expiration Date" value={ev?.tls_cert_expiry ? fmtDateLong(ev.tls_cert_expiry) : (website.ssl_expiry_date ? fmtDateLong(website.ssl_expiry_date) : '—')} desc={getExpiryDesc(ev?.tls_cert_expiry || website.ssl_expiry_date)} />
-                    <CardRow label="Remaining Days" value={ev?.tls_cert_expiry ? getRemainingDays(ev.tls_cert_expiry) : (website.ssl_expiry_date ? getRemainingDays(website.ssl_expiry_date) : '—')} desc={getRemainingDesc(ev?.tls_cert_expiry || website.ssl_expiry_date)} />
+                  <CardBox title={t.cardSecurity}>
+                    <CardRow label={t.rowSslStatus} value={ev?.tls_handshake_ok ? t.valValid : (ev?.tls_handshake_ok === false ? t.valInvalid : '—')} valueColor={sslColor} desc={getSslDesc(ev?.tls_handshake_ok)} />
+                    <CardRow label={t.rowExpiration} value={ev?.tls_cert_expiry ? fmtDateLong(ev.tls_cert_expiry) : (website.ssl_expiry_date ? fmtDateLong(website.ssl_expiry_date) : '—')} desc={getExpiryDesc(ev?.tls_cert_expiry || website.ssl_expiry_date)} />
+                    <CardRow label={t.rowRemainingDays} value={ev?.tls_cert_expiry ? getRemainingDays(ev.tls_cert_expiry) : (website.ssl_expiry_date ? getRemainingDays(website.ssl_expiry_date) : '—')} desc={getRemainingDesc(ev?.tls_cert_expiry || website.ssl_expiry_date)} />
                   </CardBox>
 
-                  <CardBox title="INFRASTRUCTURE">
-                    <CardRow label="Server" value={ev?.server_header || 'Unknown'} desc={getServerDesc(ev?.server_header)} />
+                  <CardBox title={t.cardInfrastructure}>
+                    <CardRow label={t.rowServer} value={ev?.server_header || t.valUnknown} desc={getServerDesc(ev?.server_header)} />
+                    {botBlocked && wafName && (
+                      <CardRow label={t.rowBotDetector} value={wafName} valueColor="#f59e0b" desc={`Sistem keamanan (WAF/CDN) yang dipakai ${website?.name || 'situs ini'} untuk memblokir akses otomatis/bot.`} />
+                    )}
                   </CardBox>
                 </div>
 
@@ -1017,7 +1046,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                     onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px var(--primary-glow)' }}
                     onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px var(--primary-glow)' }}
                   >
-                    🌐 VISIT WEBSITE ↗
+                    🌐 {t.visitWebsite} ↗
                   </a>
                 </div>
               </div>
@@ -1032,9 +1061,9 @@ export default function ServiceDetailModal({ website, onClose }) {
               {/* Performance mini cards */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
                 {[
-                  { label: 'Avg Response', value: fmt(avgRT), color: '#3b82f6' },
-                  { label: 'Slowest', value: fmt(maxRT), color: '#ef4444' },
-                  { label: 'Fastest', value: fmt(minRT), color: '#10b981' },
+                  { label: t.perfAvgResponse, value: fmt(avgRT), color: '#3b82f6' },
+                  { label: t.perfSlowest, value: fmt(maxRT), color: '#ef4444' },
+                  { label: t.perfFastest, value: fmt(minRT), color: '#10b981' },
                 ].map(item => (
                   <div key={item.label} style={{ background: 'rgba(255,255,255,0.97)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 8, padding: '10px 14px' }}>
                     <div style={{ fontSize: 9, color: '#4a6fa5', letterSpacing: '0.08em' }}>{item.label.toUpperCase()}</div>
@@ -1045,7 +1074,7 @@ export default function ServiceDetailModal({ website, onClose }) {
 
               {/* Response time chart */}
               <div style={{ fontSize: 10, color: '#4a6fa5', marginBottom: 8, letterSpacing: '0.06em', fontWeight: 600 }}>
-                RESPONSE TIME — LAST {perfData.length} CHECKS
+                {t.perfResponseLast} {perfData.length} {t.perfChecks}
               </div>
               <div style={{ height: 160 }}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -1069,9 +1098,9 @@ export default function ServiceDetailModal({ website, onClose }) {
               {/* Stats */}
               <div style={{ marginTop: 14 }}>
                 {[
-                  { label: 'Total Checks (sample)', value: logs.length },
-                  { label: 'Successful Checks', value: upLogsCount },
-                  { label: 'Sample Uptime', value: `${uptime}%` },
+                  { label: t.perfTotalChecks, value: logs.length },
+                  { label: t.perfSuccessfulChecks, value: upLogsCount },
+                  { label: t.perfSampleUptime, value: `${uptime}%` },
                 ].map(item => (
                   <InfoRow key={item.label} label={item.label} value={item.value} />
                 ))}
@@ -1087,19 +1116,19 @@ export default function ServiceDetailModal({ website, onClose }) {
           {/* ── HISTORY ── */}
           {tab === 'history' && (
             loading ? (
-              <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>Loading...</div>
+              <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>{t.loading}</div>
             ) : logs.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>No history</div>
+              <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>{t.noHistory}</div>
             ) : (
               <table style={st.table}>
                 <thead>
-                  <tr>{['Time', 'Status', 'HTTP', 'Latency', 'Health', 'SSL'].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                  <tr>{[t.colTime, t.colStatus, t.colHttp, t.thLatency, t.colHealth, t.colSsl].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {logs.map((log, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                       <td style={st.td}>{fmtTime(log.checked_at)}</td>
-                      <td style={st.td}><span style={{ color: STATUS_COLORS[log.status] || '#4a5568', fontWeight: 600, fontSize: 10 }}>{log.status || '—'}</span></td>
+                      <td style={st.td}><span style={{ color: STATUS_COLORS[log.status] || '#4a5568', fontWeight: 600, fontSize: 10 }}>{log.status ? tStatus(log.status) : '—'}</span></td>
                       <td style={st.td}>{log.status_code ?? '—'}</td>
                       <td style={st.td}>{fmt(log.response_time_ms)}</td>
                       <td style={st.td}><span style={{ color: log.health_score > 80 ? '#10b981' : '#f59e0b' }}>{log.health_score}%</span></td>
@@ -1114,18 +1143,18 @@ export default function ServiceDetailModal({ website, onClose }) {
           {/* ── ALERTS ── */}
           {tab === 'alerts' && (
             alerts.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>✅ No alerts for this service</div>
+              <div style={{ textAlign: 'center', color: '#4a5568', padding: 24, fontSize: 12 }}>{t.noAlertsService}</div>
             ) : (
               <table style={st.table}>
                 <thead>
-                  <tr>{['Time', 'Status', 'Issue', 'HTTP', 'Response'].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                  <tr>{[t.colTime, t.colStatus, t.colIssue, t.colHttp, t.colResponse].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {alerts.map((log, i) => (
                     <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                       <td style={st.td}>{fmtTime(log.checked_at)}</td>
-                      <td style={st.td}><span style={{ color: { CRITICAL: '#f59e0b', OFFLINE: '#ef4444' }[log.status] || '#4a5568', fontWeight: 600, fontSize: 10 }}>{log.status}</span></td>
-                      <td style={st.td}>{log.status === 'OFFLINE' ? 'Service Unreachable' : 'Slow/Degraded'}</td>
+                      <td style={st.td}><span style={{ color: { CRITICAL: '#f59e0b', OFFLINE: '#ef4444' }[log.status] || '#4a5568', fontWeight: 600, fontSize: 10 }}>{tStatus(log.status)}</span></td>
+                      <td style={st.td}>{log.status === 'OFFLINE' ? t.issueUnreachable : t.issueDegraded}</td>
                       <td style={st.td}>{log.status_code ?? '—'}</td>
                       <td style={st.td}>{fmt(log.response_time_ms)}</td>
                     </tr>

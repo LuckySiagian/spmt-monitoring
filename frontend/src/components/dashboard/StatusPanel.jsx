@@ -1,37 +1,39 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTheme } from '../../store/theme'
 import MonitoringGraph from './MonitoringGraph'
 import { Info, X, Zap } from 'lucide-react'
 
 function InfoModal({ onClose }) {
-  return (
+  const { t, tStatus } = useTheme()
+  return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)', zIndex: 100000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg-card)', borderRadius: 20, width: 600, maxWidth: '100%', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)', animation: 'fadeIn 0.2s ease' }}>
+      <div style={{ background: 'var(--bg-card)', borderRadius: 20, width: 560, maxWidth: '100%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', border: '1px solid var(--border)', animation: 'fadeIn 0.2s ease' }}>
         <div style={{ padding: '20px 24px', background: 'var(--primary)', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Info size={18} /></div>
-            <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.02em' }}>MONITORING GUIDE</span>
+            <span style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.02em' }}>{t.monitoringGuide}</span>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer', opacity: 0.8 }}><X /></button>
         </div>
 
-        <div style={{ padding: 30 }}>
+        <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
           <div style={{ marginBottom: 25 }}>
-            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 15, textTransform: 'uppercase' }}>Status Legend & Conditions</div>
+            <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 15, textTransform: 'uppercase' }}>{t.statusLegendConditions}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { s: 'ONLINE', c: '#10b981', t: 'HTTP 200-399 + RT ≤ 5.000ms', d: 'Website sehat, responsif, dan seluruh parameter valid.' },
-                { s: 'WARNING', c: '#f59e0b', t: 'Slow / WAF / Intercept', d: 'Website bisa diakses tetapi mengalami perlambatan atau pembatasan ringan.' },
-                { s: 'DEGRADED', c: '#f97316', t: 'Error / HTTP 5xx / SSL Invalid', d: 'Website masih merespon tetapi mengalami masalah yang mengganggu (misal 503, sertifikat SSL invalid).' },
-                { s: 'CRITICAL', c: '#ef4444', t: 'Severe Timeout / WAF Block', d: 'Sangat sulit diakses, sebagian besar request gagal atau diblokir.' },
-                { s: 'OFFLINE', c: '#dc2626', t: 'Down / Timeout Total / TCP Fail', d: 'Website sama sekali tidak dapat dijangkau oleh sistem.' }
+                { s: 'ONLINE', c: '#10b981', t: t.legendOnlineCond, d: t.legendOnlineDesc },
+                { s: 'WARNING', c: '#f59e0b', t: t.legendWarningCond, d: t.legendWarningDesc },
+                { s: 'DEGRADED', c: '#f97316', t: t.legendDegradedCond, d: t.legendDegradedDesc },
+                { s: 'CRITICAL', c: '#ef4444', t: t.legendCriticalCond, d: t.legendCriticalDesc },
+                { s: 'OFFLINE', c: '#dc2626', t: t.legendOfflineCond, d: t.legendOfflineDesc }
               ].map(item => (
                 <div key={item.s} style={{ display: 'flex', gap: 16, padding: 14, background: 'var(--bg-main)', borderRadius: 12, border: '1px solid var(--border)' }}>
                   <div style={{ width: 12, height: 12, borderRadius: '50%', background: item.c, marginTop: 4, flexShrink: 0, boxShadow: `0 0 10px ${item.c}44` }} />
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 900, color: item.c }}>{item.s}</span>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: item.c }}>{tStatus(item.s)}</span>
                       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', padding: '2px 8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 4 }}>{item.t}</span>
                     </div>
                     <p style={{ margin: 0, fontSize: 12, color: 'var(--text-sub)', lineHeight: 1.5 }}>{item.d}</p>
@@ -43,15 +45,16 @@ function InfoModal({ onClose }) {
 
           <div style={{ padding: 20, background: 'rgba(99, 102, 241, 0.05)', borderRadius: 12, border: '1px dashed var(--accent)' }}>
             <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Zap size={14} /> ENGINE MONITORING
+              <Zap size={14} /> {t.engineMonitoring}
             </div>
             <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              Sistem kami melakukan pengecekan kesehatan secara berkala dengan 3 pilihan standar (<b>30s, 60s, atau 120s</b>). Data yang Anda lihat di dashboard ini bersifat <b>Real-Time (Fresh)</b> yang dikirimkan secara langsung melalui WebSocket.
+              {t.engineDesc}
             </p>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -98,6 +101,7 @@ function Favicon({ url, name }) {
 // ── ServiceRow (Compact List Item) ────────────────────────────
 
 function ServiceRow({ w, isSelected, onSelect, onOpenDetail, isDark }) {
+  const { t, tStatus } = useTheme()
   const c = BADGE[w.status] || BADGE.UNKNOWN
   const isOnline = w.status === 'ONLINE'
   const [hover, setHover] = useState(false)
@@ -167,7 +171,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail, isDark }) {
             borderRadius: 4,
             flexShrink: 0
           }}>
-            {w.status_code ? `HTTP ${w.status_code}` : 'TIMEOUT'}
+            {w.status_code ? `HTTP ${w.status_code}` : t.timeout}
           </span>
         </div>
 
@@ -175,7 +179,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail, isDark }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDark ? 'rgba(0,0,0,0.05)' : `${c.color}15`, padding: '2px 8px', borderRadius: 4, border: `1px solid ${c.color}33`, flexShrink: 0 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, boxShadow: `0 0 6px ${c.color}`, animation: 'pulse 1.5s infinite' }} />
             <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.05em', color: c.color }}>
-              {w.status}
+              {tStatus(w.status)}
             </span>
           </div>
           <span style={{ fontSize: '14px', fontWeight: 1000, color: w.response_time_ms > 15000 ? 'var(--status-critical)' : subTextColor, fontFamily: '"Inter", sans-serif', flexShrink: 0 }}>
@@ -190,7 +194,7 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail, isDark }) {
 // ── Main StatusPanel ──────────────────────────────────────────
 
 export default function StatusPanel({ websites, selectedId, onSelect, onOpenDetail, realtimeSnapshot, activeIncidents = [] }) {
-  const { themeId } = useTheme()
+  const { themeId, t } = useTheme()
   const isDark = themeId === 'theme-dark'
   const [showInfo, setShowInfo] = useState(false)
   const [search, setSearch] = useState('')
@@ -242,71 +246,74 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
             {/* Row 1: Title and Info Button */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-sub)', letterSpacing: '0.05em' }}>
-                🌐 LIVE NODES FEED ({sorted.length}/{websites.length})
+                🌐 {t.liveNodesFeed} ({sorted.length}/{websites.length})
               </span>
               <button
                 onClick={() => setShowInfo(true)}
                 style={{ background: 'var(--accent-light)', border: '1px solid var(--border)', borderRadius: '50%', width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--accent)', flexShrink: 0 }}
-                title="Learn about status meanings"
+                title={t.learnStatus}
               >
                 <Info size={12} />
               </button>
             </div>
 
-            {/* Row 2: Search, Status, Sort controls */}
+            {/* Row 2: Search (full width) */}
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {/* Search input */}
-              <div style={{ flex: 1.2, position: 'relative', minWidth: 0 }}>
-                <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, opacity: 0.5 }}>🔍</span>
+              {/* Search input — baris penuh sendiri agar tidak terpotong/tersembunyi */}
+              <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, opacity: 0.5 }}>🔍</span>
                 <input
                   style={{
-                    width: '100%', padding: '4px 8px 4px 22px', borderRadius: 8,
+                    width: '100%', padding: '8px 12px 8px 32px', borderRadius: 8,
                     border: '1px solid var(--border)', background: 'var(--bg-card)',
-                    color: 'var(--text)', fontSize: 10, outline: 'none', transition: 'all 0.2s',
+                    color: 'var(--text)', fontSize: 12, outline: 'none', transition: 'all 0.2s',
                     textOverflow: 'ellipsis'
                   }}
-                  placeholder="Search..."
+                  placeholder={t.searchPlaceholder}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
                 {search && (
-                  <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 9 }}>✕</button>
+                  <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>✕</button>
                 )}
               </div>
+            </div>
 
+            {/* Row 3: Status & Sort controls */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               {/* Status filter */}
               <select
                 style={{
-                  flex: 0.9, padding: '4px 4px', borderRadius: 8,
+                  flex: 1, padding: '7px 6px', borderRadius: 8,
                   border: '1px solid var(--border)', background: 'var(--bg-card)',
-                  color: 'var(--text)', fontSize: 10, outline: 'none', cursor: 'pointer',
+                  color: 'var(--text)', fontSize: 11, outline: 'none', cursor: 'pointer',
                   fontWeight: 700, minWidth: 0, textOverflow: 'ellipsis'
                 }}
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
               >
-                <option value="ALL">Semua Status</option>
-                <option value="ONLINE">🟢 Online</option>
-                <option value="CRITICAL">🟡 Critical</option>
-                <option value="OFFLINE">🔴 Offline</option>
+                <option value="ALL">{t.allStatus}</option>
+                <option value="ONLINE">🟢 {t.online}</option>
+                <option value="CRITICAL">🟡 {t.critical}</option>
+                <option value="OFFLINE">🔴 {t.offline}</option>
               </select>
 
               {/* Sort by */}
               <select
                 style={{
-                  flex: 0.9, padding: '4px 4px', borderRadius: 8,
+                  flex: 1, padding: '7px 6px', borderRadius: 8,
                   border: '1px solid var(--border)', background: 'var(--bg-card)',
-                  color: 'var(--text)', fontSize: 10, outline: 'none', cursor: 'pointer',
+                  color: 'var(--text)', fontSize: 11, outline: 'none', cursor: 'pointer',
                   fontWeight: 700, minWidth: 0, textOverflow: 'ellipsis'
                 }}
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
               >
-                <option value="status">Urutkan</option>
-                <option value="a-z">A - Z</option>
-                <option value="z-a">Z - A</option>
-                <option value="newest">Terbaru</option>
-                <option value="oldest">Terlama</option>
+                <option value="status">{t.sortLabel}</option>
+                <option value="a-z">{t.azLabel}</option>
+                <option value="z-a">{t.zaLabel}</option>
+                <option value="newest">{t.newestLabel}</option>
+                <option value="oldest">{t.oldestLabel}</option>
               </select>
             </div>
           </div>
@@ -316,15 +323,15 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '30px 0' }}>
                 {search || statusFilter !== 'ALL' ? (
                   <div>
-                    // NO MATCHING NODES FOUND
+                    {t.noMatchingNodes}
                     <button
                       onClick={() => { setSearch(''); setStatusFilter('ALL'); setSortBy('status') }}
                       style={{ display: 'block', margin: '8px auto', background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
                     >
-                      Reset Filters
+                      {t.resetFilters}
                     </button>
                   </div>
-                ) : '// NO SERVICES CONFIGURED'}
+                ) : t.noServicesConfigured}
               </div>
             )}
             {sorted.map(w => (

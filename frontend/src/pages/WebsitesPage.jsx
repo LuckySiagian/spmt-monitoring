@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { websiteAPI } from '../services/api'
 import { useAuth } from '../store/auth'
+import { useTheme } from '../store/theme'
 import Badge from '../components/common/Badge'
+
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
 const Modal = ({ title, onClose, children }) => (
   <div style={mStyles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -22,18 +25,18 @@ const Input = ({ label, ...props }) => (
   </div>
 )
 
-const Select = ({ label, options, value, onChange, ...props }) => {
+const Select = ({ label, options, value, onChange, currentLabel = 'Seconds (Current)', ...props }) => {
   const exists = options.some(opt => opt.val === value)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
       <label style={mStyles.label}>{label}</label>
-      <select 
-        style={mStyles.input} 
-        value={value} 
-        onChange={e => onChange(parseInt(e.target.value))} 
+      <select
+        style={mStyles.input}
+        value={value}
+        onChange={e => onChange(parseInt(e.target.value))}
         {...props}
       >
-        {!exists && value && <option value={value}>{value} Seconds (Current)</option>}
+        {!exists && value && <option value={value}>{value} {currentLabel}</option>}
         {options.map(opt => <option key={opt.val} value={opt.val}>{opt.lbl}</option>)}
       </select>
     </div>
@@ -49,6 +52,8 @@ const Textarea = ({ label, ...props }) => (
 
 export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const { isAdmin } = useAuth()
+  const { t, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const [showAdd, setShowAdd] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -89,7 +94,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
       setEditTarget(null)
       onWebsiteUpdate?.() // Triggers global reload in App.jsx
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save')
+      setError(err.response?.data?.error || t.failedToSave)
     } finally {
       setSaving(false)
     }
@@ -147,8 +152,8 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
     <div style={wStyles.page}>
       <div style={wStyles.header}>
         <div>
-          <div style={wStyles.title}>Website Management</div>
-          <div style={wStyles.sub}>{websites.length} / 100 websites configured</div>
+          <div style={wStyles.title}>{t.websiteManagement}</div>
+          <div style={wStyles.sub}>{websites.length} / 100 {t.websitesConfigured}</div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -157,7 +162,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
             <span style={sStyles.searchIcon}>🔍</span>
             <input 
               style={sStyles.searchInput} 
-              placeholder="Search website or URL..." 
+              placeholder={t.searchWebsiteUrl}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
@@ -171,7 +176,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
             {/* Recommendations Dropdown */}
             {showRecs && recs.length > 0 && (
               <div style={sStyles.recsDropdown}>
-                <div style={sStyles.recsHeader}>RECOMMENDATIONS</div>
+                <div style={sStyles.recsHeader}>{t.recommendations}</div>
                 {recs.map(r => (
                   <div 
                     key={r.id} 
@@ -205,10 +210,10 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
             >
-              <option value="ALL">Semua Status</option>
-              <option value="ONLINE">🟢 Online</option>
-              <option value="CRITICAL">🟡 Critical</option>
-              <option value="OFFLINE">🔴 Offline</option>
+              <option value="ALL">{t.allStatus}</option>
+              <option value="ONLINE">🟢 {t.online}</option>
+              <option value="CRITICAL">🟡 {t.critical}</option>
+              <option value="OFFLINE">🔴 {t.offline}</option>
             </select>
           </div>
 
@@ -220,10 +225,10 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
             >
-              <option value="a-z">Nama (A - Z)</option>
-              <option value="z-a">Nama (Z - A)</option>
-              <option value="newest">Terbaru Dibuat</option>
-              <option value="oldest">Terlama Dibuat</option>
+              <option value="a-z">{t.sortNameAz}</option>
+              <option value="z-a">{t.sortNameZa}</option>
+              <option value="newest">{t.sortNewestCreated}</option>
+              <option value="oldest">{t.sortOldestCreated}</option>
             </select>
           </div>
 
@@ -235,9 +240,9 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                 cursor: websites.length >= 100 ? 'not-allowed' : 'pointer'
               }} 
               onClick={websites.length >= 100 ? null : openAdd}
-              title={websites.length >= 100 ? 'Limit 100 websites reached' : 'Add new website'}
+              title={websites.length >= 100 ? t.limitReachedTitle : t.addNewWebsiteTitle}
             >
-              {websites.length >= 100 ? 'Limit Reached' : '+ Add Website'}
+              {websites.length >= 100 ? t.limitReached : t.addWebsiteBtn}
             </button>
           )}
         </div>
@@ -245,32 +250,32 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
 
       <div className="website-table-container" style={wStyles.tableContainer}>
         {websites.length === 0 ? (
-          <div style={wStyles.empty}>No websites configured. {isAdmin && 'Click "Add Website" to begin.'}</div>
+          <div style={wStyles.empty}>{t.noWebsitesConfigured} {isAdmin && t.clickAddWebsite}</div>
         ) : sortedWebsites.length === 0 ? (
           <div style={wStyles.empty}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
-            No websites match the current search or filters.
-            <button 
-              onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setSortBy('a-z') }} 
+            {t.noWebsitesMatch}
+            <button
+              onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setSortBy('a-z') }}
               style={{ display: 'block', margin: '12px auto', background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
             >
-              Reset Filters
+              {t.resetFilters}
             </button>
           </div>
         ) : (
           <table className="website-table" style={wStyles.table}>
             <thead>
               <tr>
-                <th style={{ ...wStyles.th, width: '16%' }}>WEBSITE</th>
-                <th style={{ ...wStyles.th, width: '16%' }}>URL / ENDPOINT</th>
-                <th style={{ ...wStyles.th, width: '7%', textAlign: 'center' }}>INTERVAL</th>
-                <th style={{ ...wStyles.th, width: '10%', textAlign: 'center' }}>STATUS</th>
-                <th style={{ ...wStyles.th, width: '11%', textAlign: 'center' }}>HEALTH</th>
-                <th style={{ ...wStyles.th, width: '8%', textAlign: 'center' }}>LATENCY</th>
-                <th style={{ ...wStyles.th, width: '6%', textAlign: 'center' }}>HTTP</th>
-                <th style={{ ...wStyles.th, width: '10%', textAlign: 'center' }}>SSL</th>
-                <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>NET LATENCIES</th>
-                {isAdmin && <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>ACTIONS</th>}
+                <th style={{ ...wStyles.th, width: '16%' }}>{t.thWebsite}</th>
+                <th style={{ ...wStyles.th, width: '16%' }}>{t.thUrlEndpoint}</th>
+                <th style={{ ...wStyles.th, width: '7%', textAlign: 'center' }}>{t.thInterval}</th>
+                <th style={{ ...wStyles.th, width: '10%', textAlign: 'center' }}>{t.thStatus}</th>
+                <th style={{ ...wStyles.th, width: '11%', textAlign: 'center' }}>{t.thHealth}</th>
+                <th style={{ ...wStyles.th, width: '8%', textAlign: 'center' }}>{t.thLatency}</th>
+                <th style={{ ...wStyles.th, width: '6%', textAlign: 'center' }}>{t.thHttp}</th>
+                <th style={{ ...wStyles.th, width: '10%', textAlign: 'center' }}>{t.thSsl}</th>
+                <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>{t.thNetLatencies}</th>
+                {isAdmin && <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>{t.thActions}</th>}
               </tr>
             </thead>
             <tbody>
@@ -392,11 +397,11 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                         alignItems: 'center',
                         gap: 4
                       }}>
-                        {w.ssl_valid ? '🔒 Valid' : w.ssl_valid === false ? '🔓 Invalid' : '—'}
+                        {w.ssl_valid ? `🔒 ${t.validLabel}` : w.ssl_valid === false ? `🔓 ${t.invalidLabel}` : '—'}
                       </span>
                       {w.ssl_expiry_date && (
                         <span style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
-                          Exp: {new Date(w.ssl_expiry_date).toLocaleDateString('id-ID')}
+                          {t.exp}: {new Date(w.ssl_expiry_date).toLocaleDateString(locale)}
                         </span>
                       )}
                     </div>
@@ -420,8 +425,8 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                   {isAdmin && (
                     <td style={wStyles.td}>
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                        <button style={wStyles.editBtn} onClick={() => openEdit(w)}>✏️ Edit</button>
-                        <button style={wStyles.delBtn} onClick={() => setDeleteTarget(w)}>🗑️ Hapus</button>
+                        <button style={wStyles.editBtn} onClick={() => openEdit(w)}>✏️ {t.editBtn}</button>
+                        <button style={wStyles.delBtn} onClick={() => setDeleteTarget(w)}>🗑️ {t.deleteBtn}</button>
                       </div>
                     </td>
                   )}
@@ -434,19 +439,20 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
 
       {/* Add/Edit Modal */}
       {(showAdd || editTarget) && (
-        <Modal title={editTarget ? 'Edit Website' : 'Add Website'} onClose={() => { setShowAdd(false); setEditTarget(null) }}>
+        <Modal title={editTarget ? t.editWebsiteTitle : t.addWebsiteModalTitle} onClose={() => { setShowAdd(false); setEditTarget(null) }}>
           <form onSubmit={handleSave}>
-            <Input label="NAME *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="My Website" required />
-            <Input label="URL *" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://example.com" required />
-            <Textarea label="DESCRIPTION" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" />
-            <Select 
-              label="MONITORING INTERVAL" 
-              value={form.interval_seconds} 
+            <Input label={t.fieldName} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={t.fieldNamePh} required />
+            <Input label={t.fieldUrl} value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} placeholder="https://example.com" required />
+            <Textarea label={t.fieldDescription} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={t.fieldDescriptionPh} />
+            <Select
+              label={t.fieldInterval}
+              currentLabel={t.secondsCurrent}
+              value={form.interval_seconds}
               onChange={val => setForm(f => ({ ...f, interval_seconds: val }))}
               options={[
-                { val: 30, lbl: '30 Seconds (Fast)' },
-                { val: 60, lbl: '60 Seconds (Recommended)' },
-                { val: 120, lbl: '120 Seconds (Normal)' },
+                { val: 30, lbl: t.interval30 },
+                { val: 60, lbl: t.interval60 },
+                { val: 120, lbl: t.interval120 },
               ]}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: 16 }}>
@@ -458,13 +464,13 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                 style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--primary)' }}
               />
               <label htmlFor="save_screenshot" style={{ ...mStyles.label, marginBottom: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, userSelect: 'none' }}>
-                AMBIL SCREENSHOT HALAMAN (SIMPAN FOTO)
+                {t.takeScreenshot}
               </label>
             </div>
             {error && <div style={mStyles.error}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button type="button" style={mStyles.cancelBtn} onClick={() => { setShowAdd(false); setEditTarget(null) }}>Cancel</button>
-              <button type="submit" style={mStyles.saveBtn} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+              <button type="button" style={mStyles.cancelBtn} onClick={() => { setShowAdd(false); setEditTarget(null) }}>{t.cancel}</button>
+              <button type="submit" style={mStyles.saveBtn} disabled={saving}>{saving ? t.saving : t.saveBtn}</button>
             </div>
           </form>
         </Modal>
@@ -472,13 +478,13 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
 
       {/* Delete Confirm */}
       {deleteTarget && (
-        <Modal title="Confirm Delete" onClose={() => setDeleteTarget(null)}>
+        <Modal title={t.confirmDeleteTitle} onClose={() => setDeleteTarget(null)}>
           <p style={{ color: 'var(--text-muted)', marginBottom: 20, fontSize: 13, lineHeight: 1.5 }}>
-            Delete <strong style={{ color: 'var(--text)' }}>{deleteTarget.name}</strong>? This will also permanently remove all monitoring logs from the database.
+            {t.deleteConfirmPrefix} <strong style={{ color: 'var(--text)' }}>{deleteTarget.name}</strong>{t.deleteConfirmSuffix}
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button style={mStyles.cancelBtn} onClick={() => setDeleteTarget(null)}>Cancel</button>
-            <button style={{ ...mStyles.saveBtn, background: 'linear-gradient(135deg, #dc2626, #ef4444)' }} onClick={handleDelete}>Delete</button>
+            <button style={mStyles.cancelBtn} onClick={() => setDeleteTarget(null)}>{t.cancel}</button>
+            <button style={{ ...mStyles.saveBtn, background: 'linear-gradient(135deg, #dc2626, #ef4444)' }} onClick={handleDelete}>{t.delete}</button>
           </div>
         </Modal>
       )}

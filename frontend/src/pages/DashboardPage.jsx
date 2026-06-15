@@ -3,6 +3,7 @@ import { dashboardAPI, websiteAPI, incidentAPI } from '../services/api'
 import { useGlobalWebSocket } from '../store/WebSocketContext'
 import NetworkTopology from '../components/topology/NetworkTopology'
 import StatusPanel from '../components/dashboard/StatusPanel'
+import { cleanReason } from '../utils/rootCause'
 
 export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpdate, onNewNotification, wsConnected, setWsConnected, realtimeSnapshot, onOpenDetail }) {
   const [selectedId, setSelectedId] = useState(null)
@@ -61,7 +62,7 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
     }
     if (msg.type === 'status_change') {
       const p = msg.payload
-      onNewNotification?.({ type: p.new_status, name: p.website, websiteId: p.website_id, url: p.url, oldStatus: p.old_status, reason: p.root_cause, ip: p.ip_address, responseTime: p.response_time_ms, ts: Date.now(), read: false })
+      onNewNotification?.({ type: p.new_status, name: p.website, websiteId: p.website_id, url: p.url, oldStatus: p.old_status, reason: cleanReason(p.root_cause), ip: p.ip_address, responseTime: p.response_time_ms, ts: Date.now(), read: false })
       loadActiveIncidents()
     }
   }, [onWebsitesUpdate, onSummaryUpdate, onNewNotification, setWsConnected, loadActiveIncidents])

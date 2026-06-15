@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../store/auth'
+import { useTheme } from '../store/theme'
 import { Turnstile } from '@marsidev/react-turnstile'
 import { authAPI } from '../services/api'
 import { showToast } from '../components/dashboard/Toast'
@@ -11,6 +12,7 @@ const videos = [
 
 export default function LoginPage({ onLogin }) {
   const { login } = useAuth()
+  const { t } = useTheme()
 
   const [form, setForm] = useState({ username: '', password: '', email: '', telegram_id: '' })
   const [turnstileToken, setTurnstileToken] = useState('')
@@ -28,7 +30,7 @@ export default function LoginPage({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!turnstileToken) {
-      setError('Please complete the CAPTCHA')
+      setError(t.completeCaptcha)
       return
     }
     setError('')
@@ -47,13 +49,13 @@ export default function LoginPage({ onLogin }) {
         setForm({ username: '', password: '', email: '', telegram_id: '' })
         setTurnstileToken('')
         if (window.turnstile) window.turnstile.reset() // Reset turnstile widget
-        showToast('Account created successfully! Please sign in.', 'success')
+        showToast(t.regSuccess, 'success')
       } else {
         await login(form.username, form.password, turnstileToken)
         onLogin()
       }
     } catch (err) {
-      setError(err.response?.data?.error || (isRegister ? 'Registration failed.' : 'Login failed. Check credentials.'))
+      setError(err.response?.data?.error || (isRegister ? t.regFailed : t.loginFailed))
     } finally {
       setLoading(false)
     }
@@ -120,10 +122,10 @@ export default function LoginPage({ onLogin }) {
           />
         </div>
 
-        <div style={s.welcomeText}>{isRegister ? 'Create Account' : 'Welcome'}</div>
+        <div style={s.welcomeText}>{isRegister ? t.createAccount : t.welcome}</div>
 
         <div style={s.welcomeSub}>
-          {isRegister ? 'Sign up to monitor services' : 'Sign in to access the monitoring dashboard'}
+          {isRegister ? t.signUpMonitor : t.signInAccess}
         </div>
 
         <form onSubmit={handleSubmit} style={s.form}>
@@ -136,7 +138,7 @@ export default function LoginPage({ onLogin }) {
             type="text"
             value={form.username}
             onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-            placeholder={isRegister ? "Username *" : "Username"}
+            placeholder={isRegister ? `${t.usernamePh} *` : t.usernamePh}
             required
           />
 
@@ -150,7 +152,7 @@ export default function LoginPage({ onLogin }) {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                placeholder="Email *"
+                placeholder={t.emailReqPh}
                 required
               />
               <input
@@ -161,7 +163,7 @@ export default function LoginPage({ onLogin }) {
                 type="text"
                 value={form.telegram_id}
                 onChange={e => setForm(f => ({ ...f, telegram_id: e.target.value }))}
-                placeholder="Telegram ID (optional)"
+                placeholder={t.telegramOptPh}
               />
             </>
           )}
@@ -174,7 +176,7 @@ export default function LoginPage({ onLogin }) {
             type="password"
             value={form.password}
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-            placeholder={isRegister ? "Password *" : "Password"}
+            placeholder={isRegister ? `${t.passwordPh} *` : t.passwordPh}
             required
           />
 
@@ -188,18 +190,18 @@ export default function LoginPage({ onLogin }) {
           {error && <div style={s.error}>{error}</div>}
 
           <button type="submit" style={s.btn} disabled={loading}>
-            {loading ? 'Processing...' : (isRegister ? 'REGISTER' : 'SIGN IN')}
+            {loading ? t.processing : (isRegister ? t.register : t.signIn)}
           </button>
 
         </form>
 
         <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text-sub)' }}>
-          {isRegister ? 'Already have an account? ' : 'Need an account? '}
-          <span 
-            onClick={() => { setIsRegister(!isRegister); setError(''); }} 
+          {isRegister ? t.alreadyHaveAccount : t.needAccount}
+          <span
+            onClick={() => { setIsRegister(!isRegister); setError(''); }}
             style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}
           >
-            {isRegister ? 'Sign in' : 'Register here'}
+            {isRegister ? t.signInLink : t.registerHere}
           </span>
         </div>
 

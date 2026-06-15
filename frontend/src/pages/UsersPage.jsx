@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { userAPI, userAdminAPI } from '../services/api'
 import { useAuth } from '../store/auth'
+import { useTheme } from '../store/theme'
 
 import Badge from '../components/common/Badge'
+
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
 const RoleBadge = ({ role }) => {
   const map = {
@@ -24,6 +27,8 @@ const RoleBadge = ({ role }) => {
 
 export default function UsersPage({ users, onUserUpdate }) {
   const { user: currentUser } = useAuth()
+  const { t, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const [showRegister, setShowRegister] = useState(false)
   const [regForm, setRegForm] = useState({ username: '', password: '', email: '', telegram_id: '', role: 'viewer' })
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -91,14 +96,14 @@ export default function UsersPage({ users, onUserUpdate }) {
     <div style={styles.page}>
       <div style={styles.header}>
         <div>
-          <div style={styles.title}>User Management</div>
+          <div style={styles.title}>{t.userManagement}</div>
           <div style={styles.sub}>
-            {users.length} users · {adminCount}/3 admins used
+            {users.length} {t.usersLabel} · {adminCount}/3 {t.adminsUsed}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={styles.addBtn} onClick={() => setShowRegister(true)}>
-            + CREATE USER
+            {t.createUserBtn}
           </button>
         </div>
       </div>
@@ -109,7 +114,7 @@ export default function UsersPage({ users, onUserUpdate }) {
 
       {/* Admin limit bar */}
       <div style={styles.limitBar}>
-        <span style={styles.limitLabel}>ADMIN SLOTS</span>
+        <span style={styles.limitLabel}>{t.adminSlots}</span>
         <div style={styles.limitTrack}>
           {[0, 1, 2].map(i => (
             <div key={i} style={{
@@ -125,15 +130,15 @@ export default function UsersPage({ users, onUserUpdate }) {
 
       <div style={styles.tableContainer}>
         {!users || users.length === 0 ? (
-          <div style={styles.empty}>No users found.</div>
+          <div style={styles.empty}>{t.noUsersFound}</div>
         ) : (
           <table style={styles.table}>
             <thead>
               <tr>
-                <th style={styles.th}>USERNAME</th>
-                <th style={styles.th}>ROLE</th>
-                <th style={styles.th} className="hide-mobile">CREATED AT</th>
-                <th style={styles.th}>ACTIONS</th>
+                <th style={styles.th}>{t.thUsername}</th>
+                <th style={styles.th}>{t.thRole}</th>
+                <th style={styles.th} className="hide-mobile">{t.thCreatedAt}</th>
+                <th style={styles.th}>{t.thActions}</th>
               </tr>
             </thead>
             <tbody>
@@ -149,19 +154,19 @@ export default function UsersPage({ users, onUserUpdate }) {
                       </div>
                       <div>
                         <div style={{ color: 'var(--text)', fontWeight: 800, fontSize: 17 }}>{u.username}</div>
-                        {u.id === currentUser?.id && <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 700 }}>You</div>}
+                        {u.id === currentUser?.id && <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 700 }}>{t.youLabel}</div>}
                       </div>
                     </div>
                   </td>
                   <td style={styles.td}><RoleBadge role={u.role} /></td>
                   <td className="hide-mobile" style={{ ...styles.td, color: 'var(--text-muted)', fontSize: 11 }}>
-                    {new Date(u.created_at).toLocaleString('id-ID')}
+                    {new Date(u.created_at).toLocaleString(locale)}
                   </td>
                   <td style={styles.td}>
                     {u.role === 'superadmin' ? (
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Protected</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{t.protectedLabel}</span>
                     ) : u.id === currentUser?.id ? (
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Current user</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{t.currentUserLabel}</span>
                     ) : (
                       <div style={{ display: 'flex', gap: 6 }}>
                         {u.role === 'viewer' && (
@@ -169,14 +174,14 @@ export default function UsersPage({ users, onUserUpdate }) {
                             style={{ ...styles.promoteBtn, opacity: adminCount >= 3 ? 0.4 : 1 }}
                             onClick={() => handlePromote(u.id)}
                             disabled={adminCount >= 3}
-                            title={adminCount >= 3 ? 'Max 3 admins reached' : 'Promote to Admin'}
+                            title={adminCount >= 3 ? t.maxAdminsReached : t.promoteToAdmin}
                           >
-                            ↑ Promote
+                            {t.promoteBtn}
                           </button>
                         )}
                         {u.role === 'admin' && (
                           <button style={styles.demoteBtn} onClick={() => handleDemote(u.id)}>
-                            ↓ Demote
+                            {t.demoteBtn}
                           </button>
                         )}
                         <button style={styles.deleteBtn} onClick={() => setDeleteTarget(u)}>
@@ -197,13 +202,13 @@ export default function UsersPage({ users, onUserUpdate }) {
         <div style={mStyles.overlay}>
           <div style={{ ...mStyles.modal, width: 320, padding: 24, textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Delete User</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{t.deleteUserTitle}</div>
             <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 24 }}>
-              Delete <strong style={{ color: 'var(--text)' }}>{deleteTarget.username}</strong>? This cannot be undone.
+              {t.deleteUserConfirmPrefix} <strong style={{ color: 'var(--text)' }}>{deleteTarget.username}</strong>{t.cannotBeUndone}
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button style={mStyles.cancelBtn} onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button style={{ ...mStyles.saveBtn, background: '#dc2626' }} onClick={() => handleDelete(deleteTarget.id)}>Delete</button>
+              <button style={mStyles.cancelBtn} onClick={() => setDeleteTarget(null)}>{t.cancel}</button>
+              <button style={{ ...mStyles.saveBtn, background: '#dc2626' }} onClick={() => handleDelete(deleteTarget.id)}>{t.delete}</button>
             </div>
           </div>
         </div>
@@ -214,38 +219,38 @@ export default function UsersPage({ users, onUserUpdate }) {
         <div style={mStyles.overlay}>
           <div style={mStyles.modal}>
             <div style={mStyles.mHeader}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Create New User</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{t.createNewUser}</span>
               <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }} onClick={() => setShowRegister(false)}>✕</button>
             </div>
             <form onSubmit={handleRegister} style={{ padding: 20 }}>
               <div style={{ marginBottom: 14 }}>
-                <label style={mStyles.label}>USERNAME</label>
+                <label style={mStyles.label}>{t.thUsername}</label>
                 <input style={mStyles.input} value={regForm.username} onChange={e => setRegForm(f => ({ ...f, username: e.target.value }))} placeholder="username" required />
               </div>
               <div style={{ marginBottom: 14 }}>
-                <label style={mStyles.label}>PASSWORD</label>
-                <input style={mStyles.input} type="password" value={regForm.password} onChange={e => setRegForm(f => ({ ...f, password: e.target.value }))} placeholder="password (min 6 chars)" required />
+                <label style={mStyles.label}>{t.fieldPassword}</label>
+                <input style={mStyles.input} type="password" value={regForm.password} onChange={e => setRegForm(f => ({ ...f, password: e.target.value }))} placeholder={t.passwordMinPh} required />
               </div>
               <div style={{ marginBottom: 14 }}>
-                <label style={mStyles.label}>ROLE</label>
+                <label style={mStyles.label}>{t.thRole}</label>
                 <select style={{ ...mStyles.input, cursor: 'pointer' }} value={regForm.role} onChange={e => setRegForm(f => ({ ...f, role: e.target.value }))}>
-                  <option value="viewer">Viewer</option>
-                  <option value="admin">Admin</option>
-                  <option value="adminpelindo">Admin Pelindo</option>
+                  <option value="viewer">{t.roleViewer}</option>
+                  <option value="admin">{t.roleAdmin}</option>
+                  <option value="adminpelindo">{t.roleAdminPelindo}</option>
                 </select>
               </div>
               <div style={{ marginBottom: 14 }}>
-                <label style={mStyles.label}>EMAIL *</label>
+                <label style={mStyles.label}>{t.fieldEmail}</label>
                 <input style={mStyles.input} type="email" value={regForm.email} onChange={e => setRegForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" required />
               </div>
               <div style={{ marginBottom: 14 }}>
-                <label style={mStyles.label}>TELEGRAM ID (Optional)</label>
+                <label style={mStyles.label}>{t.fieldTelegramOpt}</label>
                 <input style={mStyles.input} type="text" value={regForm.telegram_id} onChange={e => setRegForm(f => ({ ...f, telegram_id: e.target.value }))} placeholder="@username or Chat ID" />
               </div>
               {regError && <div style={mStyles.error}>{regError}</div>}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button type="button" style={mStyles.cancelBtn} onClick={() => setShowRegister(false)}>Cancel</button>
-                <button type="submit" style={mStyles.saveBtn} disabled={saving}>{saving ? 'Creating...' : 'Create User'}</button>
+                <button type="button" style={mStyles.cancelBtn} onClick={() => setShowRegister(false)}>{t.cancel}</button>
+                <button type="submit" style={mStyles.saveBtn} disabled={saving}>{saving ? t.creating : t.createUserSubmit}</button>
               </div>
             </form>
           </div>

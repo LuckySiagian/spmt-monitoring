@@ -146,6 +146,16 @@ func (h *Handler) TestEmail(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, map[string]string{"message": "test email sent"})
 }
 
+// SendWeeklyReportNow triggers the weekly email report immediately (manual/testing).
+func (h *Handler) SendWeeklyReportNow(w http.ResponseWriter, r *http.Request) {
+	log.Println("[Handler] Manual weekly report triggered")
+	if err := h.notif.SendWeeklyReport(r.Context()); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	respond(w, http.StatusOK, map[string]string{"message": "weekly report sent"})
+}
+
 // ─── USERS ────────────────────────────────────────────────────
 
 func (h *Handler) GetUsers(w http.ResponseWriter, r *http.Request) {

@@ -27,11 +27,12 @@ func NewService(cfg *config.Config, repo *repository.Repository) *Service {
 }
 
 func (s *Service) NotifyStatusChange(websiteName, oldStatus, newStatus, rootCause string) {
-	// 1. Send to Telegram (Global Group)
-	s.sendTelegram(websiteName, oldStatus, newStatus, rootCause)
-
-	// 2. Send to Emails (All Registered Users) - TEMPORARILY DISABLED FOR REVISION
-	// s.sendEmails(websiteName, oldStatus, newStatus, rootCause)
+	// Telegram alerts fire only when a site goes DOWN (OFFLINE or CRITICAL) —
+	// not on recovery, WARNING, or PROTECTED transitions. Email is intentionally
+	// NOT sent per-event: it is delivered as a weekly digest (see SendWeeklyReport).
+	if newStatus == string(model.StatusOffline) || newStatus == string(model.StatusCritical) {
+		s.sendTelegram(websiteName, oldStatus, newStatus, rootCause)
+	}
 }
 
 func (s *Service) NotifyEscalation(inc *model.Incident) {

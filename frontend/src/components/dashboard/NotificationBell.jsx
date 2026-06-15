@@ -1,13 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { notificationAPI } from '../../services/api'
+import { useTheme } from '../../store/theme'
+import { cleanReason } from '../../utils/rootCause'
 
 const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
 const SI = { ONLINE: '🟢', WARNING: '🟡', DEGRADED: '🟠', CRITICAL: '🔴', OFFLINE: '🔴', UNKNOWN: '⚪' }
 const DD_ID = 'spmt-notif-dd'
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 const getDomain = url => { try { return new URL(url).hostname } catch { return null } }
 
 function NotifDetailModal({ n, onClose }) {
+  const { t, tStatus, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const domain = n.url ? getDomain(n.url) : null
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -17,17 +22,17 @@ function NotifDetailModal({ n, onClose }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {domain && <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={18} height={18} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 4 }} />}
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.name}</span>
-            <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{n.type}</span>
+            <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{tStatus(n.type)}</span>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16 }}>✕</button>
         </div>
         <div style={{ padding: '6px 18px 18px' }}>
-          {[['Status Change', <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)', fontWeight: 600 }}>{n.oldStatus || '—'}</span><span style={{ color: 'var(--text-sub)', margin: '0 8px' }}>→</span><span style={{ color: SC[n.type] || 'var(--text)', fontWeight: 700 }}>{n.type}</span></>],
-          ['Root Cause', <span style={{ color: '#d97706' }}>{n.reason || '—'}</span>],
-          n.ip && ['IP', <span style={{ color: 'var(--text-muted)' }}>{n.ip}</span>],
-          n.responseTime != null && ['Response', <span style={{ color: n.responseTime > 3000 ? '#d97706' : '#059669' }}>{n.responseTime}ms</span>],
-          n.url && ['URL', <span style={{ color: '#4f46e5', fontSize: 11, wordBreak: 'break-all' }}>{n.url}</span>],
-          ['Time', <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{new Date(n.ts).toLocaleString('id-ID', { hour12: false })}</span>],
+          {[[t.statusChange, <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)', fontWeight: 600 }}>{n.oldStatus ? tStatus(n.oldStatus) : '—'}</span><span style={{ color: 'var(--text-sub)', margin: '0 8px' }}>→</span><span style={{ color: SC[n.type] || 'var(--text)', fontWeight: 700 }}>{tStatus(n.type)}</span></>],
+          [t.rootCause, <span style={{ color: '#d97706' }}>{cleanReason(n.reason) || '—'}</span>],
+          n.ip && [t.ipLabel, <span style={{ color: 'var(--text-muted)' }}>{n.ip}</span>],
+          n.responseTime != null && [t.responseLabel, <span style={{ color: n.responseTime > 3000 ? '#d97706' : '#059669' }}>{n.responseTime}ms</span>],
+          n.url && [t.urlLabel, <span style={{ color: '#4f46e5', fontSize: 11, wordBreak: 'break-all' }}>{n.url}</span>],
+          [t.timeLabel, <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{new Date(n.ts).toLocaleString(locale, { hour12: false })}</span>],
           ].filter(Boolean).map(([k, v]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(99,102,241,0.06)' }}>
               <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.06em', flexShrink: 0 }}>{k}</span>
@@ -42,21 +47,23 @@ function NotifDetailModal({ n, onClose }) {
 }
 
 function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick, onViewAll }) {
+  const { t, tStatus, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
   const [rect, setRect] = useState(null)
   useEffect(() => { if (bellRef.current) setRect(bellRef.current.getBoundingClientRect()) }, [bellRef])
   if (!rect) return null
-  const fmt = ts => new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+  const fmt = ts => new Date(ts).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   return createPortal(
     <div id={DD_ID} style={{ position: 'fixed', top: rect.bottom + 6, right: window.innerWidth - rect.right, width: 340, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 99990, overflow: 'hidden', animation: 'fadeIn 0.15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'var(--bg-card)' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>🔔 Notifications</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>🔔 {t.notifTitle}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {unread > 0 && <button style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)', color: '#4f46e5', borderRadius: 4, padding: '2px 8px', fontSize: 9, fontWeight: 700, cursor: 'pointer' }} onClick={onMarkAll}>Mark all read</button>}
-          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{unread > 0 ? `${unread} unread` : 'All read'}</span>
+          {unread > 0 && <button style={{ background: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)', color: '#4f46e5', borderRadius: 4, padding: '2px 8px', fontSize: 9, fontWeight: 700, cursor: 'pointer' }} onClick={onMarkAll}>{t.markAllReadBtn}</button>}
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{unread > 0 ? `${unread} ${t.unreadLabel}` : t.allReadLabel}</span>
         </div>
       </div>
       <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-        {notifications.length === 0 ? <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '28px 0' }}>No notifications yet</div>
+        {notifications.length === 0 ? <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '28px 0' }}>{t.noNotifYet}</div>
           : notifications.slice(0, 50).map((n, i) => {
             const domain = n.url ? getDomain(n.url) : null
             return (
@@ -67,11 +74,11 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
                 {domain ? <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} width={16} height={16} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 3, flexShrink: 0, marginTop: 1 }} /> : <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1 }}>{SI[n.type] || '🔔'}</span>}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: SC[n.type] || 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {n.name}{!n.read && <span style={{ fontSize: 8, background: '#f0ededff', color: 'var(--text)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>NEW</span>}
+                    {n.name}{!n.read && <span style={{ fontSize: 8, background: '#f0ededff', color: 'var(--text)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>{t.newBadge}</span>}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {n.oldStatus && <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)' }}>{n.oldStatus}</span><span style={{ color: 'var(--text-sub)', margin: '0 4px' }}>→</span></>}
-                    <span style={{ color: SC[n.type] || 'var(--text-muted)', fontWeight: 600 }}>{n.type}</span>
+                    {n.oldStatus && <><span style={{ color: SC[n.oldStatus] || 'var(--text-muted)' }}>{tStatus(n.oldStatus)}</span><span style={{ color: 'var(--text-sub)', margin: '0 4px' }}>→</span></>}
+                    <span style={{ color: SC[n.type] || 'var(--text-muted)', fontWeight: 600 }}>{tStatus(n.type)}</span>
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>{fmt(n.ts)}</div>
                 </div>
@@ -81,7 +88,7 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
           })}
       </div>
       <div style={{ padding: '8px 14px', background: 'var(--bg-card)', borderTop: '1px solid rgba(99,102,241,0.1)', textAlign: 'center' }}>
-        <button style={{ background: 'none', border: 'none', color: '#4f46e5', fontSize: 11, fontWeight: 700, cursor: 'pointer' }} onClick={onViewAll}>View All Notifications →</button>
+        <button style={{ background: 'none', border: 'none', color: '#4f46e5', fontSize: 11, fontWeight: 700, cursor: 'pointer' }} onClick={onViewAll}>{t.viewAllNotif} →</button>
       </div>
     </div>,
     document.body
@@ -89,6 +96,7 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
 }
 
 export default function NotificationBell({ notifications = [], onMarkRead, onMarkAllRead, onNavigate }) {
+  const { t } = useTheme()
   const filteredNotifs = notifications.filter(n => n.type === 'ONLINE' || n.type === 'OFFLINE')
   const [open, setOpen] = useState(false)
   const [detail, setDetail] = useState(null)
@@ -120,7 +128,7 @@ export default function NotificationBell({ notifications = [], onMarkRead, onMar
             display: 'flex', alignItems: 'center', transition: 'all 0.2s',
             boxShadow: isHovered ? '0 0 15px rgba(99, 102, 241, 0.2)' : 'none'
           }}
-          onClick={() => setOpen(v => !v)} title="Notifications">
+          onClick={() => setOpen(v => !v)} title={t.notifTitle}>
           <svg 
             className={unread > 0 && !isHovered ? 'vibrate-intense' : ''}
             width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"

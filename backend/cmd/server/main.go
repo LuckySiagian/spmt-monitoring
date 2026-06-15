@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -64,8 +65,10 @@ func main() {
 	// ─── Start services ───────────────────────────────────────
 	go hub.Run()
 	workerPool.Start()
+	notif.StartWeeklyReportScheduler(context.Background())
 	log.Println("✅ Worker pool started")
 	log.Println("✅ Network context monitoring started")
+	log.Println("✅ Weekly email report scheduler started")
 
 	// ─── Router ───────────────────────────────────────────────
 	h := handler.New(svc, workerPool, hub, notif)
@@ -75,7 +78,18 @@ func main() {
 	r.Use(chimiddleware.Recoverer)
 	r.Use(chimiddleware.RequestID)
 	r.Use(cors.Handler(cors.Options{
-		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
+		AllowOriginFunc: func(_ *http.Request, origin string) bool {
+			// Empty allowlist = dev mode: accept any origin (warned at startup).
+			if len(cfg.AllowedOrigins) == 0 {
+				return true
+			}
+			for _, allowed := range cfg.AllowedOrigins {
+				if allowed == "*" || strings.EqualFold(allowed, origin) {
+					return true
+				}
+			}
+			return false
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
@@ -161,6 +175,7 @@ func main() {
 			r.Post("/users/create", h.CreateUser)
 			r.Delete("/users/{id}", h.DeleteUser)
 			r.Post("/chaos/toggle", h.ToggleChaos)
+			r.Post("/reports/weekly/send", h.SendWeeklyReportNow)
 		})
 		r.Get("/dashboard/distribution", h.GetStatusDistribution)
 	})

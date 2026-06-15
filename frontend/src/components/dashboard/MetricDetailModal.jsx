@@ -1,6 +1,10 @@
 import { useState } from 'react'
+import { useTheme } from '../../store/theme'
+
+const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
 const StatusBadge = ({ status }) => {
+  const { tStatus } = useTheme()
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
     WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
@@ -10,19 +14,21 @@ const StatusBadge = ({ status }) => {
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
   return (
     <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>
-      {status || 'PENDING'}
+      {tStatus(status)}
     </span>
   )
 }
 
 const fmt = (ms) => ms != null ? `${ms}ms` : '—'
-const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('id-ID', { hour12: false }) : '—'
 
 export default function MetricDetailModal({ type, websites, summary, onOpenDetail, onClose }) {
   if (!type) return null
+  const { t, lang } = useTheme()
+  const locale = LOCALE_MAP[lang] || 'en-US'
+  const fmtTime = (d) => d ? new Date(d).toLocaleTimeString(locale, { hour12: false }) : '—'
 
-  const [sortKey, setSortKey] = useState(type === 'AVG RT' ? 'response_time_ms' : (type === 'SLA' ? 'sla' : 'name'))
-  const [sortDirection, setSortDirection] = useState(type === 'AVG RT' || type === 'SLA' ? 'desc' : 'asc')
+  const [sortKey, setSortKey] = useState(type === 'avg-rt' ? 'response_time_ms' : (type === 'sla' ? 'sla' : 'name'))
+  const [sortDirection, setSortDirection] = useState(type === 'avg-rt' || type === 'sla' ? 'desc' : 'asc')
 
   const handleRowClick = (w) => {
     onOpenDetail?.(w)
@@ -39,13 +45,13 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
   }
 
   const filtered = {
-    ONLINE: websites.filter(w => w.status === 'ONLINE'),
-    CRITICAL: websites.filter(w => w.status === 'CRITICAL' || w.status === 'DEGRADED' || w.status === 'WARNING'),
-    OFFLINE: websites.filter(w => w.status === 'OFFLINE'),
-    TOTAL: websites,
-    ALERTS: websites.filter(w => w.status !== 'ONLINE' && w.status !== 'UNKNOWN'),
-    'AVG RT': websites,
-    SLA: websites,
+    online: websites.filter(w => w.status === 'ONLINE'),
+    critical: websites.filter(w => w.status === 'CRITICAL' || w.status === 'DEGRADED' || w.status === 'WARNING'),
+    offline: websites.filter(w => w.status === 'OFFLINE'),
+    total: websites,
+    alerts: websites.filter(w => w.status !== 'ONLINE' && w.status !== 'UNKNOWN'),
+    'avg-rt': websites,
+    sla: websites,
   }[type] || websites
 
   const getSlaValue = w => {
@@ -121,13 +127,13 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
   }
 
   const titles = {
-    ONLINE: '🟢 Online Services',
-    CRITICAL: '🚨 Critical/Degraded Services',
-    OFFLINE: '🔴 Offline Services',
-    TOTAL: '📋 All Services',
-    ALERTS: '🚨 Active Alerts',
-    'AVG RT': '⚡ Response Time Ranking',
-    SLA: '📈 SLA Overview',
+    online: `🟢 ${t.mdOnline}`,
+    critical: `🚨 ${t.mdCritical}`,
+    offline: `🔴 ${t.mdOffline}`,
+    total: `📋 ${t.mdAll}`,
+    alerts: `🚨 ${t.mdAlerts}`,
+    'avg-rt': `⚡ ${t.mdRtRank}`,
+    sla: `📈 ${t.mdSla}`,
   }
 
   return (
@@ -138,24 +144,24 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
           <button style={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
 
-        {type === 'SLA' ? (
+        {type === 'sla' ? (
           <div style={styles.body}>
             <div style={styles.slaCard}>
               <div style={styles.slaValue}>{Number(summary?.sla_percent ?? 0).toFixed(3)}%</div>
-              <div style={styles.slaLabel}>Overall SLA</div>
+              <div style={styles.slaLabel}>{t.overallSla}</div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px 6px 14px', borderBottom: '1px solid var(--border)', marginTop: 20 }}>
               <span 
                 style={{ fontSize: 10, fontWeight: 900, color: sortKey === 'name' ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                 onClick={() => handleSort('name')}
               >
-                SERVICE NAME {sortKey === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                {t.serviceNameCol} {sortKey === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
               </span>
               <span 
                 style={{ fontSize: 10, fontWeight: 900, color: sortKey === 'sla' ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                 onClick={() => handleSort('sla')}
               >
-                SLA VALUE {sortKey === 'sla' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                {t.slaValueCol} {sortKey === 'sla' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
               </span>
             </div>
             <div style={{ marginTop: 8 }}>
@@ -173,16 +179,16 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
               })}
             </div>
           </div>
-        ) : type === 'AVG RT' ? (
+        ) : type === 'avg-rt' ? (
           <div style={styles.body}>
             <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>#</th>
-                  {renderHeader('Service', 'name')}
-                  {renderHeader('URL', 'url')}
-                  {renderHeader('Response Time', 'response_time_ms')}
-                  {renderHeader('Status', 'status')}
+                  {renderHeader(t.colService, 'name')}
+                  {renderHeader(t.colUrl, 'url')}
+                  {renderHeader(t.colResponseTime, 'response_time_ms')}
+                  {renderHeader(t.colStatus, 'status')}
                 </tr>
               </thead>
               <tbody>
@@ -211,19 +217,19 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
               </tbody>
             </table>
           </div>
-        ) : type === 'ALERTS' ? (
+        ) : type === 'alerts' ? (
           <div style={styles.body}>
             {sortedList.length === 0 ? (
-              <div style={styles.noAlerts}>✅ No active alerts — all systems operational</div>
+              <div style={styles.noAlerts}>{t.noActiveAlerts}</div>
             ) : (
               <table style={styles.table}>
                 <thead>
                   <tr>
-                    {renderHeader('Website', 'name')}
-                    {renderHeader('Status', 'status')}
-                    {renderHeader('Issue', 'status')}
-                    {renderHeader('Response', 'response_time_ms')}
-                    {renderHeader('Last Check', 'last_checked')}
+                    {renderHeader(t.colWebsite, 'name')}
+                    {renderHeader(t.colStatus, 'status')}
+                    {renderHeader(t.colIssue, 'status')}
+                    {renderHeader(t.colResponse, 'response_time_ms')}
+                    {renderHeader(t.colLastCheck, 'last_checked')}
                   </tr>
                 </thead>
                 <tbody>
@@ -243,9 +249,9 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
                       <td style={styles.td}><span style={{ color: 'var(--text)', fontWeight: 600 }}>{w.name}</span></td>
                       <td style={styles.td}><StatusBadge status={w.status} /></td>
                       <td style={styles.td}>
-                        {w.status === 'OFFLINE' ? 'Service Unreachable' : 
-                         w.status === 'CRITICAL' ? 'Critical Failure' :
-                         w.status === 'WARNING' ? 'Stability Warning' : 'Degraded Performance'}
+                        {w.status === 'OFFLINE' ? t.issueUnreachable :
+                         w.status === 'CRITICAL' ? t.issueCriticalFail :
+                         w.status === 'WARNING' ? t.issueStability : t.issueDegraded}
                       </td>
                       <td style={styles.td}>{fmt(w.response_time_ms)}</td>
                       <td style={styles.td}>{fmtTime(w.last_checked)}</td>
@@ -260,18 +266,18 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
             <table style={styles.table}>
               <thead>
                 <tr>
-                  {renderHeader('Service', 'name')}
-                  {renderHeader('URL', 'url')}
-                  {renderHeader('Status', 'status')}
-                  {renderHeader('HTTP', 'status_code')}
-                  {renderHeader('Response', 'response_time_ms')}
-                  {renderHeader('SSL', 'ssl_valid')}
-                  {renderHeader('Last Check', 'last_checked')}
+                  {renderHeader(t.colService, 'name')}
+                  {renderHeader(t.colUrl, 'url')}
+                  {renderHeader(t.colStatus, 'status')}
+                  {renderHeader(t.colHttp, 'status_code')}
+                  {renderHeader(t.colResponse, 'response_time_ms')}
+                  {renderHeader(t.colSsl, 'ssl_valid')}
+                  {renderHeader(t.colLastCheck, 'last_checked')}
                 </tr>
               </thead>
               <tbody>
                 {sortedList.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#4a5568', fontSize: 12 }}>No services found</td></tr>
+                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#4a5568', fontSize: 12 }}>{t.noServicesFound}</td></tr>
                 ) : sortedList.map((w, i) => (
                   <tr 
                     key={w.id} 

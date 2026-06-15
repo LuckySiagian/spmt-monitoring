@@ -380,6 +380,12 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, req mode
 	if req.NewPassword != req.ConfirmPassword {
 		return errors.New("new password and confirmation do not match")
 	}
+	if len(req.NewPassword) < 6 {
+		return errors.New("password must be at least 6 characters")
+	}
+	if req.NewPassword == req.OldPassword {
+		return errors.New("new password must be different from the old password")
+	}
 
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
