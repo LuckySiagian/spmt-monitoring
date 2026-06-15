@@ -4,6 +4,7 @@ import { useGlobalWebSocket } from '../../store/WebSocketContext'
 import { useTheme } from '../../store/theme'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Copy, Check } from 'lucide-react'
+import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
 
 const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
@@ -333,6 +334,11 @@ export default function ServiceDetailModal({ website, onClose }) {
   const [isZoomed, setIsZoomed] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
+  const [chartMounted, setChartMounted] = useState(false)
+
+  useEffect(() => {
+    setChartMounted(true)
+  }, [])
 
   const latestLog = logs[0]
   const rootCauseStr = latestLog?.root_cause || website.root_cause
@@ -448,10 +454,8 @@ export default function ServiceDetailModal({ website, onClose }) {
     return { avgRT: avg, maxRT: max, minRT: min, uptime: ut, alerts: al, perfData: pd, upLogsCount: upLogs.length }
   }, [logs])
 
-  const domain = (() => { try { return new URL(website.url).hostname } catch { return website.url } })()
-  const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) ||
-    domain.endsWith('.pelindo.co.id') ||
-    domain.endsWith('.pelindomultiterminal.co.id')
+  const domain = getDomain(website.url)
+  const shouldSkip = shouldSkipFavicon(website.url)
 
   const faviconUrl = shouldSkip ? null : `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
   const initial = (website.name || 'W')[0].toUpperCase()
@@ -1077,22 +1081,24 @@ export default function ServiceDetailModal({ website, onClose }) {
                 {t.perfResponseLast} {perfData.length} {t.perfChecks}
               </div>
               <div style={{ height: 160 }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <LineChart data={perfData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,74,0.8)" />
-                    <XAxis dataKey="i" tick={false} axisLine={{ stroke: 'var(--border)' }} />
-                    <YAxis tick={{ fill: '#4a6fa5', fontSize: 9 }} tickLine={false} axisLine={{ stroke: 'var(--border)' }} />
-                    <Tooltip
-                      content={({ active, payload }) => active && payload?.length ? (
-                        <div style={{ background: 'var(--bg-header)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
-                          <div style={{ color: '#3b82f6', fontWeight: 600 }}>{payload[0].value}ms</div>
-                          <div style={{ color: '#4a5568', fontSize: 9 }}>{payload[0].payload.time}</div>
-                        </div>
-                      ) : null}
-                    />
-                    <Line type="monotone" dataKey="rt" stroke="#3b82f6" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+                {chartMounted && (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                    <LineChart data={perfData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,74,0.8)" />
+                      <XAxis dataKey="i" tick={false} axisLine={{ stroke: 'var(--border)' }} />
+                      <YAxis tick={{ fill: '#4a6fa5', fontSize: 9 }} tickLine={false} axisLine={{ stroke: 'var(--border)' }} />
+                      <Tooltip
+                        content={({ active, payload }) => active && payload?.length ? (
+                          <div style={{ background: 'var(--bg-header)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: 6, padding: '8px 12px', fontSize: 11 }}>
+                            <div style={{ color: '#3b82f6', fontWeight: 600 }}>{payload[0].value}ms</div>
+                            <div style={{ color: '#4a5568', fontSize: 9 }}>{payload[0].payload.time}</div>
+                          </div>
+                        ) : null}
+                      />
+                      <Line type="monotone" dataKey="rt" stroke="#3b82f6" strokeWidth={1.5} dot={false} activeDot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
 
               {/* Stats */}

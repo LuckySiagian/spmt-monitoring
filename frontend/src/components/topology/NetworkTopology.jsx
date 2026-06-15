@@ -3,6 +3,7 @@ import { useTheme } from '../../store/theme'
 import { websiteAPI, systemAPI } from '../../services/api'
 import { showToast } from '../dashboard/Toast'
 import { useGlobalWebSocket } from '../../store/WebSocketContext'
+import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
 
 const STATUS_COLORS = {
   ONLINE: '#10b981',
@@ -65,15 +66,6 @@ function drawProbe(ctx, pointAt, t, cyclePos, color, scale = 1) {
     ctx.beginPath(); ctx.arc(node.x, node.y, (5 + 16 * prog) * scale, 0, Math.PI * 2)
     ctx.strokeStyle = rgba(color, 0.55 * (1 - prog)); ctx.lineWidth = 2 * scale; ctx.stroke()
   }
-}
-
-function getDomain(url) {
-  if (!url) return ''
-  try {
-    let clean = url.trim()
-    if (!clean.startsWith('http')) clean = 'http://' + clean
-    return new URL(clean).hostname
-  } catch { return url }
 }
 
 // ── Layout functions ──────────────────────────────────────────
@@ -322,9 +314,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   useEffect(() => {
     websites.forEach(w => {
       const domain = getDomain(w.url)
-      const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) ||
-        domain.endsWith('.pelindo.co.id') ||
-        domain.endsWith('.pelindomultiterminal.co.id')
+      const shouldSkip = shouldSkipFavicon(w.url)
 
       if (!shouldSkip && !faviconCache.current[domain]) {
         const img = new Image()
@@ -337,6 +327,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       }
     })
   }, [websites])
+
 
   // Recalc layout when websites or mode changes
   useEffect(() => {

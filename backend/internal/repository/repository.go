@@ -585,6 +585,35 @@ func (r *Repository) CountDownEventsByWebsite(ctx context.Context, since time.Ti
 	return counts, rows.Err()
 }
 
+// GetDowntimeForRecovery reports, for a site that just returned to ONLINE, when it
+// last left ONLINE (downStart) and whether it was actually OFFLINE during that
+// streak. downStart is nil when there is no prior ONLINE→down transition on record.
+// The current recovery event (new_status='ONLINE') never matches the old_status filter,
+// so it does not interfere. The query always returns exactly one row.
+func (r *Repository) GetDowntimeForRecovery(ctx context.Context, websiteID uuid.UUID) (downStart *time.Time, wasOffline bool, err error) {
+	row := r.db.QueryRow(ctx, `
+		WITH last_left AS (
+			SELECT created_at FROM status_events
+			WHERE website_id = $1 AND old_status = 'ONLINE' AND new_status <> 'ONLINE'
+			ORDER BY created_at DESC LIMIT 1
+		)
+		SELECT
+			(SELECT created_at FROM last_left),
+			EXISTS (
+				SELECT 1 FROM status_events
+				WHERE website_id = $1 AND new_status = 'OFFLINE'
+				  AND created_at >= (SELECT created_at FROM last_left)
+			)
+	`, websiteID)
+
+	var ds *time.Time
+	var off bool
+	if scanErr := row.Scan(&ds, &off); scanErr != nil {
+		return nil, false, fmt.Errorf("get downtime for recovery: %w", scanErr)
+	}
+	return ds, off, nil
+}
+
 func (r *Repository) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*model.WebsiteSLA, error) {
 	sla := &model.WebsiteSLA{
 		SLA24h: 100.0,

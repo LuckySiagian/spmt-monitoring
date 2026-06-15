@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTheme } from '../../store/theme'
 import MonitoringGraph from './MonitoringGraph'
 import { Info, X, Zap } from 'lucide-react'
+import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
 
 function InfoModal({ onClose }) {
   const { t, tStatus } = useTheme()
@@ -60,7 +61,6 @@ function InfoModal({ onClose }) {
 
 // ── Helpers ──────────────────────────────────────────────────
 const fmtMs = ms => ms != null ? `${ms}ms` : '—'
-const getDomain = u => { try { return new URL(u).hostname } catch { return u } }
 
 const BADGE = {
   ONLINE: { color: '#10b981', glow: 'rgba(16,185,129,0.15)' },
@@ -75,10 +75,7 @@ const BADGE = {
 
 function Favicon({ url, name }) {
   const domain = getDomain(url)
-  // Skip Google Favicon API for internal/private domains to avoid console 404s
-  const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) ||
-    domain.endsWith('.pelindo.co.id') ||
-    domain.endsWith('.pelindomultiterminal.co.id')
+  const shouldSkip = shouldSkipFavicon(url)
 
   const initial = (name || 'W')[0].toUpperCase()
   return (

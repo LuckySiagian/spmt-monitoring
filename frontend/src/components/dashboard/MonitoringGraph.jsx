@@ -71,6 +71,11 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
   const [range,    setRange]   = useState('live')
   const [data,     setData]    = useState([])
   const [loading,  setLoading] = useState(false)
+  const [mounted,  setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const liveRef   = useRef(buildLiveFrame(MAX_LIVE))
   const bucketRef = useRef({})
@@ -165,22 +170,25 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
             <span style={{ fontSize:11 }}>{t.waitingData}</span>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-            <AreaChart data={data} margin={{ top:6, right:12, left:-6, bottom:4 }}>
-              <defs>
-                <linearGradient id="gOn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.45}/><stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/></linearGradient>
-                <linearGradient id="gCr" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#d97706" stopOpacity={0.4}/><stop offset="95%" stopColor="#d97706" stopOpacity={0.02}/></linearGradient>
-                <linearGradient id="gOf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#dc2626" stopOpacity={0.45}/><stop offset="95%" stopColor="#dc2626" stopOpacity={0.02}/></linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.1)" vertical={false}/>
-              <XAxis dataKey="label" tick={{ fill:'var(--text-muted)', fontSize:11, fontWeight:600 }} tickLine={false} axisLine={{ stroke:'var(--border)' }} interval="preserveStartEnd" minTickGap={40}/>
-              <YAxis domain={[0, yMax]} ticks={yTicks} tick={{ fill:'var(--text-muted)', fontSize:11, fontWeight:600 }} tickLine={false} axisLine={{ stroke:'var(--border)' }} allowDecimals={false} width={34}/>
-              <Tooltip content={<CustomTooltip/>} cursor={{ stroke:'var(--accent)', strokeWidth:1, strokeDasharray:'4 4' }}/>
-              <Area type="monotone" dataKey="online"   name={t.online}   stroke="#10b981" strokeWidth={2.6} fill="url(#gOn)" dot={false} activeDot={{ r:5, strokeWidth:2, stroke:'var(--bg-card)' }} connectNulls={false} isAnimationActive={false}/>
-              <Area type="monotone" dataKey="critical" name={t.critical} stroke="#d97706" strokeWidth={2.4} fill="url(#gCr)" dot={false} activeDot={{ r:5, strokeWidth:2, stroke:'var(--bg-card)' }} connectNulls={false} isAnimationActive={false}/>
-              <Area type="monotone" dataKey="offline"  name={t.offline}  stroke="#dc2626" strokeWidth={2.6} fill="url(#gOf)" dot={false} activeDot={{ r:5, strokeWidth:2, stroke:'var(--bg-card)' }} connectNulls={false} isAnimationActive={false}/>
-            </AreaChart>
-          </ResponsiveContainer>
+          mounted && (
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <AreaChart data={data} margin={{ top:6, right:12, left:-6, bottom:4 }}>
+                <defs>
+                  <linearGradient id="gOn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.45}/><stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/></linearGradient>
+                  <linearGradient id="gCr" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#d97706" stopOpacity={0.4}/><stop offset="95%" stopColor="#d97706" stopOpacity={0.02}/></linearGradient>
+                  <linearGradient id="gOf" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#dc2626" stopOpacity={0.45}/><stop offset="95%" stopColor="#dc2626" stopOpacity={0.02}/></linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.1)" vertical={false}/>
+                <XAxis dataKey="label" tick={{ fill:'var(--text-muted)', fontSize:11, fontWeight:600 }} tickLine={false} axisLine={{ stroke:'var(--border)' }} interval="preserveStartEnd" minTickGap={40}/>
+                <YAxis domain={[0, yMax]} ticks={yTicks} tick={{ fill:'var(--text-muted)', fontSize:11, fontWeight:600 }} tickLine={false} axisLine={{ stroke:'var(--border)' }} allowDecimals={false} width={34}/>
+                <Tooltip content={<CustomTooltip/>} cursor={{ stroke:'var(--accent)', strokeWidth:1, strokeDasharray:'4 4' }}/>
+                <Area type="monotone" dataKey="online"   name={t.online}   stroke="#10b981" strokeWidth={2.6} fill="url(#gOn)" dot={false} activeDot={{ r:5, strokeWidth:2, stroke:'var(--bg-card)' }} connectNulls={false} isAnimationActive={false}/>
+                <Area type="monotone" dataKey="critical" name={t.critical} stroke="#d97706" strokeWidth={2.4} fill="url(#gCr)" dot={false} activeDot={{ r:5, strokeWidth:2, stroke:'var(--bg-card)' }} connectNulls={false} isAnimationActive={false}/>
+                <Area type="monotone" dataKey="offline"  name={t.offline}  stroke="#dc2626" strokeWidth={2.6} fill="url(#gOf)" dot={false} activeDot={{ r:5, strokeWidth:2, stroke:'var(--bg-card)' }} connectNulls={false} isAnimationActive={false}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          )
+
         )}
       </div>
 

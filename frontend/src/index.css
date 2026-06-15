@@ -767,11 +767,11 @@ tr:hover {
     padding: 12px 8px !important;
     gap: 10px;
   }
-  .topbar-branding { 
-    width: 100%; 
-    justify-content: center; 
-    height: auto; 
-    padding: 4px; 
+  .topbar-branding {
+    width: 100%;
+    justify-content: center;
+    height: auto;
+    padding: 4px;
   }
   .topbar-metrics { 
     width: 100%;

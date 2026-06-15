@@ -55,18 +55,56 @@ func nextOccurrence(from time.Time, weekday time.Weekday, hour int) time.Time {
 	return next
 }
 
-// reportRow is one site's line in the weekly digest.
-type reportRow struct {
-	Name      string
-	URL       string
-	Status    string
-	Uptime7d  float64
-	DownCount int
+// siteCondition is one site's current condition in the grouped report.
+type siteCondition struct {
+	Name        string
+	URL         string
+	Status      string
+	RootCause   string
+	ResponseMs  *int
+	DownCount7d int
 }
 
-// SendWeeklyReport compiles a 7-day uptime digest for every monitored site and
-// emails it to all registered users. Safe to call manually (admin endpoint) or
-// from the scheduler.
+// statusOrder controls the section order in the report (problems first).
+var statusOrder = []string{"OFFLINE", "CRITICAL", "WARNING", "ONLINE", "LAINNYA"}
+
+// statusMeta maps a status to its emoji, hex color (for email), and awam label.
+func statusMeta(status string) (emoji, color, label string) {
+	switch status {
+	case "ONLINE":
+		return "✅", "#10b981", "ONLINE (Normal)"
+	case "WARNING":
+		return "🟠", "#f59e0b", "WARNING (Perlu Perhatian)"
+	case "CRITICAL":
+		return "⚠️", "#f97316", "CRITICAL (Kritis)"
+	case "OFFLINE":
+		return "🔴", "#ef4444", "OFFLINE (Tidak Dapat Diakses)"
+	default:
+		return "⚪", "#64748b", status
+	}
+}
+
+// normalizeStatus folds unknown/protected statuses into the catch-all bucket.
+func normalizeStatus(s string) string {
+	switch s {
+	case "OFFLINE", "CRITICAL", "WARNING", "ONLINE":
+		return s
+	default:
+		return "LAINNYA"
+	}
+}
+
+// orDash returns "—" for blank text so empty fields stay readable in the report.
+func orDash(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "—"
+	}
+	return s
+}
+
+// SendWeeklyReport compiles a current-condition digest of every monitored site,
+// grouped by status (problems first), and emails it to all registered users.
+// Safe to call manually (admin endpoint) or from the scheduler.
 func (s *Service) SendWeeklyReport(ctx context.Context) error {
 	if s.cfg.SMTPHost == "" || s.cfg.SMTPUser == "" {
 		return fmt.Errorf("SMTP not configured")
@@ -80,36 +118,24 @@ func (s *Service) SendWeeklyReport(ctx context.Context) error {
 	since := time.Now().AddDate(0, 0, -7)
 	downCounts, err := s.repo.CountDownEventsByWebsite(ctx, since)
 	if err != nil {
-		// Non-fatal: still report uptime, just without per-site down counts.
+		// Non-fatal: still report condition, just without per-site down counts.
 		log.Printf("[Report] down-event count failed: %v", err)
 		downCounts = map[uuid.UUID]int{}
 	}
 
-	rows := make([]reportRow, 0, len(sites))
-	var uptimeSum float64
-	totalDown := 0
+	groups := map[string][]siteCondition{}
+	counts := map[string]int{}
 	for _, w := range sites {
-		uptime := 100.0
-		if sla, err := s.repo.GetWebsiteSLA(ctx, w.ID); err == nil {
-			uptime = sla.SLA7d
-		}
-		rows = append(rows, reportRow{
-			Name:      w.Name,
-			URL:       w.URL,
-			Status:    w.Status,
-			Uptime7d:  uptime,
-			DownCount: downCounts[w.ID],
+		st := normalizeStatus(w.Status)
+		groups[st] = append(groups[st], siteCondition{
+			Name:        w.Name,
+			URL:         w.URL,
+			Status:      w.Status,
+			RootCause:   w.RootCause,
+			ResponseMs:  w.ResponseTimeMs,
+			DownCount7d: downCounts[w.ID],
 		})
-		uptimeSum += uptime
-		totalDown += downCounts[w.ID]
-	}
-
-	// Worst uptime first so problems sit at the top of the table.
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Uptime7d < rows[j].Uptime7d })
-
-	avgUptime := 100.0
-	if len(rows) > 0 {
-		avgUptime = uptimeSum / float64(len(rows))
+		counts[st]++
 	}
 
 	recipients, err := s.reportRecipients(ctx)
@@ -120,9 +146,8 @@ func (s *Service) SendWeeklyReport(ctx context.Context) error {
 		return fmt.Errorf("no recipients with an email address")
 	}
 
-	subject := fmt.Sprintf("Laporan Mingguan Monitoring — %s s/d %s",
-		since.Format("2 Jan"), time.Now().Format("2 Jan 2006"))
-	html := s.buildWeeklyReportHTML(rows, avgUptime, totalDown, since)
+	subject := fmt.Sprintf("Laporan Kondisi Website — %s", time.Now().Format("2 Jan 2006"))
+	html := s.buildConditionReportHTML(groups, counts, len(sites), time.Now())
 
 	return s.sendHTMLEmail(subject, html, recipients)
 }
@@ -141,82 +166,98 @@ func (s *Service) reportRecipients(ctx context.Context) ([]string, error) {
 	return recipients, nil
 }
 
-func (s *Service) buildWeeklyReportHTML(rows []reportRow, avgUptime float64, totalDown int, since time.Time) string {
-	var tableRows strings.Builder
-	for _, r := range rows {
-		color := "#10b981" // green
-		switch {
-		case r.Uptime7d < 99.0:
-			color = "#ef4444" // red
-		case r.Uptime7d < 99.9:
-			color = "#f59e0b" // amber
-		}
-		tableRows.WriteString(fmt.Sprintf(`
-			<tr>
-				<td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;">
-					<div style="font-weight:600;">%s</div>
-					<div style="font-size:12px;color:#64748b;">%s</div>
-				</td>
-				<td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;color:%s;font-weight:700;">%.2f%%</td>
-				<td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;">%d</td>
-				<td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px;color:#64748b;">%s</td>
-			</tr>`,
-			htmlEscape(r.Name), htmlEscape(r.URL), color, r.Uptime7d, r.DownCount, htmlEscape(r.Status)))
+func (s *Service) buildConditionReportHTML(groups map[string][]siteCondition, counts map[string]int, total int, generatedAt time.Time) string {
+	summary := func(label, value, color string) string {
+		return fmt.Sprintf(`
+			<td style="padding:6px;text-align:center;">
+				<div style="background:#f8fafc;border-radius:8px;padding:14px 8px;">
+					<div style="font-size:11px;color:#64748b;">%s</div>
+					<div style="font-size:22px;font-weight:700;color:%s;">%s</div>
+				</div>
+			</td>`, label, color, value)
 	}
 
-	avgColor := "#10b981"
-	switch {
-	case avgUptime < 99.0:
-		avgColor = "#ef4444"
-	case avgUptime < 99.9:
-		avgColor = "#f59e0b"
+	summaryRow := fmt.Sprintf("<tr>%s%s%s%s%s</tr>",
+		summary("Total", fmt.Sprintf("%d", total), "#0f172a"),
+		summary("Online", fmt.Sprintf("%d", counts["ONLINE"]), "#10b981"),
+		summary("Warning", fmt.Sprintf("%d", counts["WARNING"]), "#f59e0b"),
+		summary("Critical", fmt.Sprintf("%d", counts["CRITICAL"]), "#f97316"),
+		summary("Offline", fmt.Sprintf("%d", counts["OFFLINE"]), "#ef4444"),
+	)
+
+	var sections strings.Builder
+	for _, st := range statusOrder {
+		list := groups[st]
+		if len(list) == 0 {
+			continue
+		}
+		emoji, color, label := statusMeta(st)
+
+		// Worst first: more 7-day down incidents on top, then alphabetical.
+		sort.Slice(list, func(i, j int) bool {
+			if list[i].DownCount7d != list[j].DownCount7d {
+				return list[i].DownCount7d > list[j].DownCount7d
+			}
+			return list[i].Name < list[j].Name
+		})
+
+		sections.WriteString(fmt.Sprintf(
+			`<div style="margin-bottom:18px;">
+				<div style="font-size:14px;font-weight:700;color:%s;border-bottom:2px solid %s;padding-bottom:6px;margin-bottom:10px;">%s %s — %d situs</div>`,
+			color, color, emoji, label, len(list)))
+
+		if st == "ONLINE" {
+			// Condensed: just names, since everything here is healthy.
+			names := make([]string, 0, len(list))
+			for _, c := range list {
+				names = append(names, htmlEscape(c.Name))
+			}
+			sections.WriteString(fmt.Sprintf(
+				`<div style="font-size:13px;line-height:1.7;background:#f0fdf4;border-radius:8px;padding:12px 14px;color:#475569;">%s<div style="color:#94a3b8;font-size:12px;margin-top:4px;">Semua normal — situs dapat diakses dengan baik.</div></div>`,
+				strings.Join(names, " · ")))
+		} else {
+			for _, c := range list {
+				meta := ""
+				if c.ResponseMs != nil {
+					meta = fmt.Sprintf(" · Respon %d ms", *c.ResponseMs)
+				}
+				if c.DownCount7d > 0 {
+					meta += fmt.Sprintf(" · %d insiden down (7h)", c.DownCount7d)
+				}
+				sections.WriteString(fmt.Sprintf(
+					`<div style="font-size:13px;line-height:1.5;background:#f8fafc;border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+						<div style="font-weight:600;">%s <span style="font-weight:400;color:#64748b;font-size:12px;">%s</span></div>
+						<div style="color:#64748b;">%s%s</div>
+					</div>`,
+					htmlEscape(c.Name), htmlEscape(c.URL), htmlEscape(orDash(c.RootCause)), meta))
+			}
+		}
+		sections.WriteString("</div>")
 	}
 
 	return fmt.Sprintf(`
 		<html>
 		<body style="font-family:sans-serif;line-height:1.6;color:#333;background:#f8fafc;padding:20px;">
 			<div style="max-width:680px;margin:0 auto;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff;">
-				<div style="background:#0f172a;padding:24px;color:#fff;">
-					<h2 style="margin:0;">📊 Laporan Mingguan Monitoring</h2>
-					<p style="margin:6px 0 0;font-size:13px;color:#cbd5e1;">Periode %s — %s</p>
+				<div style="background:#0f172a;padding:22px 24px;color:#fff;">
+					<h2 style="margin:0;">📋 Laporan Kondisi Website</h2>
+					<p style="margin:6px 0 0;font-size:13px;color:#cbd5e1;">Snapshot %s WIB</p>
 				</div>
-				<div style="padding:24px;">
-					<div style="display:flex;gap:16px;margin-bottom:20px;">
-						<div style="flex:1;background:#f8fafc;border-radius:8px;padding:16px;text-align:center;">
-							<div style="font-size:12px;color:#64748b;">Total Situs</div>
-							<div style="font-size:24px;font-weight:700;">%d</div>
-						</div>
-						<div style="flex:1;background:#f8fafc;border-radius:8px;padding:16px;text-align:center;">
-							<div style="font-size:12px;color:#64748b;">Rata-rata Uptime</div>
-							<div style="font-size:24px;font-weight:700;color:%s;">%.2f%%</div>
-						</div>
-						<div style="flex:1;background:#f8fafc;border-radius:8px;padding:16px;text-align:center;">
-							<div style="font-size:12px;color:#64748b;">Total Insiden Down</div>
-							<div style="font-size:24px;font-weight:700;">%d</div>
-						</div>
-					</div>
-					<table style="width:100%%;border-collapse:collapse;font-size:14px;">
-						<thead>
-							<tr style="background:#f1f5f9;text-align:left;">
-								<th style="padding:10px 12px;">Situs</th>
-								<th style="padding:10px 12px;text-align:center;">Uptime 7h</th>
-								<th style="padding:10px 12px;text-align:center;">Down</th>
-								<th style="padding:10px 12px;text-align:center;">Status Kini</th>
-							</tr>
-						</thead>
-						<tbody>%s</tbody>
-					</table>
-					<p style="margin-top:20px;">Buka <a href="%s" style="color:#3b82f6;">Dashboard Monitoring</a> untuk detail lengkap.</p>
+				<div style="padding:20px 24px;">
+					<table style="width:100%%;border-collapse:collapse;margin-bottom:18px;">%s</table>
+					%s
+					<p style="margin-top:8px;">Buka <a href="%s" style="color:#3b82f6;">Dashboard Monitoring</a> untuk detail lengkap tiap situs.</p>
 				</div>
 				<div style="background:#f1f5f9;padding:12px;text-align:center;font-size:12px;color:#64748b;">
-					&copy; 2026 SPMT Monitoring System · Laporan otomatis mingguan
+					&copy; 2026 SPMT Monitoring System · Laporan kondisi otomatis
 				</div>
 			</div>
 		</body>
 		</html>`,
-		since.Format("2 Jan 2006"), time.Now().Format("2 Jan 2006"),
-		len(rows), avgColor, avgUptime, totalDown,
-		tableRows.String(), s.cfg.FrontendURL)
+		generatedAt.Format("2 Jan 2006 15:04"),
+		summaryRow,
+		sections.String(),
+		s.cfg.FrontendURL)
 }
 
 // sendHTMLEmail sends one HTML email to each recipient individually.

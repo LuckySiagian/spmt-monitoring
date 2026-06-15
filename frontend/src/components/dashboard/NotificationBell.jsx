@@ -3,24 +3,25 @@ import { createPortal } from 'react-dom'
 import { notificationAPI } from '../../services/api'
 import { useTheme } from '../../store/theme'
 import { cleanReason } from '../../utils/rootCause'
+import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
 
 const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
 const SI = { ONLINE: '🟢', WARNING: '🟡', DEGRADED: '🟠', CRITICAL: '🔴', OFFLINE: '🔴', UNKNOWN: '⚪' }
 const DD_ID = 'spmt-notif-dd'
 const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
-const getDomain = url => { try { return new URL(url).hostname } catch { return null } }
 
 function NotifDetailModal({ n, onClose }) {
   const { t, tStatus, lang } = useTheme()
   const locale = LOCALE_MAP[lang] || 'en-US'
   const domain = n.url ? getDomain(n.url) : null
+  const shouldSkip = n.url ? shouldSkipFavicon(n.url) : true
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 14, width: 400, maxWidth: '92vw', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {domain && <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={18} height={18} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 4 }} />}
+            {!shouldSkip && domain && <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={18} height={18} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 4 }} />}
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{n.name}</span>
             <span style={{ background: (SC[n.type] || '#94a3b8') + '18', color: SC[n.type] || '#94a3b8', border: `1px solid ${SC[n.type] || '#94a3b8'}33`, borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{tStatus(n.type)}</span>
           </div>
@@ -66,12 +67,13 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
         {notifications.length === 0 ? <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '28px 0' }}>{t.noNotifYet}</div>
           : notifications.slice(0, 50).map((n, i) => {
             const domain = n.url ? getDomain(n.url) : null
+            const shouldSkip = n.url ? shouldSkipFavicon(n.url) : true
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderBottom: '1px solid rgba(99,102,241,0.06)', background: !n.read ? 'rgba(79,70,229,0.05)' : 'transparent', cursor: 'pointer', transition: 'background 0.15s' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.06)'}
                 onMouseLeave={e => e.currentTarget.style.background = !n.read ? 'rgba(79,70,229,0.05)' : 'transparent'}
                 onClick={() => onItemClick(n, i)}>
-                {domain ? <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} width={16} height={16} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 3, flexShrink: 0, marginTop: 1 }} /> : <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1 }}>{SI[n.type] || '🔔'}</span>}
+                {!shouldSkip && domain ? <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} width={16} height={16} alt="" onError={e => { e.target.style.display = 'none' }} style={{ borderRadius: 3, flexShrink: 0, marginTop: 1 }} /> : <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1 }}>{SI[n.type] || '🔔'}</span>}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: SC[n.type] || 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
                     {n.name}{!n.read && <span style={{ fontSize: 8, background: '#f0ededff', color: 'var(--text)', borderRadius: 3, padding: '1px 4px', fontWeight: 700 }}>{t.newBadge}</span>}

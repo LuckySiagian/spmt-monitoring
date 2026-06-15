@@ -1308,7 +1308,7 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog, 
 		log.Printf("[Worker] STATUS CHANGE %s: %s → %s (%s)", w.Name, prevStatus, logEntry.Status, logEntry.RootCause)
 
 		if p.notif != nil {
-			go p.notif.NotifyStatusChange(w.Name, prevStatus, string(logEntry.Status), logEntry.RootCause)
+			go p.notif.NotifyStatusChange(w.ID, w.Name, w.URL, prevStatus, string(logEntry.Status), logEntry.RootCause)
 		}
 	}
 

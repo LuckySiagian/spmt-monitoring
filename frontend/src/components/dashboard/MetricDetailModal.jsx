@@ -21,6 +21,23 @@ const StatusBadge = ({ status }) => {
 
 const fmt = (ms) => ms != null ? `${ms}ms` : '—'
 
+// Panel penjelasan ringkas — tampil terpisah di bawah tabel/daftar
+function Legend({ title, items }) {
+  return (
+    <div style={styles.legend}>
+      <div style={styles.legendHead}>ℹ️ {title}</div>
+      <div style={styles.legendGrid}>
+        {items.map(item => (
+          <div key={item.k} style={styles.legendItem}>
+            <span style={styles.legendItemTitle}>{item.title}</span>
+            <span style={styles.legendItemDesc}>{item.desc}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function MetricDetailModal({ type, websites, summary, onOpenDetail, onClose }) {
   if (!type) return null
   const { t, lang } = useTheme()
@@ -145,7 +162,8 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
         </div>
 
         {type === 'sla' ? (
-          <div style={styles.body}>
+          <div style={styles.bodySplit}>
+            <div style={styles.bodyScroll}>
             <div style={styles.slaCard}>
               <div style={styles.slaValue}>{Number(summary?.sla_percent ?? 0).toFixed(3)}%</div>
               <div style={styles.slaLabel}>{t.overallSla}</div>
@@ -178,9 +196,16 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
                 )
               })}
             </div>
+            </div>
+            <Legend title={t.mdLegendTitle} items={[
+              { k: 'sla', title: t.legSlaTitle, desc: t.legSlaDesc },
+              { k: 'slaval', title: t.legSlaValueTitle, desc: t.legSlaValueDesc },
+              { k: 'slaoverall', title: t.legSlaOverallTitle, desc: t.legSlaOverallDesc },
+            ]} />
           </div>
         ) : type === 'avg-rt' ? (
-          <div style={styles.body}>
+          <div style={styles.bodySplit}>
+            <div style={styles.bodyScroll}>
             <table style={styles.table}>
               <thead>
                 <tr>
@@ -216,6 +241,12 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
                 ))}
               </tbody>
             </table>
+            </div>
+            <Legend title={t.mdLegendTitle} items={[
+              { k: 'rt', title: t.legRtTitle, desc: t.legRtDesc },
+              { k: 'rtcolor', title: t.legRtColorTitle, desc: t.legRtColorDesc },
+              { k: 'rtrank', title: t.legRtRankTitle, desc: t.legRtRankDesc },
+            ]} />
           </div>
         ) : type === 'alerts' ? (
           <div style={styles.body}>
@@ -262,7 +293,8 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
             )}
           </div>
         ) : (
-          <div style={styles.body}>
+          <div style={styles.bodySplit}>
+            <div style={styles.bodyScroll}>
             <table style={styles.table}>
               <thead>
                 <tr>
@@ -304,6 +336,15 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
                 ))}
               </tbody>
             </table>
+            </div>
+
+            {/* Penjelasan kolom — terpisah di bawah tabel, ringkas */}
+            <Legend title={t.mdLegendTitle} items={[
+              { k: 'status', title: t.legStatusTitle, desc: t.legStatusDesc },
+              { k: 'http', title: t.legHttpTitle, desc: t.legHttpDesc },
+              { k: 'ssl', title: t.legSslTitle, desc: t.legSslDesc },
+              { k: 'check', title: t.legCheckTitle, desc: t.legCheckDesc },
+            ]} />
           </div>
         )}
       </div>
@@ -342,6 +383,27 @@ const styles = {
     color: '#ef4444', borderRadius: 6, padding: '5px 9px', cursor: 'pointer', fontSize: 12,
   },
   body: { flex: 1, overflowY: 'auto', padding: '16px 18px' },
+  // Layout terbagi: tabel di atas (scroll), penjelasan ringkas di bawah (tetap)
+  bodySplit: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
+  bodyScroll: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 18px' },
+  legend: {
+    flexShrink: 0,
+    borderTop: '2px solid var(--border)',
+    background: 'var(--bg-header)',
+    padding: '10px 18px 12px',
+  },
+  legendHead: {
+    fontSize: 10, fontWeight: 900, color: 'var(--text-sub)',
+    letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8,
+  },
+  legendGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: '8px 18px',
+  },
+  legendItem: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+  legendItemTitle: { fontSize: 10, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.04em' },
+  legendItemDesc: { fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.45 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 11 },
   th: {
     textAlign: 'left', padding: '8px 10px',

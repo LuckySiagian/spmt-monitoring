@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from '../../store/theme'
+import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
 
 const STATUS_FILTERS = ['ALL', 'ONLINE', 'WARNING', 'DEGRADED', 'CRITICAL', 'OFFLINE']
 
@@ -93,10 +94,8 @@ export default function MonitoringTable({ websites, onOpenDetail }) {
                 </td>
               </tr>
             ) : filtered.map((w, i) => {
-              const domain = (() => { try { return new URL(w.url).hostname } catch { return w.url } })()
-              const shouldSkip = /^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(domain) || 
-                                 domain.endsWith('.pelindo.co.id') || 
-                                 domain.endsWith('.pelindomultiterminal.co.id')
+              const domain = getDomain(w.url)
+              const shouldSkip = shouldSkipFavicon(w.url)
               
               const faviconUrl = shouldSkip ? null : `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
               const initial = (w.name || 'W')[0].toUpperCase()

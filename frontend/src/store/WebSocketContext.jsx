@@ -10,7 +10,7 @@ export function WebSocketProvider({ children }) {
   const reconnectTimer = useRef(null)
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return
 
     const ws = new WebSocket(WS_URL)
     wsRef.current = ws
@@ -47,8 +47,17 @@ export function WebSocketProvider({ children }) {
   useEffect(() => {
     connect()
     return () => {
-      if (wsRef.current) wsRef.current.close()
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+      if (wsRef.current) {
+        wsRef.current.onopen = null
+        wsRef.current.onmessage = null
+        wsRef.current.onerror = null
+        wsRef.current.onclose = null
+        wsRef.current.close()
+      }
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current)
+        reconnectTimer.current = null
+      }
     }
   }, [connect])
 
