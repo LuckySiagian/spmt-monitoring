@@ -171,7 +171,7 @@ export default function MonitoringGraph({ realtimeSnapshot }) {
           </div>
         ) : (
           mounted && (
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 400, height: 200 }}>
               <AreaChart data={data} margin={{ top:6, right:12, left:-6, bottom:4 }}>
                 <defs>
                   <linearGradient id="gOn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.45}/><stop offset="95%" stopColor="#10b981" stopOpacity={0.02}/></linearGradient>

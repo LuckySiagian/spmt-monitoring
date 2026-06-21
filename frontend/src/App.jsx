@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AuthProvider, useAuth } from './store/auth'
 import { ThemeProvider, useTheme } from './store/theme'
-import { WebSocketProvider } from './store/WebSocketContext'
+import { WebSocketProvider, useWebSocketStatus } from './store/WebSocketContext'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import WebsitesPage from './pages/WebsitesPage'
@@ -21,7 +21,7 @@ const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru
 function AllNotificationsPanel({ notifications, onDelete, onClearAll, onClose, onOpen }) {
   const { t, lang } = useTheme()
   const locale = LOCALE_MAP[lang] || 'en-US'
-  const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
+  const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
   const fmtTime = d => d ? new Date(d).toLocaleString(locale, { hour12: false }) : '—'
 
   return createPortal(
@@ -270,7 +270,7 @@ function LogoutModal({ onConfirm, onCancel }) {
   return createPortal(
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(30,41,59,0.45)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: '32px', width: 320, textAlign: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
+      <div style={{ background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, padding: '32px', width: 320, maxWidth: '90vw', textAlign: 'center', boxShadow: '0 16px 48px rgba(0,0,0,0.2)', animation: 'fadeIn 0.15s ease' }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>🚪</div>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{t.logoutQ}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>{t.logoutConfirm}</div>
@@ -724,7 +724,7 @@ function getInitialNav() {
 }
 
 function AppInner() {
-  const { user, isSuperAdmin, logout } = useAuth()
+  const { user, isSuperAdmin, canManageUsers, logout } = useAuth()
   const { themeId, t } = useTheme()
   const [loggedIn, setLoggedIn] = useState(!!user)
   const [activeNav, setActiveNav] = useState(getInitialNav)
@@ -740,7 +740,9 @@ function AppInner() {
   const [showAllNotifs, setShowAllNotifs] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isTvMode, setTvMode] = useState(false)
-  const [wsConnected, setWsConnected] = useState(false)
+  // Drive the LIVE/CONNECTING indicator from the real WebSocket open state, not from
+  // the first monitor_update message (which can lag many seconds after a refresh).
+  const wsConnected = useWebSocketStatus()
   const [globalRefreshKey, setGlobalRefreshKey] = useState(0)
   const [detailWebsiteId, setDetailWebsiteId] = useState(null)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
@@ -862,12 +864,12 @@ function AppInner() {
   }, [loggedIn])
 
   const loadUsers = useCallback(async () => {
-    if (!loggedIn || !isSuperAdmin) return;
+    if (!loggedIn || !canManageUsers) return;
     try {
       const r = await userAPI.getAll();
       setUsers(r.data || []);
     } catch (e) { }
-  }, [loggedIn, isSuperAdmin])
+  }, [loggedIn, canManageUsers])
 
   const loadEvents = useCallback(async () => {
     if (!loggedIn) return;
@@ -917,12 +919,12 @@ function AppInner() {
   }, [loggedIn, triggerGlobalRefresh, loadSummary, loadWebsites, loadUsers, loadEvents])
 
   const navTo = useCallback((nav) => {
-    if (nav === 'users' && !isSuperAdmin) return;
+    if (nav === 'users' && !canManageUsers) return;
     setActiveNav(nav);
     localStorage.setItem('spmt_active_nav', nav);
     // Auto refresh data whenever user switches pages
     triggerGlobalRefresh();
-  }, [isSuperAdmin, triggerGlobalRefresh])
+  }, [canManageUsers, triggerGlobalRefresh])
 
   const handleNewNotification = useCallback((notif) => {
     // Recovery event: optionally auto-acknowledge (mark read) prior alerts for this website
@@ -934,7 +936,7 @@ function AppInner() {
       }
       return
     }
-    if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL' && notif.type !== 'DEGRADED' && notif.type !== 'WARNING') return
+    if (notif.type !== 'OFFLINE' && notif.type !== 'CRITICAL' && notif.type !== 'WARNING') return
     setNotifications(prev => {
       const dupe = prev.find(n => n.websiteId === notif.websiteId && n.type === notif.type && (Date.now() - n.ts) < 300000);
       if (dupe) return prev;
@@ -991,17 +993,17 @@ function AppInner() {
     )
   }
 
-  const navItems = ['dashboard', 'websites', 'activity-log', ...(isSuperAdmin ? ['users'] : [])]
+  const navItems = ['dashboard', 'websites', 'activity-log', ...(canManageUsers ? ['users'] : [])]
 
   const realtimeSnapshot = {
     online: websites.filter(w => w.status === 'ONLINE').length,
-    critical: websites.filter(w => w.status === 'CRITICAL' || w.status === 'DEGRADED' || w.status === 'WARNING').length,
+    critical: websites.filter(w => w.status === 'CRITICAL' || w.status === 'WARNING').length,
     offline: websites.filter(w => w.status === 'OFFLINE').length,
     unknown: websites.filter(w => !w.status || w.status === 'UNKNOWN').length
   }
 
   return (
-    <div className={themeId} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)', position: 'relative' }}>
+    <div className={`${themeId} app-shell`} style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-main)', color: 'var(--text)', position: 'relative' }}>
 
       {/* Sci-Fi Ambient Glows (Light Mode) */}
       <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '40vw', height: '40vw', background: 'radial-gradient(circle, var(--accent-light) 0%, transparent 70%)', zIndex: 0, pointerEvents: 'none', opacity: 0.5 }} />
@@ -1009,6 +1011,7 @@ function AppInner() {
 
       <TopBar
         summary={summary} activeNav={activeNav} onNavChange={navTo}
+        pendingCount={canManageUsers ? users.filter(u => u.status === 'pending').length : 0}
         websites={websites} notifications={notifications}
         onMarkRead={handleMarkRead} onMarkAllRead={handleMarkAllRead}
         onNavigate={(nav) => { if (nav === 'notifications') setShowAllNotifs(true); else navTo(nav) }}
@@ -1020,11 +1023,11 @@ function AppInner() {
         onSettings={() => setShowSettings(true)}
         onAbout={() => setShowAbout(true)}
       />
-      <div className="page-fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, zIndex: 1, position: 'relative' }}>
-        {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} websites={websites} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} realtimeSnapshot={realtimeSnapshot} wsConnected={wsConnected} setWsConnected={setWsConnected} onOpenDetail={(w) => setDetailWebsiteId(w.id)} />}
+      <div className="page-fade-in app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, zIndex: 1, position: 'relative' }}>
+        {activeNav === 'dashboard' && <DashboardPage onSummaryUpdate={setSummary} websites={websites} onWebsitesUpdate={setWebsites} onNewNotification={handleNewNotification} refreshTrigger={refreshTrigger} realtimeSnapshot={realtimeSnapshot} wsConnected={wsConnected} onOpenDetail={(w) => setDetailWebsiteId(w.id)} />}
         {activeNav === 'websites' && <WebsitesPage websites={websites} onWebsiteUpdate={handleWebsiteUpdate} />}
         {activeNav === 'activity-log' && <ActivityLogPage events={allEvents} />}
-        {activeNav === 'users' && isSuperAdmin && <UsersPage users={users} onUserUpdate={handleUserUpdate} />}
+        {activeNav === 'users' && canManageUsers && <UsersPage users={users} onUserUpdate={handleUserUpdate} />}
       </div>
 
       {detailWebsiteId === 'spmt-server' && (

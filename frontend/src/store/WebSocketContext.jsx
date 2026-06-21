@@ -16,7 +16,7 @@ export function WebSocketProvider({ children }) {
     wsRef.current = ws
 
     ws.onopen = () => {
-      console.log('[Global WS] Connected')
+      if (import.meta.env.DEV) console.log('[Global WS] Connected')
       setIsConnected(true)
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current)
@@ -38,7 +38,7 @@ export function WebSocketProvider({ children }) {
     }
 
     ws.onclose = () => {
-      console.log('[Global WS] Disconnected, reconnecting in 3s...')
+      if (import.meta.env.DEV) console.log('[Global WS] Disconnected, reconnecting in 3s...')
       setIsConnected(false)
       reconnectTimer.current = setTimeout(connect, 3000)
     }
@@ -47,12 +47,21 @@ export function WebSocketProvider({ children }) {
   useEffect(() => {
     connect()
     return () => {
-      if (wsRef.current) {
-        wsRef.current.onopen = null
-        wsRef.current.onmessage = null
-        wsRef.current.onerror = null
-        wsRef.current.onclose = null
-        wsRef.current.close()
+      const ws = wsRef.current
+      wsRef.current = null
+      if (ws) {
+        ws.onopen = null
+        ws.onmessage = null
+        ws.onerror = null
+        ws.onclose = null
+        // Menutup socket yang masih CONNECTING memicu warning
+        // "WebSocket is closed before the connection is established".
+        // Tunda penutupan sampai koneksi terbuka agar console tetap bersih.
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.addEventListener('open', () => ws.close(), { once: true })
+        } else if (ws.readyState === WebSocket.OPEN) {
+          ws.close()
+        }
       }
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current)
@@ -85,4 +94,12 @@ export function useGlobalWebSocket(onMessage) {
     const callback = (msg) => onMessageRef.current?.(msg)
     return subscribe(callback)
   }, [subscribe])
+}
+
+// Read-only access to the live WebSocket connection state (true once the socket is
+// actually OPEN). Use this to drive "LIVE/CONNECTING" indicators instead of waiting
+// for the first data message to arrive (which can lag many seconds after a refresh).
+export function useWebSocketStatus() {
+  const ctx = useContext(WebSocketContext)
+  return ctx ? ctx.isConnected : false
 }

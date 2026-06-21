@@ -344,6 +344,29 @@ func (h *Handler) DeleteWebsite(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, map[string]string{"message": "website deleted"})
 }
 
+// BulkDeleteWebsites deletes several websites in one atomic transaction.
+func (h *Handler) BulkDeleteWebsites(w http.ResponseWriter, r *http.Request) {
+	var req model.BulkDeleteWebsitesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(req.IDs) == 0 {
+		respondError(w, http.StatusBadRequest, "no website ids provided")
+		return
+	}
+
+	deleted, err := h.svc.DeleteWebsites(r.Context(), req.IDs)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.writeAuditLog(r, "BULK_DELETE_WEBSITE", "", "Bulk deleted "+strconv.FormatInt(deleted, 10)+" website(s)")
+
+	respond(w, http.StatusOK, map[string]interface{}{"message": "websites deleted", "deleted": deleted})
+}
+
 func (h *Handler) GetWebsiteSLA(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := uuid.Parse(idStr)
@@ -524,6 +547,38 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	h.writeAuditLog(r, "CREATE_USER", user.ID.String(), "Created user: "+user.Username+" with role "+string(user.Role))
 
 	respond(w, http.StatusCreated, user)
+}
+
+// GetPendingUserCount — jumlah registrasi yang menunggu konfirmasi admin.
+func (h *Handler) GetPendingUserCount(w http.ResponseWriter, r *http.Request) {
+	count, err := h.svc.GetPendingUserCount(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	respond(w, http.StatusOK, map[string]int{"pending": count})
+}
+
+// ApproveUser — admin menyetujui registrasi user baru (jadi viewer aktif).
+func (h *Handler) ApproveUser(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	if err := h.svc.ApproveUser(r.Context(), idStr); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	h.writeAuditLog(r, "APPROVE_USER", idStr, "Approved registration for user ID: "+idStr)
+	respond(w, http.StatusOK, map[string]string{"message": "user approved"})
+}
+
+// RejectUser — admin menolak registrasi user baru (akun dihapus).
+func (h *Handler) RejectUser(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	if err := h.svc.RejectUser(r.Context(), idStr); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	h.writeAuditLog(r, "REJECT_USER", idStr, "Rejected registration for user ID: "+idStr)
+	respond(w, http.StatusOK, map[string]string{"message": "user rejected"})
 }
 
 // DeleteUser — superadmin hapus user

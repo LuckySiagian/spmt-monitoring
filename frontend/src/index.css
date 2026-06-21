@@ -27,10 +27,6 @@
   to { transform: rotate(360deg); }
 }
 
-.night-port-video {
-  /* Natural Video */
-}
-
 .glass-panel {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
@@ -41,7 +37,6 @@
 
 .status-icon-glow-online { filter: drop-shadow(0 0 8px var(--status-online)); }
 .status-icon-glow-warning { filter: drop-shadow(0 0 8px var(--status-warning)); }
-.status-icon-glow-degraded { filter: drop-shadow(0 0 8px var(--status-degraded)); }
 .status-icon-glow-critical { filter: drop-shadow(0 0 8px var(--status-critical)); }
 .status-icon-glow-offline { filter: drop-shadow(0 0 8px var(--status-offline)); }
 
@@ -187,12 +182,12 @@ body::before {
   --text: #1e293b; /* Softer slate dark text to reduce stark contrast */
   --text-sub: #475569;
   --text-muted: #64748b;
-  
+  --text-strong: #000000; /* Solid black — for high-readability explanatory text */
+
   /* Status Colors */
   --status-online: #10b981;
   --status-online-to: #059669;
   --status-warning: #d97706;
-  --status-degraded: #ea580c;
   --status-critical: #d97706;
   --status-offline: #dc2626;
   
@@ -219,12 +214,12 @@ body::before {
   --text: #f1f5f9; /* Bright off-white text for clear readability */
   --text-sub: #cbd5e1; /* Brighter secondary text */
   --text-muted: #94a3b8; /* Boosted muted text — clearly readable */
-  
+  --text-strong: #ffffff; /* Solid white — for high-readability explanatory text */
+
   /* Status Colors */
   --status-online: #34d399;
   --status-online-to: #10b981;
   --status-warning: #fbbf24;
-  --status-degraded: #f97316;
   --status-critical: #fbbf24;
   --status-offline: #f87171;
   
@@ -918,6 +913,19 @@ tr:hover {
   }
 }
 
+/* ── Responsive: TopBar clock (shrinks on small screens) ── */
+@media (max-width: 1024px) {
+  .topbar-clock { min-width: 0 !important; padding: 0 12px !important; }
+  .topbar-clock-time { font-size: 22px !important; }
+}
+@media (max-width: 640px) {
+  .topbar-clock {
+    border-left: none !important; border-right: none !important;
+    padding: 2px 0 !important; text-align: center !important; align-items: center;
+  }
+  .topbar-clock-time { font-size: 24px !important; }
+}
+
 /* ── Interactive State Classes ── */
 .vibrate-gentle:hover {
   animation: gentleVibrate 0.6s infinite ease-in-out;
@@ -925,4 +933,94 @@ tr:hover {
 
 .vibrate-intense {
   animation: intenseVibrate 0.3s infinite ease-in-out !important;
+}
+
+/* ═══════════════════════════════════════════════
+   MOBILE SHELL — let the stacked layout scroll.
+   The desktop app is locked to viewport height
+   (overflow:hidden); on phones/tablets the content
+   is taller than the screen, so allow vertical
+   scroll instead of clipping/cramming it.
+   ═══════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  html, body, #root {
+    height: auto !important;
+    min-height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  .app-shell {
+    height: auto !important;
+    min-height: 100dvh;
+    overflow: visible !important;
+  }
+  .app-main { overflow: visible !important; }
+  .dashboard-page { overflow: visible !important; height: auto !important; }
+}
+
+/* ── Phone + Tablet topbar: ROW 1 = logo + nav + bell/profile ; ROW 2 = 6 stat boxes ──
+   Applies up to 1024px so iPad gets a clean two-row header instead of the desktop
+   one-row layout overflowing/overlapping. Desktop (>1024) keeps the single row. */
+@media (max-width: 1024px) {
+  .topbar {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    height: auto !important;
+    min-height: 0 !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
+  }
+  .topbar-clock { display: none !important; }
+
+  /* Row 1, left: logo */
+  .topbar-branding { order: 1 !important; width: auto !important; justify-content: flex-start !important; height: auto !important; padding: 0 !important; flex: 0 0 auto !important; }
+  .topbar-branding > div { padding: 5px 10px !important; }
+  .topbar-branding img { height: 34px !important; }
+
+  /* Row 1, middle: nav. flex-basis 0 → it never forces the actions onto a second
+     line; it just grows into the leftover space and scrolls if the icons overflow. */
+  .topbar-nav-container { order: 2 !important; flex: 1 1 0 !important; width: auto !important; margin: 0 !important; min-width: 0 !important; }
+  .topbar-nav { width: 100% !important; height: 46px !important; padding: 3px !important; gap: 3px; overflow-x: auto; justify-content: center; box-shadow: 0 2px 8px rgba(53,188,218,0.5) !important; }
+  .nav-btn-custom { font-size: 19px !important; padding: 0 12px !important; }
+
+  /* Row 1, right: bell + profile */
+  .topbar-actions { order: 3 !important; width: auto !important; justify-content: flex-end !important; gap: 8px !important; flex-wrap: nowrap !important; flex: 0 0 auto !important; }
+
+  /* Row 2: all six stat boxes on one full-width row */
+  .topbar-metrics {
+    order: 4 !important;
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+  }
+  .metric-card { height: 50px !important; padding: 5px 3px !important; border-left-width: 3px !important; border-radius: 8px !important; }
+}
+
+/* ── Phone-only shrinks so ROW 1 (logo + nav + bell + profile) fits small phones ── */
+@media (max-width: 640px) {
+  .topbar { padding: 8px 10px !important; }
+  .topbar-branding > div { padding: 4px 8px !important; }
+  .topbar-branding img { height: 28px !important; }
+  .topbar-nav { height: 40px !important; }
+  .nav-btn-custom { font-size: 16px !important; padding: 0 8px !important; }
+  .topbar-username { display: none !important; }
+  /* profile becomes an icon-only chip: smaller avatar + tight padding */
+  .topbar-actions > div:last-child > button { padding: 3px !important; gap: 0 !important; }
+  .topbar-actions > div:last-child > button > div:first-child { width: 30px !important; height: 30px !important; font-size: 13px !important; }
+  .topbar-metrics { gap: 4px !important; }
+  .metric-card { height: 44px !important; padding: 4px 1px !important; }
+  .metric-card span:first-child { font-size: 14px !important; margin-right: 0 !important; }
+  .metric-card span:last-child { font-size: 6.5px !important; letter-spacing: 0.01em !important; }
+}
+
+/* ── Very narrow phones (≤380px): ease nav + the 6-up metric row ── */
+@media (max-width: 380px) {
+  .nav-btn-custom { font-size: 14px !important; padding: 0 6px !important; }
+  .metric-card span:first-child { font-size: 12px !important; }
+  .metric-card span:last-child { font-size: 6px !important; }
 }

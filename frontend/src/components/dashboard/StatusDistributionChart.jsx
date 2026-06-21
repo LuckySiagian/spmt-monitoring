@@ -7,7 +7,6 @@ import { useTheme } from '../../store/theme'
 const COLORS = {
   ONLINE:   '#10b981',
   WARNING: '#f59e0b',
-  DEGRADED: '#f97316',
   CRITICAL: '#ef4444',
   OFFLINE:  '#dc2626',
 }
@@ -31,17 +30,15 @@ export default function StatusDistributionChart({ websites }) {
   const total   = websites.length
   const online  = websites.filter(w => w.status === 'ONLINE').length
   const warning = websites.filter(w => w.status === 'WARNING').length
-  const degraded = websites.filter(w => w.status === 'DEGRADED').length
   const critical = websites.filter(w => w.status === 'CRITICAL').length
   const offline  = websites.filter(w => w.status === 'OFFLINE').length
-  const pending  = total - online - warning - degraded - critical - offline
+  const pending  = total - online - warning - critical - offline
 
   const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0
 
   const data = [
     { name: 'ONLINE',   value: online,   percent: pct(online),   fill: '#10b981' },
     { name: 'WARNING',  value: warning,  percent: pct(warning),  fill: '#f59e0b' },
-    { name: 'DEGRADED', value: degraded, percent: pct(degraded), fill: '#f97316' },
     { name: 'CRITICAL', value: critical, percent: pct(critical), fill: '#ef4444' },
     { name: 'OFFLINE',  value: offline,  percent: pct(offline),  fill: '#dc2626' },
   ].filter(d => d.value > 0)
@@ -70,7 +67,7 @@ export default function StatusDistributionChart({ websites }) {
           <>
             {/* Rose / Radial chart */}
             <div style={styles.chartWrap}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 200, height: 200 }}>
                 <RadialBarChart
                   cx="50%"
                   cy="50%"
@@ -112,7 +109,6 @@ export default function StatusDistributionChart({ websites }) {
               {[
                 { label: 'ONLINE',   count: online,   color: '#10b981' },
                 { label: 'WARNING',  count: warning,  color: '#f59e0b' },
-                { label: 'DEGRADED', count: degraded, color: '#f97316' },
                 { label: 'CRITICAL', count: critical, color: '#ef4444' },
                 { label: 'OFFLINE',  count: offline,  color: '#dc2626' },
                 ...(pending > 0 ? [{ label: 'PENDING', count: pending, color: '#4a5568' }] : []),

@@ -8,7 +8,6 @@ const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
     WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-    DEGRADED: { bg: 'rgba(249,115,22,0.15)', color: '#f97316', border: 'rgba(249,115,22,0.3)' },
     CRITICAL: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
     OFFLINE: { bg: 'rgba(220,38,38,0.15)', color: '#dc2626', border: 'rgba(220,38,38,0.3)' },
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
@@ -63,7 +62,7 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
 
   const filtered = {
     online: websites.filter(w => w.status === 'ONLINE'),
-    critical: websites.filter(w => w.status === 'CRITICAL' || w.status === 'DEGRADED' || w.status === 'WARNING'),
+    critical: websites.filter(w => w.status === 'CRITICAL' || w.status === 'WARNING'),
     offline: websites.filter(w => w.status === 'OFFLINE'),
     total: websites,
     alerts: websites.filter(w => w.status !== 'ONLINE' && w.status !== 'UNKNOWN'),
@@ -72,7 +71,7 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
   }[type] || websites
 
   const getSlaValue = w => {
-    return w.status === 'ONLINE' ? 100 : w.status === 'DEGRADED' ? 95 : w.status === 'WARNING' ? 90 : w.status === 'CRITICAL' ? 80 : 0
+    return w.status === 'ONLINE' ? 100 : w.status === 'WARNING' ? 90 : w.status === 'CRITICAL' ? 80 : 0
   }
 
   const sortedList = [...filtered].sort((a, b) => {
@@ -243,6 +242,7 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
             </table>
             </div>
             <Legend title={t.mdLegendTitle} items={[
+              { k: 'avg', title: t.legAvgTitle, desc: t.legAvgDesc },
               { k: 'rt', title: t.legRtTitle, desc: t.legRtDesc },
               { k: 'rtcolor', title: t.legRtColorTitle, desc: t.legRtColorDesc },
               { k: 'rtrank', title: t.legRtRankTitle, desc: t.legRtRankDesc },
@@ -282,7 +282,7 @@ export default function MetricDetailModal({ type, websites, summary, onOpenDetai
                       <td style={styles.td}>
                         {w.status === 'OFFLINE' ? t.issueUnreachable :
                          w.status === 'CRITICAL' ? t.issueCriticalFail :
-                         w.status === 'WARNING' ? t.issueStability : t.issueDegraded}
+                         t.issueStability}
                       </td>
                       <td style={styles.td}>{fmt(w.response_time_ms)}</td>
                       <td style={styles.td}>{fmtTime(w.last_checked)}</td>
@@ -393,17 +393,17 @@ const styles = {
     padding: '10px 18px 12px',
   },
   legendHead: {
-    fontSize: 10, fontWeight: 900, color: 'var(--text-sub)',
+    fontSize: 12, fontWeight: 900, color: 'var(--text-sub)',
     letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 8,
   },
   legendGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-    gap: '8px 18px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+    gap: '10px 18px',
   },
-  legendItem: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
-  legendItemTitle: { fontSize: 10, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.04em' },
-  legendItemDesc: { fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.45 },
+  legendItem: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
+  legendItemTitle: { fontSize: 12, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.04em' },
+  legendItemDesc: { fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.5 },
   table: { width: '100%', borderCollapse: 'collapse', fontSize: 11 },
   th: {
     textAlign: 'left', padding: '8px 10px',

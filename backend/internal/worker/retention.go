@@ -20,6 +20,10 @@ func (p *Pool) startRetentionWorker() {
 		PRIMARY KEY (website_id, day)
 	);
 	CREATE INDEX IF NOT EXISTS idx_daily_aggregates_day ON daily_aggregates(day DESC);
+	-- Self-heal columns added in migration 017 (existing tables predate them).
+	ALTER TABLE daily_aggregates ADD COLUMN IF NOT EXISTS min_response_time_ms INT NOT NULL DEFAULT 0;
+	ALTER TABLE daily_aggregates ADD COLUMN IF NOT EXISTS max_response_time_ms INT NOT NULL DEFAULT 0;
+	ALTER TABLE daily_aggregates ADD COLUMN IF NOT EXISTS peaks_over_1000      INT NOT NULL DEFAULT 0;
 	`
 	_, err := p.repo.GetDB().Exec(ctx, setupSQL)
 	if err != nil {
@@ -53,20 +57,26 @@ func (p *Pool) runAggregationAndRetention() {
 
 	// Calculate and store daily aggregates for the last 8 days (re-writing overlaps to ensure correctness)
 	aggSQL := `
-	INSERT INTO daily_aggregates (website_id, day, total_checks, online_checks, avg_response_time_ms)
-	SELECT 
+	INSERT INTO daily_aggregates (website_id, day, total_checks, online_checks, avg_response_time_ms, min_response_time_ms, max_response_time_ms, peaks_over_1000)
+	SELECT
 		website_id,
 		checked_at::date AS day,
 		COUNT(*) AS total_checks,
 		COUNT(CASE WHEN status = 'ONLINE' THEN 1 END) AS online_checks,
-		COALESCE(AVG(response_time_ms), 0)::int AS avg_response_time_ms
+		COALESCE(AVG(response_time_ms), 0)::int AS avg_response_time_ms,
+		COALESCE(MIN(response_time_ms) FILTER (WHERE response_time_ms > 0), 0) AS min_response_time_ms,
+		COALESCE(MAX(response_time_ms), 0) AS max_response_time_ms,
+		COUNT(*) FILTER (WHERE response_time_ms > 1000) AS peaks_over_1000
 	FROM monitoring_logs
 	WHERE checked_at >= NOW() - INTERVAL '8 days'
 	GROUP BY website_id, day
 	ON CONFLICT (website_id, day) DO UPDATE
 	SET total_checks = EXCLUDED.total_checks,
 		online_checks = EXCLUDED.online_checks,
-		avg_response_time_ms = EXCLUDED.avg_response_time_ms;
+		avg_response_time_ms = EXCLUDED.avg_response_time_ms,
+		min_response_time_ms = EXCLUDED.min_response_time_ms,
+		max_response_time_ms = EXCLUDED.max_response_time_ms,
+		peaks_over_1000 = EXCLUDED.peaks_over_1000;
 	`
 	_, err := p.repo.GetDB().Exec(ctx, aggSQL)
 	if err != nil {

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTheme } from '../../store/theme'
+import { useBreakpoint } from '../../hooks/useBreakpoint'
 import MonitoringGraph from './MonitoringGraph'
 import { Info, X, Zap } from 'lucide-react'
 import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
@@ -26,7 +27,6 @@ function InfoModal({ onClose }) {
               {[
                 { s: 'ONLINE', c: '#10b981', t: t.legendOnlineCond, d: t.legendOnlineDesc },
                 { s: 'WARNING', c: '#f59e0b', t: t.legendWarningCond, d: t.legendWarningDesc },
-                { s: 'DEGRADED', c: '#f97316', t: t.legendDegradedCond, d: t.legendDegradedDesc },
                 { s: 'CRITICAL', c: '#ef4444', t: t.legendCriticalCond, d: t.legendCriticalDesc },
                 { s: 'OFFLINE', c: '#dc2626', t: t.legendOfflineCond, d: t.legendOfflineDesc }
               ].map(item => (
@@ -65,7 +65,6 @@ const fmtMs = ms => ms != null ? `${ms}ms` : '—'
 const BADGE = {
   ONLINE: { color: '#10b981', glow: 'rgba(16,185,129,0.15)' },
   WARNING: { color: '#f59e0b', glow: 'rgba(245,158,11,0.15)' },
-  DEGRADED: { color: '#f97316', glow: 'rgba(249,115,22,0.15)' },
   CRITICAL: { color: '#ef4444', glow: 'rgba(239,68,68,0.15)' },
   OFFLINE: { color: '#dc2626', glow: 'rgba(220,38,38,0.15)' },
   UNKNOWN: { color: '#94a3b8', glow: 'none' },
@@ -193,6 +192,9 @@ function ServiceRow({ w, isSelected, onSelect, onOpenDetail, isDark }) {
 export default function StatusPanel({ websites, selectedId, onSelect, onOpenDetail, realtimeSnapshot, activeIncidents = [] }) {
   const { themeId, t } = useTheme()
   const isDark = themeId === 'theme-dark'
+  // On phones the node list lives in the topology section (with its own search/
+  // filter/sort), so this duplicate Live Feed is hidden and the graph takes over.
+  const { isPhone } = useBreakpoint()
   const [showInfo, setShowInfo] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
@@ -212,7 +214,7 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'status') {
-      const order = { OFFLINE: 0, CRITICAL: 1, WARNING: 2, DEGRADED: 3, ONLINE: 4, UNKNOWN: 5 }
+      const order = { OFFLINE: 0, CRITICAL: 1, WARNING: 2, ONLINE: 4, UNKNOWN: 5 }
       return (order[a.status] ?? 6) - (order[b.status] ?? 6)
     }
     if (sortBy === 'a-z') {
@@ -236,7 +238,8 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
       {/* Content Stack: Live Feed Top, Graph Bottom */}
       <div style={{ flex: 1, overflowY: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-        {/* LIVE FEED SECTION (Top 60%) */}
+        {/* LIVE FEED SECTION (Top 60%) — hidden on phones (lives in topology there) */}
+        {!isPhone && (
         <div style={{ height: '60%', display: 'flex', flexDirection: 'column', borderBottom: '2px solid var(--border)' }}>
           <div style={{ padding: '8px 12px', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
@@ -260,6 +263,11 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
               <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
                 <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, opacity: 0.5 }}>🔍</span>
                 <input
+                  id="service-search"
+                  name="service-search"
+                  type="search"
+                  aria-label={t.searchPlaceholder}
+                  autoComplete="off"
                   style={{
                     width: '100%', padding: '8px 12px 8px 32px', borderRadius: 8,
                     border: '1px solid var(--border)', background: 'var(--bg-card)',
@@ -280,6 +288,9 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               {/* Status filter */}
               <select
+                id="status-filter"
+                name="status-filter"
+                aria-label={t.allStatus}
                 style={{
                   flex: 1, padding: '7px 6px', borderRadius: 8,
                   border: '1px solid var(--border)', background: 'var(--bg-card)',
@@ -297,6 +308,9 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
 
               {/* Sort by */}
               <select
+                id="sort-by"
+                name="sort-by"
+                aria-label={t.sortLabel}
                 style={{
                   flex: 1, padding: '7px 6px', borderRadius: 8,
                   border: '1px solid var(--border)', background: 'var(--bg-card)',
@@ -344,8 +358,10 @@ export default function StatusPanel({ websites, selectedId, onSelect, onOpenDeta
           </div>
         </div>
 
-        {/* GRAPH SECTION (Bottom 40%) */}
-        <div style={{ height: '40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
+        )}
+
+        {/* GRAPH SECTION (Bottom 40%; full height on phones since the feed is hidden) */}
+        <div style={{ height: isPhone ? '100%' : '40%', display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden', padding: '10px' }}>
             <MonitoringGraph realtimeSnapshot={realtimeSnapshot} />
           </div>

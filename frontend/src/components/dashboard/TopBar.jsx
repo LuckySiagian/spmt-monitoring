@@ -12,8 +12,8 @@ const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru
 function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbout, onClose, rect }) {
   if (!rect) return null
   const { themeId, setTheme, THEME_OPTIONS, t } = useTheme()
-  const rc = { superadmin: '#7c3aed', admin: '#3b82f6', viewer: '#64748b' }[user?.role] || '#64748b'
-  const rl = { superadmin: 'SuperAdmin', admin: 'Admin', viewer: 'Viewer' }[user?.role] || 'User'
+  const rc = { superadmin: '#7c3aed', admin: '#3b82f6', adminpelindo: '#10b981', viewer: '#64748b' }[user?.role] || '#64748b'
+  const rl = { superadmin: 'SuperAdmin', admin: 'Admin', adminpelindo: 'Admin Pelindo', viewer: 'Viewer' }[user?.role] || 'User'
 
   const lightThemes = THEME_OPTIONS.filter(t => t.dark === false)
   const darkThemes = THEME_OPTIONS.filter(t => t.dark === true)
@@ -34,26 +34,6 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{user?.username}</div>
             <div style={{ fontSize: 11, color: rc, fontWeight: 700, letterSpacing: '0.05em' }}>{rl.toUpperCase()}</div>
           </div>
-        </div>
-      </div>
-
-      <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: '0.1em' }}>{t.chooseTheme}</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {THEME_OPTIONS.map(opt => (
-            <button key={opt.id} onClick={() => setTheme(opt.id)} title={opt.dark ? t.darkMode : t.lightMode}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 8px',
-                background: themeId === opt.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.02)',
-                border: `1px solid ${themeId === opt.id ? 'var(--accent)' : 'var(--border)'}`,
-                borderRadius: 8, cursor: 'pointer', color: 'var(--text)', fontSize: 11, fontWeight: 700, transition: 'all 0.2s',
-                boxShadow: themeId === opt.id ? `0 0 8px ${opt.color}20` : 'none'
-              }}
-            >
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: opt.color, flexShrink: 0 }} />
-              <span style={{ whiteSpace: 'nowrap' }}>{opt.dark ? t.darkMode : t.lightMode}</span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -82,7 +62,7 @@ function ProfileDropdown({ user, avatar, onProfile, onLogout, onSettings, onAbou
 export default function TopBar({
   summary, activeNav, onNavChange, onLogout,
   websites, notifications, onMarkRead, onMarkAllRead, navItems = ['dashboard', 'websites', 'activity-log'], onNavigate,
-  isTvMode, onToggleTvMode, onProfile, onSettings, onAbout, onOpenDetail
+  isTvMode, onToggleTvMode, onProfile, onSettings, onAbout, onOpenDetail, pendingCount = 0
 }) {
   const { user } = useAuth()
   const { themeId, setTheme, t, lang } = useTheme()
@@ -118,7 +98,6 @@ export default function TopBar({
 
   const alertCount = summary?.active_alerts ?? 0
   const onlineCount = websites.filter(w => w.status === 'ONLINE').length
-  const degradedCount = websites.filter(w => w.status === 'DEGRADED').length
   const warningCount = websites.filter(w => w.status === 'WARNING').length
   const criticalCount = websites.filter(w => w.status === 'CRITICAL').length
   const offlineCount = websites.filter(w => w.status === 'OFFLINE').length
@@ -127,7 +106,7 @@ export default function TopBar({
 
   const metrics = [
     { id: 'online', label: t?.online || 'ONLINE', value: onlineCount, color: '#10b981' },
-    { id: 'critical', label: t?.critical || 'CRITICAL', value: criticalCount + degradedCount + warningCount, color: '#d97706' },
+    { id: 'critical', label: t?.critical || 'CRITICAL', value: criticalCount + warningCount, color: '#d97706' },
     { id: 'offline', label: t?.offline || 'OFFLINE', value: offlineCount, color: '#ef4444' },
     { id: 'sla', label: 'SLA', value: `${fmtSLA(summary?.sla_percent)}%`, color: '#0ea5e9' },
     { id: 'total', label: t?.total || 'TOTAL', value: totalCount, color: '#64748b' },
@@ -136,8 +115,8 @@ export default function TopBar({
 
   const slaPct = Number(summary?.sla_percent || 100);
 
-  const rc = { superadmin: '#8b5cf6', admin: '#3b82f6', viewer: '#64748b' }[user?.role] || '#64748b'
-  const rl = { superadmin: 'SA', admin: 'AD', viewer: 'VW' }[user?.role] || '??'
+  const rc = { superadmin: '#8b5cf6', admin: '#3b82f6', adminpelindo: '#10b981', viewer: '#64748b' }[user?.role] || '#64748b'
+  const rl = { superadmin: 'SA', admin: 'AD', adminpelindo: 'AP', viewer: 'VW' }[user?.role] || '??'
   const navIcon = tab => {
     if (tab === 'dashboard') return '📊'
     if (tab === 'websites') return '🌐'
@@ -178,9 +157,11 @@ export default function TopBar({
           </div>
         </div>
 
-        {/* ── METRICS SECTION (Single Row) ── */}
+        {/* ── METRICS SECTION (Single Row) ──
+            Rendered only on the dashboard so other pages don't reserve an empty
+            metrics row (matters on phones, where it wraps to its own line). */}
+        {activeNav === 'dashboard' && (
         <div className="topbar-metrics" style={{
-          visibility: activeNav === 'dashboard' ? 'visible' : 'hidden',
           display: 'flex',
           flexWrap: 'nowrap',
           gap: '8px'
@@ -240,6 +221,7 @@ export default function TopBar({
             )
           })}
         </div>
+        )}
 
         {/* ── NAVIGATION SECTION (Pill Style) ── */}
         <div className="topbar-nav-container" style={{ marginLeft: 'auto', marginRight: 'auto' }}>
@@ -266,6 +248,16 @@ export default function TopBar({
                 onClick={() => onNavChange(tab)}>
                 {navIcon(tab)}
                 <span className="nav-label">{navTitle(tab)}</span>
+                {tab === 'users' && pendingCount > 0 && (
+                  <span title={`${pendingCount} registrasi menunggu konfirmasi`} style={{
+                    position: 'absolute', top: 2, right: 2, minWidth: 18, height: 18, padding: '0 5px',
+                    borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '2px solid var(--bg-header)', boxShadow: '0 0 8px rgba(239,68,68,0.7)'
+                  }}>
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -309,9 +301,9 @@ export default function TopBar({
           <div
             onMouseEnter={() => setIsClockHovered(true)}
             onMouseLeave={() => setIsClockHovered(false)}
-            className="hover-float"
+            className="hover-float topbar-clock"
             style={{ flexShrink: 0, padding: '0 24px', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: '160px', transition: 'all 0.3s ease' }}>
-            <div className={isClockHovered ? 'rainbow-text' : ''} style={{ color: 'var(--primary)', fontSize: '32px', fontWeight: 900, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
+            <div className={`topbar-clock-time ${isClockHovered ? 'rainbow-text' : ''}`} style={{ color: 'var(--primary)', fontSize: '32px', fontWeight: 900, fontFamily: '"Inter", sans-serif', letterSpacing: '0.02em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', transition: 'color 0.3s' }}>
               {clock.toLocaleTimeString(locale, { hour12: false })}
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', marginTop: 2, textTransform: 'uppercase' }}>
@@ -327,10 +319,10 @@ export default function TopBar({
               <div style={{ width: 40, height: 40, borderRadius: '50%', background: avatar ? 'transparent' : `linear-gradient(135deg,${rc}22,${rc}44)`, border: `2px solid ${rc}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: rc, flexShrink: 0, overflow: 'hidden' }}>
                 {avatar ? <img src={avatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : (user?.username || '?')[0].toUpperCase()}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+              <div className="topbar-username" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
                 <span style={{ color: 'var(--text)', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.username}</span>
               </div>
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>▾</span>
+              <span className="topbar-username" style={{ color: 'var(--text-muted)', fontSize: 12 }}>▾</span>
             </button>
             {showProfile && <ProfileDropdown user={user} avatar={avatar} rect={profileRect} onProfile={onProfile} onLogout={onLogout} onSettings={onSettings} onAbout={onAbout} onClose={() => setShowProfile(false)} />}
           </div>

@@ -1,0 +1,13 @@
+{
+  "name": "spmt-monitoring-presentation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PPT + DOCX generator for the SPMT Monitoring project",
+  "scripts": {
+    "build": "node build.js",
+    "build:doc": "node build-doc.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}

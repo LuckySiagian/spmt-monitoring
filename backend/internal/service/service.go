@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -27,6 +28,35 @@ var (
 
 func isValidURLStrict(u string) bool {
 	return urlRegex.MatchString(u)
+}
+
+// checkURLReachability is a best-effort pre-check run when adding/editing a website.
+// It HARD-fails only when the domain cannot be resolved at all (a likely typo). A
+// domain that resolves but is slow, firewalled, or temporarily down (TCP connect
+// times out / is refused) must NOT block saving — those are perfectly valid sites to
+// monitor, and the worker pool checks them with full timeouts and the false-alarm
+// safeguards. The old version dialed TCP with a 1.5s budget, which wrongly rejected
+// slow-but-alive sites (e.g. ones that take >2s to complete the TLS handshake on a
+// weak uplink) even though a browser opens them fine.
+func checkURLReachability(urlStr string) error {
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("format URL tidak valid")
+	}
+
+	host := parsed.Hostname()
+	if host == "" {
+		return fmt.Errorf("format URL tidak valid")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := net.DefaultResolver.LookupHost(ctx, host); err != nil {
+		return fmt.Errorf("domain tidak ditemukan (DNS gagal). Periksa kembali ejaan URL/domain Anda")
+	}
+	// DNS ok — accept the URL. Reachability/slowness is the monitor's job, not a save blocker.
+	return nil
 }
 
 type Service struct {
@@ -91,6 +121,14 @@ func (s *Service) Login(ctx context.Context, req model.LoginRequest) (*model.Log
 		return nil, errors.New("invalid credentials")
 	}
 
+	// Block accounts that have not yet been approved by an admin.
+	switch user.Status {
+	case model.StatusPending:
+		return nil, errors.New("account is awaiting admin approval")
+	case model.StatusRejected:
+		return nil, errors.New("registration was rejected, please contact an administrator")
+	}
+
 	token, err := s.generateToken(user)
 	if err != nil {
 		return nil, fmt.Errorf("generate token: %w", err)
@@ -104,6 +142,7 @@ func (s *Service) Login(ctx context.Context, req model.LoginRequest) (*model.Log
 			Email:      user.Email,
 			TelegramID: user.TelegramID,
 			Role:       user.Role,
+			Status:     user.Status,
 			CreatedAt:  user.CreatedAt,
 		},
 	}, nil
@@ -125,7 +164,9 @@ func (s *Service) Register(ctx context.Context, req model.RegisterRequest) (*mod
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), req.Email, req.TelegramID, model.RoleViewer)
+	// Self-registration: account starts as viewer + pending. It cannot log in
+	// until a superadmin / adminpelindo approves it from User Management.
+	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), req.Email, req.TelegramID, model.RoleViewer, model.StatusPending)
 	if err != nil {
 		return nil, errors.New("username or email already exists")
 	}
@@ -136,6 +177,7 @@ func (s *Service) Register(ctx context.Context, req model.RegisterRequest) (*mod
 		Email:      user.Email,
 		TelegramID: user.TelegramID,
 		Role:       user.Role,
+		Status:     user.Status,
 		CreatedAt:  user.CreatedAt,
 	}, nil
 }
@@ -168,10 +210,49 @@ func (s *Service) GetAllUsers(ctx context.Context) ([]*model.UserResponse, error
 			Email:      u.Email,
 			TelegramID: u.TelegramID,
 			Role:       u.Role,
+			Status:     u.Status,
 			CreatedAt:  u.CreatedAt,
 		})
 	}
 	return result, nil
+}
+
+// GetPendingUserCount — banyaknya registrasi yang menunggu konfirmasi admin.
+func (s *Service) GetPendingUserCount(ctx context.Context) (int, error) {
+	return s.repo.CountPendingUsers(ctx)
+}
+
+// ApproveUser — admin menyetujui registrasi; user menjadi viewer aktif.
+func (s *Service) ApproveUser(ctx context.Context, userIDStr string) error {
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return errors.New("invalid user id")
+	}
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+	if user.Status != model.StatusPending {
+		return errors.New("user is not pending approval")
+	}
+	return s.repo.UpdateUserStatus(ctx, userID, model.StatusActive)
+}
+
+// RejectUser — admin menolak registrasi. Akun dihapus agar username bisa
+// dipakai ulang dan daftar tetap bersih.
+func (s *Service) RejectUser(ctx context.Context, userIDStr string) error {
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return errors.New("invalid user id")
+	}
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+	if user.Status != model.StatusPending {
+		return errors.New("user is not pending approval")
+	}
+	return s.repo.DeleteUser(ctx, userID)
 }
 
 func (s *Service) PromoteUser(ctx context.Context, req model.PromoteRequest) error {
@@ -248,6 +329,11 @@ func (s *Service) CreateWebsite(ctx context.Context, req model.CreateWebsiteRequ
 	if req.IntervalSeconds < 10 {
 		req.IntervalSeconds = 10
 	}
+	// Pre-check: only blocks on DNS failure (typo). Slow/unreachable-but-valid sites
+	// are allowed through — the monitor handles them with full timeouts.
+	if err := checkURLReachability(req.URL); err != nil {
+		return nil, err
+	}
 	return s.repo.CreateWebsite(ctx, req)
 }
 
@@ -261,11 +347,20 @@ func (s *Service) UpdateWebsite(ctx context.Context, id uuid.UUID, req model.Upd
 	if req.IntervalSeconds < 10 {
 		req.IntervalSeconds = 10
 	}
+	// Pre-check: only blocks on DNS failure (typo). Slow/unreachable-but-valid sites
+	// are allowed through — the monitor handles them with full timeouts.
+	if err := checkURLReachability(req.URL); err != nil {
+		return nil, err
+	}
 	return s.repo.UpdateWebsite(ctx, id, req)
 }
 
 func (s *Service) DeleteWebsite(ctx context.Context, id uuid.UUID) error {
 	return s.repo.DeleteWebsite(ctx, id)
+}
+
+func (s *Service) DeleteWebsites(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	return s.repo.DeleteWebsites(ctx, ids)
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────
@@ -334,7 +429,8 @@ func (s *Service) CreateUserByAdmin(ctx context.Context, req model.CreateUserReq
 	if err != nil {
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
-	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), req.Email, req.TelegramID, role)
+	// Admin-created accounts are active immediately (no approval needed).
+	user, err := s.repo.CreateUser(ctx, req.Username, string(hash), req.Email, req.TelegramID, role, model.StatusActive)
 	if err != nil {
 		return nil, errors.New("username or email already exists")
 	}
@@ -344,6 +440,7 @@ func (s *Service) CreateUserByAdmin(ctx context.Context, req model.CreateUserReq
 		Email:      user.Email,
 		TelegramID: user.TelegramID,
 		Role:       user.Role,
+		Status:     user.Status,
 		CreatedAt:  user.CreatedAt,
 	}, nil
 }
@@ -459,4 +556,3 @@ func (s *Service) WriteAuditLog(ctx context.Context, log *model.AuditLog) error 
 func (s *Service) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*model.WebsiteSLA, error) {
 	return s.repo.GetWebsiteSLA(ctx, websiteID)
 }
-

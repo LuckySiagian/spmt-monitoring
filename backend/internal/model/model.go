@@ -21,23 +21,34 @@ const (
 	RoleViewer       Role = "viewer"
 )
 
+// UserStatus — siklus persetujuan registrasi mandiri.
+type UserStatus string
+
+const (
+	StatusPending  UserStatus = "pending"  // menunggu konfirmasi admin
+	StatusActive   UserStatus = "active"   // boleh login
+	StatusRejected UserStatus = "rejected" // registrasi ditolak
+)
+
 type User struct {
-	ID           uuid.UUID `json:"id" db:"id"`
-	Username     string    `json:"username" db:"username"`
-	PasswordHash string    `json:"-" db:"password_hash"`
-	Email        string    `json:"email" db:"email"`
-	TelegramID   *string   `json:"telegram_id" db:"telegram_id"`
-	Role         Role      `json:"role" db:"role"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	ID           uuid.UUID  `json:"id" db:"id"`
+	Username     string     `json:"username" db:"username"`
+	PasswordHash string     `json:"-" db:"password_hash"`
+	Email        string     `json:"email" db:"email"`
+	TelegramID   *string    `json:"telegram_id" db:"telegram_id"`
+	Role         Role       `json:"role" db:"role"`
+	Status       UserStatus `json:"status" db:"status"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 }
 
 type UserResponse struct {
-	ID         uuid.UUID `json:"id"`
-	Username   string    `json:"username"`
-	Email      string    `json:"email"`
-	TelegramID *string   `json:"telegram_id,omitempty"`
-	Role       Role      `json:"role"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         uuid.UUID  `json:"id"`
+	Username   string     `json:"username"`
+	Email      string     `json:"email"`
+	TelegramID *string    `json:"telegram_id,omitempty"`
+	Role       Role       `json:"role"`
+	Status     UserStatus `json:"status"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 // ─── Website ─────────────────────────────────────────────────
@@ -97,6 +108,10 @@ type UpdateWebsiteRequest struct {
 	SaveScreenshot  bool   `json:"save_screenshot"`
 }
 
+type BulkDeleteWebsitesRequest struct {
+	IDs []uuid.UUID `json:"ids"`
+}
+
 // ─── Monitoring Log ──────────────────────────────────────────
 
 type LogStatus string
@@ -104,7 +119,6 @@ type LogStatus string
 const (
 	StatusOnline   LogStatus = "ONLINE"
 	StatusWarning  LogStatus = "WARNING"
-	StatusDegraded LogStatus = "DEGRADED"
 	StatusCritical LogStatus = "CRITICAL"
 	StatusOffline  LogStatus = "OFFLINE"
 )
@@ -288,6 +302,9 @@ type SystemHealth struct {
 	InterfaceAlias   string    `json:"interface_alias"`
 	LocalGateway     string    `json:"local_gateway"`
 	DNSResolver      string    `json:"dns_resolver"`
+	LinkSpeed        string    `json:"link_speed"`
+	NetRxMbps        float64   `json:"net_rx_mbps"` // Live download throughput in Mbps
+	NetTxMbps        float64   `json:"net_tx_mbps"` // Live upload throughput in Mbps
 }
 
 // ─── Network Context ──────────────────────────────────────────
@@ -301,6 +318,9 @@ type NetworkContext struct {
 	NetworkType    string    `json:"network_type"` // OFFICE, PUBLIC, VPN, UNKNOWN
 	InterfaceAlias string    `json:"interface_alias"`
 	ConnectionName string    `json:"connection_name"`
+	LinkSpeed      string    `json:"link_speed"` // Negotiated link rate of the active adapter, e.g. "144 Mbps"
+	RxMbps         float64   `json:"net_rx_mbps"` // Live download throughput in Mbps
+	TxMbps         float64   `json:"net_tx_mbps"` // Live upload throughput in Mbps
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
@@ -373,6 +393,25 @@ type WebsiteSLA struct {
 	SLA24h float64 `json:"sla_24h"`
 	SLA7d  float64 `json:"sla_7d"`
 	SLA30d float64 `json:"sla_30d"`
+}
+
+// SiteAggStat is one site's uptime & response-time figures over a period, summed
+// from daily_aggregates. Used to build the weekly uptime report.
+type SiteAggStat struct {
+	TotalChecks  int
+	OnlineChecks int
+	AvgRT        int // weighted average response time (ms)
+	MinRT        int // fastest daily minimum (ms), 0 when unknown
+	MaxRT        int // slowest daily maximum (ms)
+	PeaksOver1k  int // count of checks slower than 1000ms
+}
+
+// SiteIncidentStat is one site's incident tally over a period, derived from
+// status_events. Durations are in seconds, capped at the period end.
+type SiteIncidentStat struct {
+	Incidents       int
+	TotalDownSecs   float64
+	LongestDownSecs float64
 }
 
 type AIChatMessage struct {

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Dokumentasi Sistem SPMT Monitoring</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 24pt;
+            color: #1e3a8a;
+            border-bottom: 2px solid #1e3a8a;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+        h2 {
+            font-size: 18pt;
+            color: #2563eb;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 3px;
+            margin-top: 25px;
+        }
+        h3 {
+            font-size: 14pt;
+            color: #1e40af;
+            margin-top: 20px;
+        }
+        p {
+            font-size: 11pt;
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 10.5pt;
+        }
+        th, td {
+            border: 1px solid #bdc3c7;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: #f3f4f6;
+            color: #1e3a8a;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 20px;
+        }
+        li {
+            font-size: 11pt;
+            margin-bottom: 5px;
+        }
+        code {
+            font-family: Consolas, Monaco, monospace;
+            background-color: #f3f4f6;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 10pt;
+        }
+        .code-block {
+            background-color: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #2563eb;
+            padding: 15px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 9.5pt;
+            white-space: pre-wrap;
+            margin: 15px 0;
+        }
+        .subtitle {
+            font-size: 14pt;
+            color: #666666;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+        .meta-doc {
+            font-size: 10pt;
+            color: #888888;
+            margin-bottom: 40px;
+            border-bottom: 2px double #bdc3c7;
+            padding-bottom: 15px;
+        }
+        .callout {
+            background-color: #eff6ff;
+            border-left: 4px solid #2563eb;
+            padding: 12px 15px;
+            margin: 15px 0;
+            font-size: 10.5pt;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>DOKUMENTASI SISTEM SPMT MONITORING</h1>
+    <div class="subtitle">Sistem Monitoring Uptime &amp; Metrik Jaringan Real-Time Berbasis Go, React, dan PostgreSQL</div>
+    <div class="meta-doc">
+        Dokumen ini disusun sebagai panduan teknis operasional, dokumentasi serah-terima magang, dan bahan pelaporan akademik (Dosen Pembimbing &amp; Penguji).<br>
+        <strong>Versi dokumen:</strong> 2.0 &middot; <strong>Terakhir diperbarui:</strong> Juni 2026.<br>
+        <em>Perubahan utama v2.0:</em> ambang <em>response time</em> disesuaikan ke standar umum (<em>2-second rule</em>), kebijakan notifikasi Telegram dirapikan (eskalasi insiden dihapus untuk mencegah spam), serta penambahan panduan <strong>hosting di server kantor</strong>.
+    </div>
+
+    <h2>1. PENDAHULUAN</h2>
+    <h3>1.1 Latar Belakang</h3>
+    <p>Pada lingkungan infrastruktur TI berskala menengah hingga besar (seperti di Pelindo), ketersediaan (<em>availability</em>) dari aplikasi internal dan eksternal sangat krusial. Down-time pada layanan utama dapat mengganggu produktivitas operasional pelabuhan dan logistik.</p>
+    <p>Sistem <strong>SPMT Monitoring</strong> dirancang sebagai solusi <em>Network Operations Center (NOC) Dashboard</em> yang memantau status kesehatan situs web, layanan API, dan <em>node</em> jaringan secara terus-menerus (<em>24/7</em>), real-time, dan deterministik.</p>
+
+    <h3>1.2 Tujuan</h3>
+    <ol>
+        <li>Memantau kesehatan web service melalui multi-protokol (DNS, ICMP/Ping, TCP, HTTP) secara terpusat.</li>
+        <li>Menyediakan dasbor pemantauan real-time yang meminimalkan <em>lagging</em> data tanpa membebani peramban (<em>client polling</em>).</li>
+        <li>Mencegah <em>false alarms</em> (peringatan palsu) akibat gangguan koneksi server lokal atau gangguan sesaat melalui mekanisme cerdas.</li>
+        <li>Mempermudah operator NOC melakukan manajemen status dan audit aktivitas sistem.</li>
+    </ol>
+
+    <h2>2. ARSITEKTUR SISTEM &amp; ALUR DATA</h2>
+    <p>Sistem menggunakan arsitektur tiga lapis (<em>three-tier architecture</em>) dengan pembagian tugas yang efisien:</p>
+    <ul>
+        <li><strong>Client Browser (React)</strong> mengirim request REST HTTP ke Backend dan menerima broadcast data secara instan melalui koneksi WebSocket.</li>
+        <li><strong>Backend Server (Go)</strong> melakukan operasi database ke PostgreSQL, memicu berkala proses <em>probing</em> ke website target, dan mem-broadcast hasilnya melalui WebSocket Hub.</li>
+        <li><strong>Database (PostgreSQL)</strong> menjadi media penyimpanan utama data konfigurasi website, log historis lengkap, log insiden, dan audit operator.</li>
+    </ul>
+
+    <h3>2.1 Backend (Go Engine)</h3>
+    <p>Dipilih bahasa Go karena memiliki performa tinggi (<em>native code</em>), konkurensi efisien menggunakan <em>goroutine</em>, dan konsumsi memori yang sangat kecil (hemat RAM).</p>
+    <ul>
+        <li><strong>Worker Pool Pattern</strong>: Backend menjalankan antrean pekerjaan (<em>job queue</em>) berbasis <em>channel</em> Go. Sejumlah goroutine worker (default <strong>10</strong>) memproses antrean pengecekan situs web secara paralel.</li>
+        <li><strong>WebSocket Hub</strong>: Bertanggung jawab mempertahankan koneksi persistent ke browser operator dan mem-broadcast setiap metrik terbaru (<code>monitor_update</code>) dan notifikasi status (<code>status_change</code>).</li>
+    </ul>
+
+    <h3>2.2 Frontend (React Client)</h3>
+    <p>React digunakan untuk membangun UI dasbor yang modern, interaktif, dan reaktif terhadap perubahan data.</p>
+    <ul>
+        <li><strong>Canvas Topology</strong>: Visualisasi topologi node jaringan digambar secara dinamis pada HTML5 Canvas (tersedia layout Star, Tree, dan 3D Globe).</li>
+        <li><strong>Global WebSocket State</strong>: Komponen UI tidak melakukan <em>polling</em> API berulang kali, melainkan berlangganan ke WebSocket Hub untuk langsung menampilkan data begitu diterima.</li>
+    </ul>
+
+    <h3>2.3 Database (PostgreSQL)</h3>
+    <p>Menyimpan seluruh konfigurasi website, log historis, riwayat insiden, audit operator, dan sesi pengguna secara relasional dan aman.</p>
+
+    <h2>3. LOGIKA DETEKSI STATUS &amp; LOGIKA CERDAS</h2>
+    <p>Sistem menetapkan status kesehatan website secara <strong>deterministik</strong>. Keputusan diambil bertingkat: <strong>DNS &rarr; koneksi/transport &rarr; kode HTTP &rarr; kecepatan respons</strong>. Implementasi ada di fungsi <code>classifyStatus</code> pada <code>backend/internal/worker/pool.go</code>.</p>
+
+    <h3>3.1 Klasifikasi Status Kesehatan</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 14%;">Status</th>
+                <th style="width: 22%;">Deskripsi</th>
+                <th style="width: 44%;">Kriteria Penentuan Teknis</th>
+                <th style="width: 20%;">Notifikasi Telegram</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>ONLINE</strong></td>
+                <td>Layanan normal dan responsif</td>
+                <td>DNS berhasil diurai <strong>+</strong> HTTP <strong>200&ndash;399</strong> <strong>+</strong> waktu respons <strong>&le; 2000 ms</strong>. (HTTP 403/429/503 yang membawa sidik jari WAF/anti-bot/CAPTCHA juga di-<em>upgrade</em> ke ONLINE.)</td>
+                <td>Hanya saat <strong>pemulihan</strong> (kembali dari OFFLINE/CRITICAL)</td>
+            </tr>
+            <tr>
+                <td><strong>WARNING</strong></td>
+                <td>Layanan hidup tetapi lambat / halaman tidak normal</td>
+                <td>HTTP <strong>200&ndash;399</strong> tetapi <strong>lambat</strong> (respons <strong>&gt; 2000 ms</strong> = "lambat", <strong>&gt; 5000 ms</strong> = "sangat lambat"), <strong>ATAU</strong> HTTP <strong>4xx</strong> selain 403 (mis. 404).</td>
+                <td><strong>Senyap</strong> &mdash; tidak memicu notifikasi</td>
+            </tr>
+            <tr>
+                <td><strong>CRITICAL</strong></td>
+                <td>Server error atau akses ditolak</td>
+                <td>HTTP <strong>5xx</strong> (Internal Server Error), <strong>ATAU</strong> <strong>403 Forbidden</strong> murni tanpa tanda WAF/verifikasi manusia.</td>
+                <td>Ya</td>
+            </tr>
+            <tr>
+                <td><strong>OFFLINE</strong></td>
+                <td>Layanan mati total / tidak terjangkau</td>
+                <td>DNS gagal diurai, TCP Connection Refused/Reset, Timeout, atau nihil respons HTTP yang valid.</td>
+                <td>Ya</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="callout">
+        <strong>Prinsip penting (anti false-alarm):</strong> <em>kelambatan respons tidak pernah dengan sendirinya menjadi CRITICAL atau OFFLINE.</em> Situs yang masih menjawab dianggap <strong>degraded (WARNING)</strong>, bukan mati. Menganggap "lambat = mati" adalah penyebab nomor satu alarm palsu, sehingga situs lambat tetap berstatus <strong>WARNING yang senyap</strong>.
+    </div>
+
+    <h3>3.2 Standar &amp; Sumber Ambang Response Time</h3>
+    <p>Pemilihan ambang <strong>2000 ms</strong> (batas ONLINE&rarr;WARNING) dan <strong>5000 ms</strong> (batas "lambat"&rarr;"sangat lambat") mengacu pada standar pengalaman pengguna web yang lazim dipakai industri:</p>
+    <ul>
+        <li><strong>Nielsen / Miller &mdash; Response Time Limits</strong> (Nielsen Norman Group): 0,1 s terasa <em>instan</em>; <strong>1 s</strong> menjaga alur pikir pengguna; <strong>10 s</strong> adalah batas perhatian. &rarr; mendasari batas "responsif" &le; 2 s.</li>
+        <li><strong>Google / Akamai &mdash; Page Speed &amp; Bounce Rate</strong> (riset Google/SOASTA): probabilitas pengguna meninggalkan halaman naik tajam &mdash; dari 1 s ke 3 s naik ~32%, dari 1 s ke 5 s naik ~90%. &rarr; mendasari batas "sangat lambat" &gt; 5 s.</li>
+        <li><strong>Apdex (Application Performance Index)</strong>: zona <em>Satisfied</em> (&le; T), <em>Tolerating</em> (&le; 4T), <em>Frustrated</em> (&gt; 4T). Dengan T &asymp; 1 s, zona <em>Frustrated</em> mulai ~4&ndash;5 s.</li>
+    </ul>
+    <p>Angka ini sengaja sedikit konservatif (memberi kelonggaran untuk <em>overhead</em> jaringan probe) agar tetap akurat namun tidak gampang memicu peringatan palsu.</p>
+
+    <h3>3.3 Kebijakan Notifikasi (Anti-Spam)</h3>
+    <p>Notifikasi Telegram <strong>hanya</strong> dikirim pada tiga transisi: (1) turun ke <strong>OFFLINE</strong>; (2) turun ke <strong>CRITICAL</strong>; (3) <strong>pulih ke ONLINE</strong> (hanya jika sebelumnya OFFLINE/CRITICAL). Transisi <strong>WARNING tidak pernah mengirim notifikasi</strong>.</p>
+    <p><strong>Eskalasi insiden otomatis telah dihapus</strong> karena mekanisme lama mengirim ulang peringatan setiap siklus untuk insiden yang belum ditangani &mdash; menyebabkan <strong>spam</strong> di grup Telegram. Email dikirim sebagai <strong>laporan mingguan terjadwal</strong>, bukan per kejadian.</p>
+
+    <h3>3.4 Fitur Cerdas untuk Menekan False Alarms</h3>
+    <ul>
+        <li><strong>Anti-Flapping (Debounce 3&times;)</strong>: status hard-down (<code>OFFLINE</code>/<code>CRITICAL</code>) baru dilaporkan setelah <strong>3 kali kegagalan berturut-turut</strong> pada pengecekan otomatis.</li>
+        <li><strong>Quorum Internet Check</strong>: sebelum menyatakan OFFLINE, backend memeriksa koneksi internetnya sendiri (ping ke <code>8.8.8.8</code>, <code>1.1.1.1</code>, <code>208.67.222.222</code>). Jika mayoritas gagal, insiden &amp; notifikasi <strong>ditahan</strong> karena kemungkinan jaringan node pemantau yang bermasalah.</li>
+        <li><strong>Anti-Bot/WAF Bypass</strong>: 403/429/503 dengan sidik jari WAF/CAPTCHA di-<em>upgrade</em> ke <strong>ONLINE</strong> karena server aslinya hidup.</li>
+        <li><strong>Toleransi Timeout</strong>: <em>dial timeout</em> 20 s &amp; <em>client timeout</em> 40 s agar situs lambat-tapi-hidup jatuh ke WARNING, bukan OFFLINE.</li>
+    </ul>
+
+    <h3>3.5 Logika Tombol Refresh (Pengecekan Manual)</h3>
+    <ol>
+        <li><strong>Bypass Local Network Check</strong>: refresh manual tetap menjalankan pengecekan penuh apa pun kondisi jaringan lokal.</li>
+        <li><strong>Bypass Debouncing</strong>: refresh manual langsung menulis status sebenarnya tanpa menunggu 3 sampel.</li>
+    </ol>
+
+    <h2>4. DESAIN DATABASE (SCHEMA)</h2>
+    <p>Skema PostgreSQL dengan relasi terindeks. Migrasi di <code>backend/migrations/001..018_*.sql</code> dan <strong>dijalankan berurutan</strong> (server tidak menjalankan migrasi otomatis).</p>
+    <h3>4.1 Tabel <code>websites</code></h3>
+    <p><code>id</code> (UUID, PK) &middot; <code>name</code> &middot; <code>url</code> &middot; <code>interval_seconds</code> (default 30/60s) &middot; <code>save_screenshot</code> (opsional).</p>
+    <h3>4.2 Tabel <code>monitoring_logs</code></h3>
+    <p>Rekam detail tiap pengecekan: <code>status</code>, <code>dns_resolved</code>, <code>dns_latency_ms</code>, <code>tcp_port_open</code>, <code>tls_latency_ms</code>, <code>ttfb_latency_ms</code>, <code>status_code</code>, <code>response_time_ms</code>, <code>root_cause</code> (JSON bukti probing).</p>
+    <h3>4.3 Tabel <code>status_events</code></h3>
+    <p>Sejarah transisi status: <code>old_status</code>, <code>new_status</code>, <code>created_at</code>.</p>
+    <h3>4.4 Tabel <code>incidents</code> &amp; <code>incident_history</code></h3>
+    <p>Insiden <strong>hanya dibuka untuk status hard-down (CRITICAL/OFFLINE)</strong> dan auto-resolve saat kembali ONLINE. WARNING (lambat / 4xx) <strong>tidak</strong> membuka insiden agar daftar insiden tidak berisik.</p>
+
+    <h2>5. PANDUAN DEPLOYMENT &amp; INSTALASI</h2>
+    <h3>5.1 Prasyarat Sistem</h3>
+    <ul>
+        <li>Go compiler <strong>1.21+</strong> (diuji dengan Go 1.25).</li>
+        <li>Node.js <strong>18+</strong> &amp; npm (diuji dengan Node 22).</li>
+        <li>PostgreSQL <strong>14+</strong>.</li>
+    </ul>
+
+    <h3>5.2 Menjalankan di Lokal (Windows &mdash; pengembangan)</h3>
+    <ol>
+        <li>Pastikan PostgreSQL menyala; buat database kosong <code>spmt_monitoring</code>.</li>
+        <li>Jalankan seluruh migrasi <code>backend/migrations/*.sql</code> secara berurutan.</li>
+        <li>Salin <code>backend/.env.example</code> &rarr; <code>backend/.env</code>, sesuaikan koneksi DB.</li>
+        <li>Dobel klik <strong><code>start.bat</code></strong> &mdash; menjalankan backend (8080), Vite dev (5173), dan membuka jendela aplikasi.</li>
+    </ol>
+    <p>Default superadmin: <code>superadmin</code> / <code>admin123</code> &mdash; <strong>wajib diganti</strong> di produksi.</p>
+
+    <h3>5.3 Hosting di Server Kantor (Produksi)</h3>
+    <p><strong>a. Environment produksi (<code>backend/.env</code>):</strong></p>
+    <div class="code-block">APP_ENV=production                 # WAJIB: mengaktifkan pemeriksaan keamanan
+JWT_SECRET=&lt;acak-panjang-min-32-karakter&gt;   # server menolak start jika masih default
+ALLOWED_ORIGINS=https://monitoring.pelindo.co.id   # domain frontend (CORS)
+DB_SSLMODE=require                 # gunakan SSL bila DB di host terpisah
+FRONTEND_URL=https://monitoring.pelindo.co.id
+TELEGRAM_BOT_TOKEN=&lt;token-bot&gt;
+TELEGRAM_CHAT_ID=&lt;chat-id-grup&gt;</div>
+    <div class="callout">Pada <code>APP_ENV=production</code>, server <strong>menolak berjalan</strong> bila <code>JWT_SECRET</code> masih default atau <code>ALLOWED_ORIGINS</code> kosong &mdash; pengaman agar tidak ter-deploy dengan konfigurasi tidak aman.</div>
+    <p><strong>b. Build artefak:</strong></p>
+    <div class="code-block">cd frontend &amp;&amp; npm ci &amp;&amp; npm run build        # menghasilkan dist/
+cd ../backend &amp;&amp; go build -o spmt-server cmd/server/main.go   # binari tunggal</div>
+    <p><strong>c. Migrasi database (sekali):</strong> jalankan seluruh file <code>backend/migrations/*.sql</code> berurutan via <code>psql</code>.</p>
+    <p><strong>d. Jalankan backend sebagai service</strong> (mis. <code>systemd</code> di Linux dengan <code>Restart=always</code>), atau NSSM/Task Scheduler di Windows Server.</p>
+    <p><strong>e. Reverse proxy (Nginx)</strong>: sajikan folder <code>dist/</code> sebagai file statis dan <em>proxy</em> rute API + <code>/ws</code> ke backend <code>:8080</code>. <strong>Penting:</strong> teruskan header <code>Upgrade</code>/<code>Connection</code> agar WebSocket berfungsi.</p>
+    <p><strong>f. Firewall:</strong> buka hanya 80/443 ke publik; 8080 &amp; 5432 cukup internal.</p>
+
+    <h3>5.4 Status Kelayakan Deploy (hasil uji terakhir)</h3>
+    <table>
+        <thead><tr><th>Pemeriksaan</th><th>Perintah</th><th>Hasil</th></tr></thead>
+        <tbody>
+            <tr><td>Build backend</td><td><code>go build ./...</code></td><td>Lulus</td></tr>
+            <tr><td>Unit test backend</td><td><code>go test ./...</code></td><td>Lulus</td></tr>
+            <tr><td><code>go vet</code></td><td><code>go vet ./...</code></td><td>Bersih</td></tr>
+            <tr><td>Build frontend produksi</td><td><code>npm run build</code></td><td>Lulus (<code>dist/</code>)</td></tr>
+            <tr><td>Generator PPT</td><td><code>node presentation/build.js</code></td><td>Menghasilkan <code>.pptx</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>6. APAKAH FALSE ALARM HILANG SETELAH DI-HOSTING?</h2>
+    <p>Ringkasnya: <strong>pendapat Anda sebagian besar benar, tetapi tidak 100%.</strong> Hosting <strong>sangat mengurangi</strong> false alarm, namun tidak menghilangkannya sepenuhnya.</p>
+    <p><strong>Yang benar:</strong> saat dijalankan dari perangkat &amp; jaringan lokal yang sering "lelet", node pemantau punya koneksi tidak stabil. Karena waktu respons &amp; timeout diukur <strong>dari sisi node pemantau</strong>, jaringan lelet membuat situs sehat terlihat <strong>lambat (WARNING)</strong> atau bahkan <strong>OFFLINE (timeout)</strong>. Begitu di-hosting di server kantor dengan koneksi datacenter stabil, pengukuran jauh lebih akurat dan mayoritas false alarm jenis ini hilang.</p>
+    <p><strong>Yang perlu dicatat (masih mungkin terjadi):</strong></p>
+    <ol>
+        <li><strong>Server/penyedia hosting lambat</strong> &mdash; jika server hosting sendiri lelet/overload, pengukuran ikut terganggu.</li>
+        <li><strong>Keandalan jaringan kantor</strong> &mdash; node pemantau kini bergantung pada kestabilan internet/intranet kantor (di sinilah <em>Quorum Internet Check</em> membantu).</li>
+        <li><strong>DNS split-horizon Pelindo</strong> &mdash; DNS internal dapat mengembalikan IP privat tak terjangkau untuk situs publik (Cloudflare), sehingga situs sehat terlihat OFFLINE.</li>
+        <li><strong>WAF/anti-bot</strong> memblokir agen pemantau (sudah dimitigasi: WAF &rarr; ONLINE).</li>
+        <li><strong>Jendela maintenance</strong> target.</li>
+    </ol>
+    <p><strong>Kesimpulan:</strong> justru karena itu mekanisme anti-false-alarm (debounce 3&times;, quorum internet, deteksi WAF, ambang WARNING senyap) tetap diperlukan <strong>bahkan setelah hosting</strong>. Hosting menghilangkan penyebab terbesar (jaringan lokal yang lelet), sisanya ditangani mekanisme cerdas di atas.</p>
+
+    <h2>7. LAMPIRAN SCREENSHOT (untuk Dokumen &amp; PPT)</h2>
+    <p>Generator PPT (<code>presentation/build.js</code>) <strong>otomatis menyematkan</strong> screenshot bila tersedia. Letakkan berkas berikut di <strong><code>presentation/screenshots/</code></strong> lalu jalankan ulang <code>node presentation/build.js</code>:</p>
+    <table>
+        <thead><tr><th>Nama file</th><th>Isi yang difoto</th></tr></thead>
+        <tbody>
+            <tr><td><code>02-dashboard-topology.png</code></td><td>Dashboard utama + peta topologi jaringan</td></tr>
+            <tr><td><code>03-website-detail.png</code></td><td>Modal detail diagnostik satu website (DNS/Ping/HTTP/SSL)</td></tr>
+            <tr><td><code>04-server-monitor.png</code></td><td>Monitor server &amp; jaringan node pemantau</td></tr>
+        </tbody>
+    </table>
+    <p>Selama file belum ada, slide menampilkan kotak <em>placeholder</em> sehingga PPT tetap dapat di-generate.</p>
+
+    <h2>8. KESIMPULAN &amp; REKOMENDASI PENGEMBANGAN</h2>
+    <p>Sistem SPMT Monitoring telah memenuhi kriteria operasional monitoring NOC modern: tangguh, andal, hemat sumber daya, dan <strong>layak di-deploy/hosting</strong> (seluruh build &amp; test lulus).</p>
+    <ol>
+        <li><strong>Containerization (Docker Compose)</strong> &mdash; deployment ke server kantor/VPS cukup satu langkah.</li>
+        <li><strong>Saluran Notifikasi Tambahan</strong> &mdash; integrasi ke Microsoft Teams/Slack selain Telegram &amp; Email.</li>
+        <li><strong>Code-splitting frontend</strong> &mdash; bundel produksi &plusmn;876 kB (gzip 263 kB); pertimbangkan <em>dynamic import</em>.</li>
+    </ol>
+
+</body>
+</html>

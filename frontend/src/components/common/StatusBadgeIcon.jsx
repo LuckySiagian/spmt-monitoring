@@ -11,16 +11,6 @@ export default function StatusBadgeIcon({ status, style }) {
     )
   }
   
-  if (status === 'DEGRADED') {
-    // Tanda seru warna orange muda
-    return (
-      <svg width="14" height="14" viewBox="0 0 24 24" style={style}>
-        <circle cx="12" cy="12" r="10" fill="#fdba74" stroke="#f97316" strokeWidth="2" />
-        <text x="12" y="17" fontSize="14" fill="#c2410c" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">!</text>
-      </svg>
-    )
-  }
-
   if (status === 'CRITICAL') {
     // Segitiga didalam segitiga ada tanda seru berwarna orange tua
     return (

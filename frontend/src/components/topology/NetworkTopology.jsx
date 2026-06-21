@@ -4,11 +4,11 @@ import { websiteAPI, systemAPI } from '../../services/api'
 import { showToast } from '../dashboard/Toast'
 import { useGlobalWebSocket } from '../../store/WebSocketContext'
 import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
+import { useBreakpoint } from '../../hooks/useBreakpoint'
 
 const STATUS_COLORS = {
   ONLINE: '#10b981',
   WARNING: '#f59e0b',
-  DEGRADED: '#f97316',
   CRITICAL: '#ef4444',
   OFFLINE: '#ef4444',
   UNKNOWN: '#64748b'
@@ -16,10 +16,17 @@ const STATUS_COLORS = {
 const STATUS_GLOW = {
   ONLINE: 'rgba(16,185,129,0.4)', 
   WARNING: 'rgba(245,158,11,0.4)', 
-  DEGRADED: 'rgba(249,115,22,0.4)', 
   CRITICAL: 'rgba(234,179,8,0.4)',
   OFFLINE: 'rgba(239,68,68,0.8)', 
   UNKNOWN: 'rgba(100,116,139,0.2)',
+}
+
+function formatRate(mbps) {
+  if (mbps == null || isNaN(mbps)) return '—'
+  if (mbps >= 1000) return `${(mbps / 1000).toFixed(1)} Gbps`
+  if (mbps >= 1) return `${mbps.toFixed(1)} Mbps`
+  if (mbps > 0) return `${(mbps * 1000).toFixed(0)} Kbps`
+  return '0 Kbps'
 }
 
 function hexToRgb(hex) {
@@ -188,6 +195,105 @@ function calc3dLayout(websites) {
   });
 }
 
+// Phone-only vertical list of nodes — far easier to scan/tap than the 67-node
+// map on a small screen. Rendered as an overlay above the (still-mounted) canvas.
+function MobileNodeList({ websites, onOpenDetail, tStatus, t }) {
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sortBy, setSortBy] = useState('status')
+
+  const order = { OFFLINE: 0, CRITICAL: 1, WARNING: 2, UNKNOWN: 3, ONLINE: 4 }
+  const sorted = websites
+    .filter(w => {
+      const q = search.trim().toLowerCase()
+      const matchesSearch = !q || (w.name || '').toLowerCase().includes(q) || (w.url || '').toLowerCase().includes(q)
+      const matchesStatus = statusFilter === 'ALL' || w.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      if (sortBy === 'a-z') return (a.name || '').localeCompare(b.name || '')
+      if (sortBy === 'z-a') return (b.name || '').localeCompare(a.name || '')
+      if (sortBy === 'newest') return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      if (sortBy === 'oldest') return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+      const d = (order[a.status] ?? 5) - (order[b.status] ?? 5)
+      return d !== 0 ? d : (a.name || '').localeCompare(b.name || '')
+    })
+
+  const selectStyle = {
+    flex: 1, padding: '7px 6px', borderRadius: 8, border: '1px solid var(--border)',
+    background: 'var(--bg-card)', color: 'var(--text)', fontSize: 11, outline: 'none',
+    cursor: 'pointer', fontWeight: 700, minWidth: 0,
+  }
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 50, background: 'var(--bg-card)',
+      overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Search + status filter + sort — the only controls kept on phones,
+          sitting directly under the NETWORK TOPOLOGY header. */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, opacity: 0.5 }}>🔍</span>
+          <input
+            type="search" aria-label={t.searchPlaceholder} autoComplete="off"
+            value={search} onChange={e => setSearch(e.target.value)} placeholder={t.searchPlaceholder}
+            style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-card)', color: 'var(--text)', fontSize: 12, outline: 'none' }}
+          />
+          {search && <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>✕</button>}
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <select aria-label={t.allStatus} value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={selectStyle}>
+            <option value="ALL">{t.allStatus}</option>
+            <option value="ONLINE">🟢 {t.online}</option>
+            <option value="WARNING">🟡 {t.warning || 'Warning'}</option>
+            <option value="CRITICAL">🟠 {t.critical}</option>
+            <option value="OFFLINE">🔴 {t.offline}</option>
+          </select>
+          <select aria-label={t.sortLabel} value={sortBy} onChange={e => setSortBy(e.target.value)} style={selectStyle}>
+            <option value="status">{t.sortLabel}</option>
+            <option value="a-z">{t.azLabel}</option>
+            <option value="z-a">{t.zaLabel}</option>
+            <option value="newest">{t.newestLabel}</option>
+            <option value="oldest">{t.oldestLabel}</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {sorted.length === 0 && (
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, padding: '32px 0' }}>
+          {search || statusFilter !== 'ALL' ? (t.noMatchingNodes || '—') : (t.noServiceData || '—')}
+        </div>
+      )}
+      {sorted.map(w => {
+        const color = STATUS_COLORS[w.status] || STATUS_COLORS.UNKNOWN
+        return (
+          <button key={w.id} onClick={() => onOpenDetail?.(w)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
+            background: 'var(--bg-main)', border: '1px solid var(--border)', borderLeft: `3px solid ${color}`,
+            borderRadius: 10, padding: '10px 12px', cursor: 'pointer',
+          }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.name}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.url}</div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color }}>{tStatus(w.status)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                {w.response_time_ms ? `${w.response_time_ms}ms` : '—'}{w.status_code ? ` · ${w.status_code}` : ''}
+              </div>
+            </div>
+          </button>
+        )
+      })}
+      </div>
+    </div>
+  )
+}
+
 export default function NetworkTopology({ websites, selectedId, onSelect, onOpenDetail, wsConnected }) {
   const { themeId, t, tStatus } = useTheme()
   const canvasRef = useRef(null)
@@ -198,6 +304,12 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
   const [topoMode, setMode] = useState('star') // 'star' | 'tree'
   const [hoveredId, setHoveredId] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1100)
+  const [showNetSpeedTooltip, setShowNetSpeedTooltip] = useState(false)
+  const { isPhone } = useBreakpoint()
+  // On phones the node list is the default view; map is one tap away.
+  const [mobileView, setMobileView] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'list' : 'map'))
+  // Follow the breakpoint: crossing into phone width defaults to list, leaving it restores the map.
+  useEffect(() => { setMobileView(isPhone ? 'list' : 'map') }, [isPhone])
 
   const angleXRef = useRef(0)
   const angleYRef = useRef(0)
@@ -241,7 +353,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
   const moreNodesSorted = [...moreNodesFiltered].sort((a, b) => {
     if (moreNodesSortBy === 'status') {
-      const order = { OFFLINE: 0, CRITICAL: 1, WARNING: 2, DEGRADED: 3, ONLINE: 4, UNKNOWN: 5 }
+      const order = { OFFLINE: 0, CRITICAL: 1, WARNING: 2, ONLINE: 4, UNKNOWN: 5 }
       return (order[a.status] ?? 6) - (order[b.status] ?? 6)
     }
     if (moreNodesSortBy === 'a-z') {
@@ -479,7 +591,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
 
           // Animated probe: server pings out (teal) then node replies (status color)
           if (item.status !== 'OFFLINE' && item.status !== 'UNKNOWN') {
-            const speed = (item.status === 'CRITICAL' || item.status === 'DEGRADED') ? 1.1 : (item.status === 'WARNING' ? 0.8 : 0.55)
+            const speed = (item.status === 'CRITICAL') ? 1.1 : (item.status === 'WARNING' ? 0.8 : 0.55)
             const cyclePos = (timeRef.current * speed + (item.x3d + item.y3d) * 0.005) % 1
             const t = cyclePos < 0.5 ? (1 - cyclePos * 2) : ((cyclePos - 0.5) * 2)
             const pointAt = (tt) => ({ x: item.nx + (cx - item.nx) * tt, y: item.ny + (cy - item.ny) * tt })
@@ -596,19 +708,6 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
             ctx.fillText('!', badgeX, badgeY - 1)
-          } else if (item.status === 'DEGRADED') {
-            ctx.beginPath()
-            ctx.arc(badgeX, badgeY, badgeSize*0.8, 0, Math.PI * 2)
-            ctx.fillStyle = '#fdba74'
-            ctx.fill()
-            ctx.strokeStyle = '#f97316'
-            ctx.lineWidth = 1
-            ctx.stroke()
-            ctx.fillStyle = '#c2410c'
-            ctx.font = `bold ${badgeSize}px sans-serif`
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText('!', badgeX, badgeY + 1)
           } else if (item.status === 'CRITICAL') {
             ctx.beginPath()
             ctx.moveTo(badgeX, badgeY - badgeSize*1.2)
@@ -670,7 +769,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         // Animated probe: SPMT server pings out to the node (teal), then the
         // node replies back to the server (status color) — a request→reply trip.
         if (node.status !== 'OFFLINE' && node.status !== 'UNKNOWN') {
-          const speed = (node.status === 'CRITICAL' || node.status === 'DEGRADED') ? 1.1 : (node.status === 'WARNING' ? 0.8 : 0.55)
+          const speed = (node.status === 'CRITICAL') ? 1.1 : (node.status === 'WARNING' ? 0.8 : 0.55)
           const cyclePos = (timeRef.current * speed + node.x * 3 + node.y * 2) % 1
           const t = cyclePos < 0.5 ? (1 - cyclePos * 2) : ((cyclePos - 0.5) * 2)
           let pointAt
@@ -712,8 +811,11 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
         const isHov = node.id === hoveredId
         const isCrit = node.status === 'OFFLINE'
 
-        // Node size
-        const baseR = websites.length > 70 ? 25 : (websites.length > 50 ? 30 : 35)
+        // Node size — scaled down on smaller canvases (e.g. iPad/tablet, where the
+        // dashboard stacks and the topology is shorter) so every ring stays inside
+        // the viewport and nodes don't overlap. Desktop (≥1300×780) keeps full size.
+        const nodeScale = Math.max(0.5, Math.min(1, Math.min(width / 1300, height / 780)))
+        const baseR = (websites.length > 70 ? 25 : (websites.length > 50 ? 30 : 35)) * nodeScale
         const r = isHov ? baseR * 1.3 : (isSel ? baseR * 1.25 : baseR)
 
         // Critical pulse ring
@@ -835,19 +937,6 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillText('!', badgeX, badgeY - 1)
-        } else if (node.status === 'DEGRADED') {
-          ctx.beginPath()
-          ctx.arc(badgeX, badgeY, badgeSize*0.8, 0, Math.PI * 2)
-          ctx.fillStyle = '#fdba74'
-          ctx.fill()
-          ctx.strokeStyle = '#f97316'
-          ctx.lineWidth = 1
-          ctx.stroke()
-          ctx.fillStyle = '#c2410c'
-          ctx.font = `bold ${badgeSize}px sans-serif`
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText('!', badgeX, badgeY + 1)
         } else if (node.status === 'CRITICAL') {
           ctx.beginPath()
           ctx.moveTo(badgeX, badgeY - badgeSize*1.2)
@@ -1026,7 +1115,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       {hoveredNodeData && (hoveredNodeObj || hoveredId === 'spmt-server') && (
         <div style={{
           position: 'absolute', top: cardPos.top, left: cardPos.left, transform: cardPos.transform,
-          width: hoveredNodeData.isServer ? 420 : 400,
+          width: hoveredNodeData.isServer ? 'min(420px, 92vw)' : 'min(400px, 92vw)',
           background: 'rgba(15, 23, 42, 0.94)', backdropFilter: 'blur(20px)',
           border: `2px solid ${STATUS_COLORS[hoveredNodeData.status] || 'var(--accent)'}`,
           borderRadius: 24, padding: '28px',
@@ -1087,6 +1176,13 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
                     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>{t.netName}</div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{sysHealth?.network_name || '—'}</div>
                   </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>Traffic (Dn | Up)</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#38bdf8', display: 'flex', gap: 12 }}>
+                      <span style={{ display: 'inline-block', minWidth: '82px', textAlign: 'left' }}>↓ {formatRate(sysHealth?.net_rx_mbps)}</span>
+                      <span style={{ display: 'inline-block', minWidth: '82px', textAlign: 'left', color: '#a78bfa' }}>↑ {formatRate(sysHealth?.net_tx_mbps)}</span>
+                    </div>
+                  </div>
                 </div>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'monospace' }}>
@@ -1144,17 +1240,134 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
       )}
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" style={{ marginRight: 8, filter: 'drop-shadow(0 0 4px var(--accent))' }}>
-            <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" />
-            <line x1="12" y1="2" x2="12" y2="8" /><line x1="12" y1="16" x2="12" y2="22" />
-          </svg>
-          {t.networkTopologyTitle}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 900, color: 'var(--text-muted)', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" style={{ marginRight: 8, filter: 'drop-shadow(0 0 4px var(--accent))' }}>
+              <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" />
+              <line x1="12" y1="2" x2="12" y2="8" /><line x1="12" y1="16" x2="12" y2="22" />
+            </svg>
+            {t.networkTopologyTitle}
+          </span>
+          {sysHealth?.net_rx_mbps != null && (
+            <div 
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginLeft: 6, position: 'relative', cursor: 'pointer' }}
+              onMouseEnter={() => setShowNetSpeedTooltip(true)}
+              onMouseLeave={() => setShowNetSpeedTooltip(false)}
+              onClick={() => onOpenDetail?.({ id: 'spmt-server', name: 'SPMT SERVER', url: 'Local Monitor System', status: 'ONLINE', isServer: true })}
+              title="Klik untuk membuka detail server"
+            >
+              <span style={{
+                fontSize: '10.5px',
+                fontWeight: 800,
+                background: 'rgba(56,189,248,0.08)',
+                border: '1px solid rgba(56,189,248,0.22)',
+                padding: '2px 8px',
+                borderRadius: 6,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                color: '#38bdf8',
+                fontVariantNumeric: 'tabular-nums',
+                minWidth: '192px',
+                justifyContent: 'center',
+              }}>
+                <span>📶</span>
+                <span style={{ display: 'inline-block', minWidth: '82px', textAlign: 'left' }}>↓ {formatRate(sysHealth.net_rx_mbps)}</span>
+                <span style={{ display: 'inline-block', minWidth: '82px', textAlign: 'left', color: '#a78bfa' }}>↑ {formatRate(sysHealth.net_tx_mbps)}</span>
+              </span>
+
+              {showNetSpeedTooltip && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  background: 'rgba(15, 23, 42, 0.98)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(56, 189, 248, 0.4)',
+                  borderRadius: 12,
+                  padding: '14px 16px',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(56, 189, 248, 0.15)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  zIndex: 9999,
+                  minWidth: 320,
+                  textAlign: 'left',
+                  pointerEvents: 'none',
+                }}>
+                  {/* Title */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 6 }}>
+                    <span style={{ fontSize: 13 }}>💡</span>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: '#fff', letterSpacing: '0.04em' }}>INFO KECEPATAN JARINGAN</span>
+                  </div>
+
+                  {/* Arrow Descriptions */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <span style={{ fontSize: 11, fontWeight: 900, color: '#38bdf8' }}>↓ Panah Bawah (Download / Rx)</span>
+                      <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.4 }}>
+                        Kecepatan unduh server monitor saat menerima data/respons dari target.
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <span style={{ fontSize: 11, fontWeight: 900, color: '#a78bfa' }}>↑ Panah Atas (Upload / Tx)</span>
+                      <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.65)', lineHeight: 1.4 }}>
+                        Kecepatan unggah server monitor saat mengirimkan permintaan cek ke target.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {/* Safe */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                        <span style={{ fontSize: 11, fontWeight: 900, color: '#10b981' }}>AMAN (&gt; 1 Mbps)</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.45, paddingLeft: 12 }}>
+                        Koneksi optimal. Pengecekan website berjalan lancar secara paralel tanpa antrean job.
+                      </span>
+                    </div>
+
+                    {/* Slow */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 6px #fbbf24' }} />
+                        <span style={{ fontSize: 11, fontWeight: 900, color: '#fbbf24' }}>LELET / LAMBAT (&le; 512 Kbps)</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.45, paddingLeft: 12 }}>
+                        Kinerja menurun. Pengecekan rentan mengalami penundaan, antrean bertumpuk, atau pemicuan false alarm (timeout palsu).
+                      </span>
+                    </div>
+
+                    {/* Offline */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                        <span style={{ fontSize: 11, fontWeight: 900, color: '#ef4444' }}>OFFLINE / MATI (0 Kbps / —)</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.6)', lineHeight: 1.45, paddingLeft: 12 }}>
+                        Koneksi terputus total. Server monitor kehilangan akses internet. Semua status target akan dianggap terputus (Offline) oleh sistem.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Click Action Hint */}
+                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: 8, textAlign: 'center' }}>
+                    <span style={{ fontSize: 10, color: '#00d1b2', fontWeight: 900, letterSpacing: '0.05em' }}>🖱️ KLIK UNTUK DETAIL MONITOR SERVER</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Topology mode toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {/* Topology mode toggle (STAR/TREE/3D) — hidden on phones, where the
+              node list is the only (default) view, so the header stays one row. */}
+          {!isPhone && (
           <div style={{ display: 'flex', background: 'var(--accent-light)', border: `1px solid var(--border)`, borderRadius: 6, overflow: 'hidden' }}>
             {['star', 'tree', '3d'].map(m => (
               <button
@@ -1173,6 +1386,7 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
               </button>
             ))}
           </div>
+          )}
 
           {/* Manual Refresh Button */}
           <button
@@ -1296,6 +1510,9 @@ export default function NetworkTopology({ websites, selectedId, onSelect, onOpen
             </button>
           )}
         </div>
+        {isPhone && (
+          <MobileNodeList websites={websites} onOpenDetail={onOpenDetail} tStatus={tStatus} t={t} />
+        )}
       </div>
 
       {/* Show More Overlay */}

@@ -27,8 +27,8 @@ func (r *Repository) GetDB() *pgxpool.Pool {
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
 	var u model.User
 	row := r.db.QueryRow(ctx,
-		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, created_at FROM users WHERE username = $1`, username)
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt)
+		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, COALESCE(status, 'active'), created_at FROM users WHERE username = $1`, username)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.Status, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -38,22 +38,25 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*m
 func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	var u model.User
 	row := r.db.QueryRow(ctx,
-		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, created_at FROM users WHERE id = $1`, id)
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt)
+		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, COALESCE(status, 'active'), created_at FROM users WHERE id = $1`, id)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.Status, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
-func (r *Repository) CreateUser(ctx context.Context, username, passwordHash, email string, telegramID *string, role model.Role) (*model.User, error) {
+func (r *Repository) CreateUser(ctx context.Context, username, passwordHash, email string, telegramID *string, role model.Role, status model.UserStatus) (*model.User, error) {
+	if status == "" {
+		status = model.StatusActive
+	}
 	var u model.User
 	row := r.db.QueryRow(ctx,
-		`INSERT INTO users (id, username, password_hash, email, telegram_id, role, created_at)
-		 VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, NOW())
-		 RETURNING id, username, password_hash, email, telegram_id, role, created_at`,
-		username, passwordHash, email, telegramID, role)
-	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt)
+		`INSERT INTO users (id, username, password_hash, email, telegram_id, role, status, created_at)
+		 VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, NOW())
+		 RETURNING id, username, password_hash, email, telegram_id, role, status, created_at`,
+		username, passwordHash, email, telegramID, role, status)
+	err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.Status, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +65,7 @@ func (r *Repository) CreateUser(ctx context.Context, username, passwordHash, ema
 
 func (r *Repository) GetAllUsers(ctx context.Context) ([]*model.User, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, created_at FROM users ORDER BY created_at`)
+		`SELECT id, username, password_hash, COALESCE(email, ''), telegram_id, role, COALESCE(status, 'active'), created_at FROM users ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +74,7 @@ func (r *Repository) GetAllUsers(ctx context.Context) ([]*model.User, error) {
 	var users []*model.User
 	for rows.Next() {
 		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Email, &u.TelegramID, &u.Role, &u.Status, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, &u)
@@ -85,8 +88,21 @@ func (r *Repository) CountAdmins(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// CountPendingUsers — jumlah registrasi yang menunggu konfirmasi.
+func (r *Repository) CountPendingUsers(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE status = 'pending'`).Scan(&count)
+	return count, err
+}
+
 func (r *Repository) UpdateUserRole(ctx context.Context, userID uuid.UUID, role model.Role) error {
 	_, err := r.db.Exec(ctx, `UPDATE users SET role = $1 WHERE id = $2`, role, userID)
+	return err
+}
+
+// UpdateUserStatus — ubah status persetujuan (pending/active/rejected).
+func (r *Repository) UpdateUserStatus(ctx context.Context, userID uuid.UUID, status model.UserStatus) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET status = $1 WHERE id = $2`, status, userID)
 	return err
 }
 
@@ -187,6 +203,35 @@ func (r *Repository) DeleteWebsite(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// DeleteWebsites removes multiple websites (and all their cascade-linked logs,
+// events, incidents, etc.) inside a single transaction — either every row is
+// deleted or none are, so the DB never ends up in a partially-deleted state.
+// Returns how many websites actually existed and were removed.
+func (r *Repository) DeleteWebsites(ctx context.Context, ids []uuid.UUID) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx) // no-op if the tx is already committed
+
+	var deleted int64
+	for _, id := range ids {
+		tag, err := tx.Exec(ctx, `DELETE FROM websites WHERE id = $1`, id)
+		if err != nil {
+			return 0, err
+		}
+		deleted += tag.RowsAffected()
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
 // ─── MONITORING LOGS ─────────────────────────────────────────
 
 func (r *Repository) InsertLog(ctx context.Context, log *model.MonitoringLog) error {
@@ -273,7 +318,7 @@ func (r *Repository) GetDashboardSummary(ctx context.Context) (*model.DashboardS
 		switch status {
 		case "ONLINE":
 			summary.OnlineCount += count
-		case "CRITICAL", "DEGRADED", "WARNING":
+		case "CRITICAL", "WARNING":
 			summary.CriticalCount += count
 		case "OFFLINE":
 			summary.OfflineCount += count
@@ -380,7 +425,7 @@ func (r *Repository) GetStatusHistory(ctx context.Context, rangeStr string) ([]*
 		SELECT
 			to_timestamp(floor(extract(epoch from checked_at) / $1) * $1) AS bucket,
 			COUNT(CASE WHEN status = 'ONLINE'   THEN 1 END)::int AS online_count,
-			COUNT(CASE WHEN status IN ('CRITICAL', 'DEGRADED', 'WARNING') THEN 1 END)::int AS critical_count,
+			COUNT(CASE WHEN status IN ('CRITICAL', 'WARNING') THEN 1 END)::int AS critical_count,
 			COUNT(CASE WHEN status = 'OFFLINE'  THEN 1 END)::int AS offline_count
 		FROM monitoring_logs
 		WHERE checked_at >= NOW() - $2::interval
@@ -413,7 +458,7 @@ func (r *Repository) GetStatusHistoryCustom(ctx context.Context, start, end stri
 		SELECT
 			to_timestamp(floor(extract(epoch from checked_at) / $1) * $1) AS bucket,
 			COUNT(CASE WHEN status = 'ONLINE'   THEN 1 END)::int AS online_count,
-			COUNT(CASE WHEN status IN ('CRITICAL', 'DEGRADED', 'WARNING') THEN 1 END)::int AS critical_count,
+			COUNT(CASE WHEN status IN ('CRITICAL', 'WARNING') THEN 1 END)::int AS critical_count,
 			COUNT(CASE WHEN status = 'OFFLINE'  THEN 1 END)::int AS offline_count
 		FROM monitoring_logs
 		WHERE checked_at >= $2::timestamptz AND checked_at <= $3::timestamptz
@@ -586,11 +631,12 @@ func (r *Repository) CountDownEventsByWebsite(ctx context.Context, since time.Ti
 }
 
 // GetDowntimeForRecovery reports, for a site that just returned to ONLINE, when it
-// last left ONLINE (downStart) and whether it was actually OFFLINE during that
-// streak. downStart is nil when there is no prior ONLINE→down transition on record.
-// The current recovery event (new_status='ONLINE') never matches the old_status filter,
-// so it does not interfere. The query always returns exactly one row.
-func (r *Repository) GetDowntimeForRecovery(ctx context.Context, websiteID uuid.UUID) (downStart *time.Time, wasOffline bool, err error) {
+// last left ONLINE (downStart) and whether it was actually DOWN (OFFLINE or
+// CRITICAL) during that streak. downStart is nil when there is no prior ONLINE→down
+// transition on record. The current recovery event (new_status='ONLINE') never
+// matches the old_status filter, so it does not interfere. The query always returns
+// exactly one row.
+func (r *Repository) GetDowntimeForRecovery(ctx context.Context, websiteID uuid.UUID) (downStart *time.Time, wasDown bool, err error) {
 	row := r.db.QueryRow(ctx, `
 		WITH last_left AS (
 			SELECT created_at FROM status_events
@@ -601,17 +647,17 @@ func (r *Repository) GetDowntimeForRecovery(ctx context.Context, websiteID uuid.
 			(SELECT created_at FROM last_left),
 			EXISTS (
 				SELECT 1 FROM status_events
-				WHERE website_id = $1 AND new_status = 'OFFLINE'
+				WHERE website_id = $1 AND new_status IN ('OFFLINE', 'CRITICAL')
 				  AND created_at >= (SELECT created_at FROM last_left)
 			)
 	`, websiteID)
 
 	var ds *time.Time
-	var off bool
-	if scanErr := row.Scan(&ds, &off); scanErr != nil {
+	var down bool
+	if scanErr := row.Scan(&ds, &down); scanErr != nil {
 		return nil, false, fmt.Errorf("get downtime for recovery: %w", scanErr)
 	}
-	return ds, off, nil
+	return ds, down, nil
 }
 
 func (r *Repository) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*model.WebsiteSLA, error) {
@@ -670,5 +716,80 @@ func (r *Repository) GetWebsiteSLA(ctx context.Context, websiteID uuid.UUID) (*m
 	}
 
 	return sla, nil
+}
+
+// GetAggregateStats rolls up daily_aggregates into per-site uptime and
+// response-time figures for the window [start, end], compared by calendar day.
+// Average response time is weighted by each day's check count. Sites without any
+// aggregate rows in the window are simply absent from the map.
+func (r *Repository) GetAggregateStats(ctx context.Context, start, end time.Time) (map[uuid.UUID]*model.SiteAggStat, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT website_id,
+			COALESCE(SUM(total_checks), 0),
+			COALESCE(SUM(online_checks), 0),
+			COALESCE(SUM(avg_response_time_ms::bigint * total_checks) / NULLIF(SUM(total_checks), 0), 0)::int,
+			COALESCE(MIN(NULLIF(min_response_time_ms, 0)), 0),
+			COALESCE(MAX(max_response_time_ms), 0),
+			COALESCE(SUM(peaks_over_1000), 0)
+		FROM daily_aggregates
+		WHERE day >= $1::date AND day <= $2::date
+		GROUP BY website_id
+	`, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("aggregate stats: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[uuid.UUID]*model.SiteAggStat)
+	for rows.Next() {
+		var id uuid.UUID
+		var s model.SiteAggStat
+		if err := rows.Scan(&id, &s.TotalChecks, &s.OnlineChecks, &s.AvgRT, &s.MinRT, &s.MaxRT, &s.PeaksOver1k); err != nil {
+			return nil, fmt.Errorf("scan aggregate stats: %w", err)
+		}
+		out[id] = &s
+	}
+	return out, rows.Err()
+}
+
+// GetIncidentStats counts incidents and downtime per site for [start, end], from
+// status_events. An incident = entering a down state (OFFLINE/CRITICAL) from a
+// non-down state; it ends at the next event back to a healthy state, or the period
+// end if still ongoing. Each incident's duration is capped at the period end.
+func (r *Repository) GetIncidentStats(ctx context.Context, start, end time.Time) (map[uuid.UUID]*model.SiteIncidentStat, error) {
+	rows, err := r.db.Query(ctx, `
+		WITH starts AS (
+			SELECT e.website_id, e.created_at,
+				(SELECT MIN(e2.created_at) FROM status_events e2
+				 WHERE e2.website_id = e.website_id
+				   AND e2.created_at > e.created_at
+				   AND e2.new_status NOT IN ('OFFLINE', 'CRITICAL')) AS recovered_at
+			FROM status_events e
+			WHERE e.created_at >= $1 AND e.created_at <= $2
+			  AND e.new_status IN ('OFFLINE', 'CRITICAL')
+			  AND (e.old_status IS NULL OR e.old_status NOT IN ('OFFLINE', 'CRITICAL'))
+		)
+		SELECT website_id,
+			COUNT(*),
+			COALESCE(SUM(EXTRACT(EPOCH FROM (LEAST(COALESCE(recovered_at, $2), $2) - created_at))), 0),
+			COALESCE(MAX(EXTRACT(EPOCH FROM (LEAST(COALESCE(recovered_at, $2), $2) - created_at))), 0)
+		FROM starts
+		GROUP BY website_id
+	`, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("incident stats: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[uuid.UUID]*model.SiteIncidentStat)
+	for rows.Next() {
+		var id uuid.UUID
+		var s model.SiteIncidentStat
+		if err := rows.Scan(&id, &s.Incidents, &s.TotalDownSecs, &s.LongestDownSecs); err != nil {
+			return nil, fmt.Errorf("scan incident stats: %w", err)
+		}
+		out[id] = &s
+	}
+	return out, rows.Err()
 }
 

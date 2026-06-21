@@ -50,6 +50,18 @@ func main() {
 	}
 	log.Println("✅ Connected to PostgreSQL")
 
+	// Ensure the registration-approval column exists. Idempotent and cheap, so it
+	// runs on every boot — this lets a new binary work even if migration 018 was
+	// not applied manually first (existing rows default to 'active').
+	if _, err := pool.Exec(context.Background(), `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'active';
+		ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
+		ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status IN ('pending', 'active', 'rejected'));
+		CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+	`); err != nil {
+		log.Printf("⚠️  Could not ensure users.status column: %v", err)
+	}
+
 	// ─── Layers ───────────────────────────────────────────────
 	repo := repository.New(pool)
 	svc := service.New(repo, cfg.JWTSecret, cfg.TurnstileSecret, cfg.JWTExpiryHours)
@@ -144,6 +156,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireRole(model.RoleAdmin, model.RoleAdminPelindo, model.RoleSuperAdmin))
 			r.Post("/websites", h.CreateWebsite)
+			r.Post("/websites/bulk-delete", h.BulkDeleteWebsites)
 			r.Put("/websites/{id}", h.UpdateWebsite)
 			r.Delete("/websites/{id}", h.DeleteWebsite)
 
@@ -166,14 +179,22 @@ func main() {
 		r.Put("/auth/change-password", h.ChangePassword)
 		r.Post("/auth/test-email", h.TestEmail)
 
-		// User management (superadmin only)
+		// User management (superadmin + adminpelindo)
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.RequireRole(model.RoleSuperAdmin))
+			r.Use(middleware.RequireRole(model.RoleSuperAdmin, model.RoleAdminPelindo))
 			r.Get("/users", h.GetUsers)
+			r.Get("/users/pending-count", h.GetPendingUserCount)
 			r.Post("/users/promote", h.PromoteUser)
 			r.Post("/users/demote", h.DemoteUser)
 			r.Post("/users/create", h.CreateUser)
+			r.Post("/users/{id}/approve", h.ApproveUser)
+			r.Post("/users/{id}/reject", h.RejectUser)
 			r.Delete("/users/{id}", h.DeleteUser)
+		})
+
+		// System tools (superadmin only)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireRole(model.RoleSuperAdmin))
 			r.Post("/chaos/toggle", h.ToggleChaos)
 			r.Post("/reports/weekly/send", h.SendWeeklyReportNow)
 		})

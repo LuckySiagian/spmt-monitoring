@@ -16,10 +16,16 @@
 
 ```bash
 # Buat database
-psql -U postgres -c "CREATE DATABASE monitoring_db;"
+psql -U postgres -c "CREATE DATABASE spmt_monitoring;"
 
-# Jalankan migration
-psql -U postgres -d spmt_monitoring -f backend/migrations/001_init.sql
+# Jalankan SEMUA migration secara berurutan (001 → 018).
+# Server TIDAK menjalankan migrasi otomatis, jadi semua file harus dijalankan manual.
+
+# Linux/macOS:
+for f in backend/migrations/*.sql; do psql -U postgres -d spmt_monitoring -f "$f"; done
+
+# Windows PowerShell:
+Get-ChildItem backend/migrations/*.sql | Sort-Object Name | ForEach-Object { psql -U postgres -d spmt_monitoring -f $_.FullName }
 ```
 
 **Default superadmin sudah di-seed otomatis:**
@@ -41,7 +47,7 @@ cp .env.example .env
 # DB_PORT=5432
 # DB_USER=postgres
 # DB_PASSWORD=yourpassword
-# DB_NAME=monitoring_db
+# DB_NAME=spmt_monitoring
 # JWT_SECRET=ganti-dengan-secret-yang-kuat
 
 # Download dependencies
@@ -194,11 +200,20 @@ spmt-monitoring/
 
 ## 📊 Status Monitoring Logic
 
-| Status | Kondisi |
-|--------|---------|
-| **ONLINE** | HTTP 200-399 + RT < 3000ms + DNS OK + SSL OK |
-| **CRITICAL** | HTTP 500-599 OR RT > 5000ms OR SSL invalid |
-| **OFFLINE** | DNS gagal OR timeout OR connection refused |
+Penentuan status **deterministik berdasarkan DNS + HTTP** (lihat `classifyStatus` di `internal/worker/pool.go`). SSL, ICMP, screenshot, dan analisis konten **tidak** lagi memengaruhi status.
+
+| Status | Kondisi | Notif Telegram |
+|--------|---------|:---:|
+| **ONLINE** | DNS OK + HTTP 200–399 dengan response time **≤ 2000ms**. (HTTP 403/429/503 dengan sidik jari WAF/anti-bot/CAPTCHA juga di-upgrade ke ONLINE.) | hanya saat recovery |
+| **WARNING** | HTTP 200–399 tetapi lambat (**> 2000ms** = lambat, **> 5000ms** = sangat lambat), atau HTTP 4xx selain 403. | — (senyap) |
+| **CRITICAL** | HTTP 5xx, atau HTTP 403 (Forbidden) **tanpa** tanda WAF/verifikasi manusia. | ✓ |
+| **OFFLINE** | DNS gagal, timeout, connection refused/reset, atau tidak ada respons HTTP yang valid. | ✓ |
+
+Ambang **2000ms** mengikuti *2-second rule* (Nielsen/Google/Akamai). **Kelambatan tidak pernah menjadi CRITICAL/OFFLINE** — situs yang masih menjawab = WARNING (degraded), bukan mati. Detail & sumber: lihat [DOCUMENTATION.md](DOCUMENTATION.md) §3.2.
+
+> **Anti-flapping:** status hard-down (OFFLINE/CRITICAL) baru dilaporkan setelah **3 sampel berturut-turut** gagal, agar blip sesaat tidak memicu insiden palsu.
+>
+> **Notifikasi anti-spam:** Telegram hanya ping saat OFFLINE, CRITICAL, dan recovery ke ONLINE. WARNING senyap. **Eskalasi insiden otomatis dihapus** (dulu mengirim ulang tiap siklus → spam). Email = laporan mingguan terjadwal.
 
 ---
 

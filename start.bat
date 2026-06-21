@@ -42,5 +42,20 @@ echo.
 start "SPMT Frontend" cmd /k "set VITE_API_URL=&& npm run dev -- --host 0.0.0.0"
 cd ..
 
-echo Kedua service sudah jalan. Tutup window CMD masing-masing untuk stop.
-pause
+echo Waiting 3 seconds for frontend server to initialize...
+timeout /t 3 /nobreak >nul
+
+echo Opening application window...
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+  start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --app=http://localhost:5173
+) else if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" (
+  start "" "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --app=http://localhost:5173
+) else (
+  start http://localhost:5173
+)
+
+echo.
+echo Kedua service sudah jalan dan jendela aplikasi telah dibuka.
+echo Tutup window CMD masing-masing jika ingin menghentikan server.
+echo.
+

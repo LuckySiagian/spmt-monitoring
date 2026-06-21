@@ -36,8 +36,23 @@ func TestClassifyStatus(t *testing.T) {
 			want: model.StatusOnline,
 		},
 		{
+			name: "200 just under 2s budget is online",
+			log:  &model.MonitoringLog{DNSResolved: true, StatusCode: intPtr(200), ResponseTimeMs: intPtr(1800)},
+			want: model.StatusOnline,
+		},
+		{
+			name: "200 just over 2s budget is warning (lambat)",
+			log:  &model.MonitoringLog{DNSResolved: true, StatusCode: intPtr(200), ResponseTimeMs: intPtr(2500)},
+			want: model.StatusWarning,
+		},
+		{
 			name: "200 slow is warning",
 			log:  &model.MonitoringLog{DNSResolved: true, StatusCode: intPtr(200), ResponseTimeMs: intPtr(5000)},
+			want: model.StatusWarning,
+		},
+		{
+			name: "200 very slow stays warning not offline (sangat lambat)",
+			log:  &model.MonitoringLog{DNSResolved: true, StatusCode: intPtr(200), ResponseTimeMs: intPtr(12000)},
 			want: model.StatusWarning,
 		},
 		{

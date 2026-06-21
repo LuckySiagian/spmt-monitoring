@@ -6,6 +6,15 @@ import { useTheme } from '../../store/theme'
 
 const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
+// Format a throughput rate (in Mbps) into a human-friendly string with adaptive units.
+function formatRate(mbps) {
+  if (mbps == null || isNaN(mbps)) return '—'
+  if (mbps >= 1000) return `${(mbps / 1000).toFixed(1)} Gbps`
+  if (mbps >= 1) return `${mbps.toFixed(1)} Mbps`
+  if (mbps > 0) return `${(mbps * 1000).toFixed(0)} Kbps`
+  return '0 Kbps'
+}
+
 // ── Animated gauge bar ─────────────────────────────────────────
 function GaugeBar({ label, value, max = 100, warnAt, critAt, unit = '%', color = '#6366f1' }) {
   const pct = Math.min(100, Math.round((value / max) * 100))
@@ -220,6 +229,23 @@ export default function ServerDetailModal({ onClose }) {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {health?.net_rx_mbps != null && (
+              <span
+                style={{
+                  fontSize: 12, fontWeight: 900,
+                  background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.32)',
+                  padding: '6px 12px', borderRadius: 8, letterSpacing: '0.02em',
+                  display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap',
+                  fontVariantNumeric: 'tabular-nums',
+                  position: 'relative',
+                  cursor: 'default',
+                }}
+              >
+                <span style={{ fontSize: 13 }}>📶</span>
+                <span style={{ color: '#38bdf8' }}>↓ {formatRate(health.net_rx_mbps)}</span>
+                <span style={{ color: '#a78bfa' }}>↑ {formatRate(health.net_tx_mbps)}</span>
+              </span>
+            )}
             <span style={{
               fontSize: 12, fontWeight: 900, color: statusColor,
               background: `${statusColor}18`, border: `1px solid ${statusColor}40`,
@@ -275,6 +301,7 @@ export default function ServerDetailModal({ onClose }) {
                 <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '4px 16px' }}>
                   <NetRow label={t.srvConnType} value={health?.network_type} />
                   <NetRow label={t.srvNetName} value={health?.network_name} />
+                  <NetRow label={t.srvLinkSpeed} value={health?.link_speed} mono />
                   <NetRow label={t.srvInterface} value={health?.interface_alias} mono />
                   <NetRow label={t.rowIpAddress} value={health?.public_ip} mono />
                   <NetRow label={t.srvGateway} value={health?.local_gateway} mono />
@@ -286,6 +313,72 @@ export default function ServerDetailModal({ onClose }) {
               <section>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>{t.srvAnalysis}</div>
                 <RecommendationCard cpu={cpu} ram={ram} />
+              </section>
+
+              {/* ── Network Speed Threshold Info ── */}
+              <section style={{ animation: 'srvFadeIn 0.3s ease-out' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 14 }}>AMBANG BATAS & INDIKATOR JARINGAN</div>
+                <div style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 14,
+                  padding: '16px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14,
+                }}>
+                  {/* Arrow Explanations */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: '#38bdf8' }}>↓ Panah Bawah (Download / Rx)</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.45 }}>
+                        Kecepatan unduh server monitor saat menerima data/respons dari target.
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: '#a78bfa' }}>↑ Panah Atas (Upload / Tx)</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.45 }}>
+                        Kecepatan unggah server monitor saat mengirimkan permintaan cek ke target.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Safe */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                        <span style={{ fontSize: 12, fontWeight: 900, color: '#10b981' }}>AMAN (&gt; 1 Mbps)</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.45, paddingLeft: 16 }}>
+                        Koneksi optimal. Pengecekan website berjalan lancar secara paralel tanpa antrean job.
+                      </span>
+                    </div>
+
+                    {/* Slow */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 6px #fbbf24' }} />
+                        <span style={{ fontSize: 12, fontWeight: 900, color: '#fbbf24' }}>LELET / LAMBAT (&le; 512 Kbps)</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.45, paddingLeft: 16 }}>
+                        Kinerja menurun. Pengecekan rentan mengalami penundaan, antrean bertumpuk, atau pemicuan false alarm (timeout palsu).
+                      </span>
+                    </div>
+
+                    {/* Offline */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                        <span style={{ fontSize: 12, fontWeight: 900, color: '#ef4444' }}>OFFLINE / MATI (0 Kbps / —)</span>
+                      </div>
+                      <span style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.45, paddingLeft: 16 }}>
+                        Koneksi terputus total. Server monitor kehilangan akses internet. Semua status target akan dianggap terputus (Offline) oleh sistem.
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </section>
 
             </div>

@@ -11,7 +11,6 @@ const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru
 const STATUS_COLORS = {
   ONLINE: '#10b981',
   WARNING: '#f59e0b',
-  DEGRADED: '#f97316',
   CRITICAL: '#ef4444',
   OFFLINE: '#dc2626',
   UNKNOWN: '#64748b'
@@ -25,7 +24,6 @@ const StatusBadge = ({ status }) => {
   const c = {
     ONLINE: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: 'rgba(16,185,129,0.3)' },
     WARNING: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' },
-    DEGRADED: { bg: 'rgba(249,115,22,0.15)', color: '#f97316', border: 'rgba(249,115,22,0.3)' },
     CRITICAL: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' },
     OFFLINE: { bg: 'rgba(220,38,38,0.15)', color: '#dc2626', border: 'rgba(220,38,38,0.3)' },
   }[status] || { bg: 'rgba(74,85,104,0.15)', color: '#4a5568', border: 'rgba(74,85,104,0.3)' }
@@ -174,7 +172,7 @@ function AvailabilityTimeline({ websiteId }) {
 
       {/* Legend */}
       <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-        {['ONLINE', 'DEGRADED', 'WARNING', 'CRITICAL', 'OFFLINE'].map(s => (
+        {['ONLINE', 'WARNING', 'CRITICAL', 'OFFLINE'].map(s => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 10, height: 10, borderRadius: 2, background: STATUS_COLORS[s] }} />
             <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{tStatus(s)}</span>
@@ -527,7 +525,11 @@ export default function ServiceDetailModal({ website, onClose }) {
             const botBlocked = ev?.investigation_report?.bot_blocked === true
               || ((code === 403 || code === 429) && !!wafName)
             const rt = ev?.response_time_ms ?? website.response_time_ms
-            const rtColor = !rt ? 'var(--text-muted)' : rt > 5000 ? '#ef4444' : rt > 2000 ? '#f59e0b' : '#10b981'
+            // Permintaan gagal / timeout: server tidak menjawab sama sekali, jadi angka rt
+            // yang muncul (mis. 30000–40000 ms) adalah BATAS WAKTU TUNGGU (timeout) — bukan
+            // kecepatan respon nyata. Jangan diberi warna/label "lambat" seakan masih hidup.
+            const reqFailed = !!ev?.http_error || (!code && (latestLog?.status || website.status) === 'OFFLINE')
+            const rtColor = (reqFailed || !rt) ? 'var(--text-muted)' : rt > 5000 ? '#ef4444' : rt > 2000 ? '#f59e0b' : '#10b981'
 
             const fmtTimeOnly = (d) => {
               if (!d) return '—'
@@ -585,7 +587,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                   padding: '8px 14px',
                   fontSize: 10,
                   fontWeight: 900,
-                  color: 'var(--text-muted)',
+                  color: 'var(--text-strong)',
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase'
                 }}>
@@ -611,13 +613,13 @@ export default function ServiceDetailModal({ website, onClose }) {
                   alignItems: 'center',
                   fontSize: 12
                 }}>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11, letterSpacing: '0.02em', fontWeight: 600 }}>{label}</span>
-                  <span style={{ fontWeight: 700, color: valueColor || 'var(--text)', textAlign: 'right', fontSize: 12 }}>{value ?? '—'}</span>
+                  <span style={{ color: 'var(--text-strong)', fontSize: 11, letterSpacing: '0.02em', fontWeight: 600 }}>{label}</span>
+                  <span style={{ fontWeight: 700, color: valueColor || 'var(--text-strong)', textAlign: 'right', fontSize: 12 }}>{value ?? '—'}</span>
                 </div>
                 {desc && (
                   <div style={{
                     fontSize: 10.5,
-                    color: 'var(--text-sub)',
+                    color: 'var(--text-strong)',
                     lineHeight: 1.5,
                     background: 'var(--accent-light)',
                     padding: '5px 9px',
@@ -634,7 +636,7 @@ export default function ServiceDetailModal({ website, onClose }) {
 
             const status = latestLog?.status || website.status || 'UNKNOWN';
             const isOnline = status === 'ONLINE';
-            const isWarn = status === 'WARNING' || status === 'DEGRADED';
+            const isWarn = status === 'WARNING';
             const isCrit = status === 'CRITICAL';
 
             const boxColor = isOnline
@@ -650,14 +652,46 @@ export default function ServiceDetailModal({ website, onClose }) {
             const boxBorder = boxColor + '26'; // ~15% alpha
 
             let statusText = 'ONLINE (Normal)';
-            if (isWarn) statusText = status === 'DEGRADED' ? 'DEGRADED (Menurun)' : 'WARNING (Perlu Perhatian)';
+            if (isWarn) statusText = 'WARNING (Perlu Perhatian)';
             else if (isCrit) statusText = 'CRITICAL (Bermasalah)';
             else if (status === 'OFFLINE') statusText = 'OFFLINE (Terputus)';
 
+            // ── Kesadaran IP internal / intranet ───────────────────────
+            // Sebagian target di-resolve ke alamat IP privat (RFC1918, mis.
+            // 192.168.x.x): aplikasi internal/intranet yang hanya bisa diakses
+            // dari dalam jaringan yang sama. Bila server monitoring berada di
+            // jaringan berbeda, koneksi gagal → probe melaporkan OFFLINE
+            // padahal situsnya normal bagi pengguna di jaringan yang benar.
+            // Deteksi kondisi ini agar dijelaskan apa adanya, bukan menuduh
+            // situsnya rusak ("SSL rusak", "server crash").
+            const ipAddr = ev?.ip_address || website.ip_address
+            const isInternalIP = isPrivateIP(ipAddr) || ev?.ip_classification === 'PRIVATE'
+            // "Tak terjangkau" = mengarah ke IP privat tetapi monitor tidak bisa
+            // benar-benar terhubung (tidak ada kode HTTP / timeout / ditolak).
+            const internalUnreachable = isInternalIP && status !== 'ONLINE' && !code
+
             const getStatusDesc = (status) => {
+              if (internalUnreachable) return 'Website ini mengarah ke jaringan internal (intranet) atau alamat URL yang dimasukkan salah (typo), sehingga tidak dapat dijangkau dari lokasi server monitoring.'
               if (status === 'ONLINE') return 'Website berjalan normal dan dapat diakses publik dengan lancar.'
-              if (status === 'WARNING' || status === 'DEGRADED') return 'Website masih dapat diakses, namun responnya lambat atau mengembalikan kode 4xx (client error).'
-              if (status === 'CRITICAL') return 'Server mengembalikan error 5xx (gangguan di sisi aplikasi/server).'
+              if (code >= 300 && code < 400) return 'Website ini dialihkan (redirect). Kemungkinan alamat URL/domain yang Anda masukkan salah atau mengalami typo.'
+              if (status === 'WARNING') {
+                if (code >= 400 && code < 500) {
+                  return `Website masih dapat diakses, namun mengembalikan kode status ${code} (client error).`
+                }
+                if (rt > 2000) {
+                  return `Website masih dapat diakses, namun responnya lambat (${rt} ms).`
+                }
+                return 'Website masih dapat diakses, namun ada indikator yang kurang optimal.'
+              }
+              if (status === 'CRITICAL') {
+                if (code >= 500) {
+                  return `Server mengembalikan error status ${code} (gangguan di sisi aplikasi/server).`
+                }
+                if (rt > 5000) {
+                  return `Website berjalan lambat kritis (waktu respon ${rt} ms).`
+                }
+                return 'Server mengembalikan error status atau mengalami gangguan berat.'
+              }
               if (status === 'OFFLINE') return 'Website terputus: DNS gagal, timeout, atau koneksi ditolak.'
               return 'Kondisi operasional website belum dapat ditentukan.'
             }
@@ -697,6 +731,8 @@ export default function ServiceDetailModal({ website, onClose }) {
               let penutup
               if (isOnline) {
                 penutup = `Kesimpulannya, semua indikator dalam kondisi normal sehingga ${nama} dapat diakses pengunjung dengan lancar. Tidak ada tindakan yang perlu dilakukan.`
+              } else if (internalUnreachable) {
+                penutup = `Kesimpulannya, ${nama} mengarah ke alamat IP internal (${ipAddr}). Hal ini bisa disebabkan karena alamat URL/domain yang Anda masukkan salah (typo), atau website ini berada di jaringan privat/intranet yang tidak dapat dijangkau dari lokasi server monitoring saat ini. Periksa kembali ejaan URL Anda. Jika URL sudah benar, pastikan server monitoring terhubung ke jaringan internal yang sama atau menggunakan VPN agar dapat memantau dengan akurat.`
               } else if (isCrit) {
                 penutup = `Kesimpulannya, server dapat dihubungi namun aplikasi di dalamnya mengembalikan error, sehingga halaman gagal ditampilkan dengan benar. Masalah berada di sisi server/aplikasi dan perlu ditangani oleh tim teknis pemilik website.`
               } else if (st === 'OFFLINE') {
@@ -704,21 +740,24 @@ export default function ServiceDetailModal({ website, onClose }) {
                   ? `Kesimpulannya, ${nama} terputus karena domainnya tidak bisa diterjemahkan ke alamat IP (DNS gagal). Pastikan domain masih aktif dan konfigurasi DNS benar.`
                   : `Kesimpulannya, ${nama} terputus karena server tidak menjawab sama sekali (timeout atau koneksi ditolak). Pastikan server dalam keadaan menyala dan jaringannya normal.`
               } else if (isWarn) {
-                penutup = `Kesimpulannya, ${nama} masih dapat diakses namun ada indikator yang kurang optimal (respon lambat atau mengembalikan kode 4xx). Sebaiknya dipantau agar gangguannya tidak bertambah parah.`
+                let alasan = 'ada indikator yang kurang optimal'
+                if (code >= 400 && code < 500) {
+                  alasan = `mengembalikan kode status ${code} (client error)`
+                } else if (rt > 2000) {
+                  alasan = `respon lambat (${rt} ms)`
+                }
+                penutup = `Kesimpulannya, ${nama} masih dapat diakses namun ${alasan}. Sebaiknya dipantau agar gangguannya tidak bertambah parah.`
               } else {
                 penutup = `Sistem masih mengumpulkan data pemeriksaan untuk ${nama}. Mohon tunggu sejenak hingga pengecekan pertama selesai.`
               }
 
-              return [
+              return {
                 pembuka,
-                '',
-                garis,
-                'Rincian hasil pemeriksaan:',
-                ...detail,
-                '',
-                penutup,
-              ].join('\n')
+                detail,
+                penutup
+              }
             }
+
 
             const getHttpDesc = (code, error, websiteName) => {
               const w = websiteName || 'Website ini'
@@ -756,11 +795,19 @@ export default function ServiceDetailModal({ website, onClose }) {
             }
 
             const getResponseTimeDesc = (time) => {
+              if (internalUnreachable) return `Angka ini (${time || 0} ms) adalah batas waktu tunggu (timeout) — server internal tidak menjawab dari lokasi monitoring, bukan berarti servernya lambat.`
+              // Permintaan gagal / timeout: server tidak menjawab sama sekali. Angka yang
+              // muncul adalah batas waktu tunggu (timeout), BUKAN kecepatan respon nyata.
+              if (reqFailed) {
+                if (time && time >= 1000) return `Angka ${time} ms ini adalah BATAS WAKTU TUNGGU (timeout) — server tidak menjawab sama sekali sampai waktu tunggu habis, jadi BUKAN kecepatan respon nyata. Itulah sebabnya status menjadi OFFLINE.`
+                return 'Waktu respon tidak terukur karena server gagal merespons (timeout / koneksi ditolak).'
+              }
               if (!time) return 'Waktu respon tidak terukur karena koneksi ke server gagal.'
               if (time < 300) return `Respon sangat cepat (${time} ms). Server dalam kondisi prima.`
-              if (time < 1000) return `Respon normal (${time} ms). Kecepatan muat halaman memenuhi standar.`
-              if (time < 3000) return `Respon lambat (${time} ms). Server memerlukan waktu lebih lama untuk memproses.`
-              return `Respon sangat lambat (${time} ms). Berpotensi mengganggu kenyamanan pengguna.`
+              if (time <= 1000) return `Respon normal (${time} ms). Kecepatan muat halaman memenuhi standar.`
+              if (time <= 2000) return `Respon baik (${time} ms). Masih dalam ambang sehat (≤ 2 detik) — status ONLINE.`
+              if (time <= 5000) return `Respon lambat (${time} ms). Di atas ambang 2 detik → status WARNING (degraded, masih bisa diakses).`
+              return `Respon sangat lambat (${time} ms). Di atas 5 detik → status WARNING — situs masih menjawab, jadi bukan OFFLINE.`
             }
 
             const getTtfbDesc = (time) => {
@@ -769,6 +816,7 @@ export default function ServiceDetailModal({ website, onClose }) {
             }
 
             const getPingDesc = (status, latency, tcpLat) => {
+              if (internalUnreachable && status === false) return 'Ping gagal — server internal (intranet) tidak menjawab dari jaringan tempat monitoring berjalan saat ini.'
               if (status === false) return 'Ping gagal (Request Time Out). Protokol ICMP diblokir firewall server/hosting.'
               const latVal = latency || tcpLat
               if (!latVal) return 'Ping tidak terukur.'
@@ -792,6 +840,7 @@ export default function ServiceDetailModal({ website, onClose }) {
             }
 
             const getSslDesc = (valid) => {
+              if (internalUnreachable) return 'SSL tidak dapat diperiksa karena koneksi ke server tidak tercapai dari lokasi monitoring — ini bukan berarti sertifikatnya rusak.'
               if (valid) return 'Sertifikat SSL valid. Jalur data aman & terenkripsi (melindungi informasi sensitif).'
               if (valid === false) return 'SSL tidak valid/rusak. Browser pengguna akan menampilkan peringatan bahaya.'
               return 'Website menggunakan HTTP biasa (tidak aman, rentan penyadapan).'
@@ -814,6 +863,8 @@ export default function ServiceDetailModal({ website, onClose }) {
               if (!server || server === 'Unknown') return 'Jenis perangkat lunak server tidak diumumkan ke publik (untuk keamanan).'
               return `Website dilayani oleh aplikasi web server ${server}.`
             }
+
+            const narasi = getKondisiNarasi()
 
             return (
               <div>
@@ -844,8 +895,23 @@ export default function ServiceDetailModal({ website, onClose }) {
                       {statusText}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                    {latestLog?.recommendation || website.recommendation || 'Halo! Sistem sedang menyiapkan penjelasan kondisi website Anda. Mohon tunggu sejenak.'}
+                  <div style={{ 
+                    fontSize: 16, 
+                    fontWeight: 800, 
+                    color: boxColor, 
+                    lineHeight: 1.5, 
+                    whiteSpace: 'pre-wrap',
+                    marginBottom: 8 
+                  }}>
+                    {(() => {
+                      if (code >= 300 && code < 400) {
+                        return 'Periksa kembali alamat URL/domain yang dimasukkan (kemungkinan typo atau dialihkan).'
+                      }
+                      if (ev?.dns_resolved === false || (latestLog && latestLog.dns_resolved === false)) {
+                        return 'Nama domain tidak ditemukan. Periksa kembali ejaan URL/domain (kemungkinan typo atau domain kedaluwarsa).'
+                      }
+                      return latestLog?.recommendation || website.recommendation || 'Halo! Sistem sedang menyiapkan penjelasan kondisi website Anda. Mohon tunggu sejenak.'
+                    })()}
                   </div>
 
                   {/* Penjelasan "mengapa" status seperti ini + analogi toko (untuk awam) */}
@@ -853,14 +919,66 @@ export default function ServiceDetailModal({ website, onClose }) {
                     marginTop: 14,
                     paddingTop: 14,
                     borderTop: `1px dashed ${boxBorder}`,
-                    fontSize: 12.5,
-                    fontWeight: 500,
-                    color: 'var(--text)',
-                    lineHeight: 1.7,
-                    whiteSpace: 'pre-wrap'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 12
                   }}>
-                    {getKondisiNarasi()}
+                    {/* Pembuka - diperbesar dan dibold */}
+                    <div style={{
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: 'var(--text-strong)',
+                      lineHeight: 1.6
+                    }}>
+                      {narasi.pembuka}
+                    </div>
+
+                    <div style={{
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: 'var(--text-strong)',
+                      lineHeight: 1.7,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: 'var(--text-strong)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 2 }}>
+                        Rincian hasil pemeriksaan:
+                      </div>
+                      {narasi.detail.map((d, i) => (
+                        <div key={i}>{d}</div>
+                      ))}
+                    </div>
+
+                    <div style={{
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: 'var(--text-strong)',
+                      lineHeight: 1.7
+                    }}>
+                      {narasi.penutup}
+                    </div>
                   </div>
+
+                  {/* Catatan jaringan internal / intranet (IP privat RFC1918) */}
+                  {isInternalIP ? (
+                    <div style={{
+                      marginTop: 12,
+                      padding: '10px 14px',
+                      background: 'rgba(245,158,11,0.1)',
+                      border: '1px solid rgba(245,158,11,0.3)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                      color: '#f59e0b',
+                      lineHeight: 1.55,
+                      fontWeight: 500
+                    }}>
+                      🏢 <strong>Jaringan Internal:</strong> Domain ini diterjemahkan ke alamat IP privat <strong>{ipAddr}</strong> (jaringan lokal/intranet). Situs seperti ini hanya bisa diakses dari dalam jaringan yang sama.{' '}
+                      {internalUnreachable
+                        ? 'Periksa kembali ejaan URL (kemungkinan typo). Jika URL sudah benar, ini menunjukkan website berada di jaringan internal yang tidak dapat dijangkau dari lokasi server monitoring saat ini. Untuk hasil akurat, pantau dari jaringan yang sama atau gunakan VPN.'
+                        : 'Status di sini mencerminkan jangkauan dari lokasi server monitoring.'}
+                    </div>
+                  ) : null}
                   {screenshot && code && (code === 400 || code === 403 || code === 401) ? (
                     <div style={{
                       marginTop: 12,
@@ -963,7 +1081,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                   </CardBox>
 
                   <CardBox title={t.cardSecurity}>
-                    <CardRow label={t.rowSslStatus} value={ev?.tls_handshake_ok ? t.valValid : (ev?.tls_handshake_ok === false ? t.valInvalid : '—')} valueColor={sslColor} desc={getSslDesc(ev?.tls_handshake_ok)} />
+                    <CardRow label={t.rowSslStatus} value={internalUnreachable ? '—' : (ev?.tls_handshake_ok ? t.valValid : (ev?.tls_handshake_ok === false ? t.valInvalid : '—'))} valueColor={internalUnreachable ? 'var(--text-muted)' : sslColor} desc={getSslDesc(ev?.tls_handshake_ok)} />
                     <CardRow label={t.rowExpiration} value={ev?.tls_cert_expiry ? fmtDateLong(ev.tls_cert_expiry) : (website.ssl_expiry_date ? fmtDateLong(website.ssl_expiry_date) : '—')} desc={getExpiryDesc(ev?.tls_cert_expiry || website.ssl_expiry_date)} />
                     <CardRow label={t.rowRemainingDays} value={ev?.tls_cert_expiry ? getRemainingDays(ev.tls_cert_expiry) : (website.ssl_expiry_date ? getRemainingDays(website.ssl_expiry_date) : '—')} desc={getRemainingDesc(ev?.tls_cert_expiry || website.ssl_expiry_date)} />
                   </CardBox>
@@ -994,7 +1112,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                       cursor: 'pointer',
                       fontSize: 12,
                       fontWeight: 800,
-                      color: 'var(--text-muted)',
+                      color: 'var(--text-strong)',
                       letterSpacing: '0.05em'
                     }}
                   >
@@ -1004,7 +1122,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                   
                   {showGuide && (
                     <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                      <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-strong)' }}>
                         <strong style={{ color: 'var(--accent)' }}>Service Health (Kesehatan Layanan):</strong>
                         <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                           <li><strong>Status:</strong> Kondisi operasional website saat ini (Normal/Bermasalah/Terputus).</li>
@@ -1013,7 +1131,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                           <li><strong>TTFB (Time to First Byte):</strong> Waktu tunggu sampai server mengirimkan bit data pertama. Mengukur kecepatan server memproses instruksi.</li>
                         </ul>
                       </div>
-                      <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-strong)' }}>
                         <strong style={{ color: 'var(--accent)' }}>Connectivity (Konektivitas):</strong>
                         <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                           <li><strong>ICMP Ping:</strong> Tes ketukan pintu jaringan ke server untuk mengecek apakah server aktif merespons sinyal dasar. Menggunakan data ping asli.</li>
@@ -1021,14 +1139,14 @@ export default function ServiceDetailModal({ website, onClose }) {
                           <li><strong>IP Address:</strong> Alamat unik server di jaringan internet (seperti nomor rumah/telepon).</li>
                         </ul>
                       </div>
-                      <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-strong)' }}>
                         <strong style={{ color: 'var(--accent)' }}>Security (Keamanan):</strong>
                         <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                           <li><strong>SSL Status:</strong> Status keamanan enkripsi koneksi. Jika aktif (Valid), menjamin lalu lintas data aman dan tidak bisa diintip orang lain.</li>
                           <li><strong>Expiration & Remaining:</strong> Batas masa berlaku sertifikat keamanan website. Jika kedaluwarsa, browser akan memblokir akses pengguna.</li>
                         </ul>
                       </div>
-                      <div style={{ fontSize: 11, lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-strong)' }}>
                         <strong style={{ color: 'var(--accent)' }}>Infrastructure (Infrastruktur):</strong>
                         <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                           <li><strong>Server:</strong> Perangkat lunak web server yang memproses website (misal: Nginx, Apache, IIS).</li>
@@ -1082,7 +1200,7 @@ export default function ServiceDetailModal({ website, onClose }) {
               </div>
               <div style={{ height: 160 }}>
                 {chartMounted && (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0} initialDimension={{ width: 400, height: 160 }}>
                     <LineChart data={perfData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,74,0.8)" />
                       <XAxis dataKey="i" tick={false} axisLine={{ stroke: 'var(--border)' }} />
@@ -1160,7 +1278,7 @@ export default function ServiceDetailModal({ website, onClose }) {
                     <tr key={i} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.02)' }}>
                       <td style={st.td}>{fmtTime(log.checked_at)}</td>
                       <td style={st.td}><span style={{ color: { CRITICAL: '#f59e0b', OFFLINE: '#ef4444' }[log.status] || '#4a5568', fontWeight: 600, fontSize: 10 }}>{tStatus(log.status)}</span></td>
-                      <td style={st.td}>{log.status === 'OFFLINE' ? t.issueUnreachable : t.issueDegraded}</td>
+                      <td style={st.td}>{log.status === 'OFFLINE' ? t.issueUnreachable : log.status === 'CRITICAL' ? t.issueCriticalFail : t.issueStability}</td>
                       <td style={st.td}>{log.status_code ?? '—'}</td>
                       <td style={st.td}>{fmt(log.response_time_ms)}</td>
                     </tr>
@@ -1289,8 +1407,8 @@ const st = {
   tabs: { display: 'flex', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   tabBtn: { flex: 1, background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', padding: '10px 4px', cursor: 'pointer', borderBottom: '2px solid transparent', transition: 'all 0.15s' },
   tabActive: { color: '#2563eb', borderBottom: '2px solid #2563eb', background: 'rgba(59,130,246,0.06)' },
-  body: { flex: 1, overflowY: 'auto', padding: '16px 18px' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: 11 },
+  body: { flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 18px' },
+  table: { width: '100%', minWidth: 520, borderCollapse: 'collapse', fontSize: 11 },
   th: { textAlign: 'left', padding: '8px 10px', fontSize: 9, color: 'var(--text-sub)', letterSpacing: '0.1em', borderBottom: '1px solid var(--border)', fontWeight: 800, background: 'var(--bg-header)' },
   td: { padding: '7px 10px', color: 'var(--text-sub)', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums' },
 }

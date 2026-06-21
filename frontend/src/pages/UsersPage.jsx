@@ -32,10 +32,14 @@ export default function UsersPage({ users, onUserUpdate }) {
   const [showRegister, setShowRegister] = useState(false)
   const [regForm, setRegForm] = useState({ username: '', password: '', email: '', telegram_id: '', role: 'viewer' })
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [approveTarget, setApproveTarget] = useState(null)
+  const [rejectTarget, setRejectTarget] = useState(null)
   const [regError, setRegError] = useState('')
   const [saving, setSaving] = useState(false)
   const [actionMsg, setActionMsg] = useState('')
 
+  const pendingUsers = users.filter(u => u.status === 'pending')
+  const activeUsers = users.filter(u => u.status !== 'pending')
   const adminCount = users.filter(u => u.role === 'admin').length
 
   const handlePromote = async (userId) => {
@@ -58,6 +62,32 @@ export default function UsersPage({ users, onUserUpdate }) {
       setTimeout(() => setActionMsg(''), 3000)
     } catch (e) {
       setActionMsg(e.response?.data?.error || 'Failed to demote')
+      setTimeout(() => setActionMsg(''), 3000)
+    }
+  }
+
+  const handleApprove = async (userId) => {
+    try {
+      await userAdminAPI.approve(userId)
+      setApproveTarget(null)
+      onUserUpdate?.()
+      setActionMsg(t.userApprovedMsg || 'User approved — they can now log in')
+      setTimeout(() => setActionMsg(''), 3000)
+    } catch (e) {
+      setActionMsg(e.response?.data?.error || 'Failed to approve')
+      setTimeout(() => setActionMsg(''), 3000)
+    }
+  }
+
+  const handleReject = async (userId) => {
+    try {
+      await userAdminAPI.reject(userId)
+      setRejectTarget(null)
+      onUserUpdate?.()
+      setActionMsg(t.userRejectedMsg || 'Registration rejected')
+      setTimeout(() => setActionMsg(''), 3000)
+    } catch (e) {
+      setActionMsg(e.response?.data?.error || 'Failed to reject')
       setTimeout(() => setActionMsg(''), 3000)
     }
   }
@@ -112,6 +142,47 @@ export default function UsersPage({ users, onUserUpdate }) {
         <div style={styles.actionMsg}>{actionMsg}</div>
       )}
 
+      {/* Pending Registrations — needs admin confirmation */}
+      {pendingUsers.length > 0 && (
+        <div style={styles.pendingBox}>
+          <div style={styles.pendingHeader}>
+            <span style={{ fontSize: 18 }}>🔔</span>
+            <span style={{ fontWeight: 900, color: '#f59e0b', fontSize: 15, letterSpacing: '0.02em' }}>
+              {t.pendingApprovals || 'Pending Registrations'}
+            </span>
+            <span style={styles.pendingCountPill}>{pendingUsers.length}</span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
+            {t.pendingApprovalsSub || 'New users awaiting your confirmation before they can log in.'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pendingUsers.map(u => (
+              <div key={u.id} style={styles.pendingRow}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                  <div style={{ ...styles.avatar, background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.35)', color: '#f59e0b' }}>
+                    {u.username[0].toUpperCase()}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: 'var(--text)', fontWeight: 800, fontSize: 16 }}>{u.username}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {u.email || '—'}{u.telegram_id ? ` · 📱 ${u.telegram_id}` : ''}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button style={styles.approveBtn} onClick={() => setApproveTarget(u)} title={t.approveTooltip || 'Approve registration'}>
+                    ✓ {t.approveBtn || 'Approve'}
+                  </button>
+                  <button style={styles.rejectBtn} onClick={() => setRejectTarget(u)} title={t.rejectTooltip || 'Reject registration'}>
+                    ✕ {t.rejectBtn || 'Reject'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Admin limit bar */}
       <div style={styles.limitBar}>
         <span style={styles.limitLabel}>{t.adminSlots}</span>
@@ -129,7 +200,7 @@ export default function UsersPage({ users, onUserUpdate }) {
       </div>
 
       <div style={styles.tableContainer}>
-        {!users || users.length === 0 ? (
+        {!activeUsers || activeUsers.length === 0 ? (
           <div style={styles.empty}>{t.noUsersFound}</div>
         ) : (
           <table style={styles.table}>
@@ -142,7 +213,7 @@ export default function UsersPage({ users, onUserUpdate }) {
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
+              {activeUsers.map(u => (
                 <tr key={u.id} style={{
                   ...styles.tr,
                   background: u.id === currentUser?.id ? 'rgba(59,130,246,0.04)' : '',
@@ -200,7 +271,7 @@ export default function UsersPage({ users, onUserUpdate }) {
       {/* Delete Confirm Modal */}
       {deleteTarget && (
         <div style={mStyles.overlay}>
-          <div style={{ ...mStyles.modal, width: 320, padding: 24, textAlign: 'center' }}>
+          <div style={{ ...mStyles.modal, width: 'min(320px, 94vw)', padding: 24, textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🗑️</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{t.deleteUserTitle}</div>
             <div style={{ fontSize: 13, color: 'var(--text-sub)', marginBottom: 24 }}>
@@ -209,6 +280,40 @@ export default function UsersPage({ users, onUserUpdate }) {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button style={mStyles.cancelBtn} onClick={() => setDeleteTarget(null)}>{t.cancel}</button>
               <button style={{ ...mStyles.saveBtn, background: '#dc2626' }} onClick={() => handleDelete(deleteTarget.id)}>{t.delete}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Confirm Modal */}
+      {approveTarget && (
+        <div style={mStyles.overlay}>
+          <div style={{ ...mStyles.modal, width: 'min(360px, 94vw)', padding: 24, textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>{t.approveUserTitle || 'Approve Registration'}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-sub)', marginBottom: 24, lineHeight: 1.5 }}>
+              {t.approveUserConfirmPrefix || 'Allow user'} <strong style={{ color: 'var(--text)' }}>{approveTarget.username}</strong> {t.approveUserConfirmSuffix || 'to create a new account?'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button style={mStyles.cancelBtn} onClick={() => setApproveTarget(null)}>{t.cancel}</button>
+              <button style={{ ...mStyles.saveBtn, background: '#10b981' }} onClick={() => handleApprove(approveTarget.id)}>{t.approveBtn || 'Approve'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Confirm Modal */}
+      {rejectTarget && (
+        <div style={mStyles.overlay}>
+          <div style={{ ...mStyles.modal, width: 'min(360px, 94vw)', padding: 24, textAlign: 'center' }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🚫</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', marginBottom: 8 }}>{t.rejectUserTitle || 'Reject Registration'}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-sub)', marginBottom: 24, lineHeight: 1.5 }}>
+              {t.rejectUserConfirmPrefix || 'You are rejecting'} <strong style={{ color: 'var(--text)' }}>{rejectTarget.username}</strong> {t.rejectUserConfirmSuffix || 'as a new user. Their registration will be removed.'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button style={mStyles.cancelBtn} onClick={() => setRejectTarget(null)}>{t.cancel}</button>
+              <button style={{ ...mStyles.saveBtn, background: '#dc2626' }} onClick={() => handleReject(rejectTarget.id)}>{t.rejectBtn || 'Reject'}</button>
             </div>
           </div>
         </div>
@@ -271,8 +376,8 @@ const styles = {
   limitLabel: { fontSize: 9, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em' },
   limitTrack: { display: 'flex', gap: 4 },
   limitSlot: { width: 40, height: 8, borderRadius: 2, transition: 'background 0.3s' },
-  tableContainer: { flex: 1, overflowY: 'auto', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow)' },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  tableContainer: { flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow)' },
+  table: { width: '100%', minWidth: 640, borderCollapse: 'collapse' },
   th: { padding: '14px 18px', textAlign: 'left', fontSize: 13, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: '0.1em', borderBottom: '2px solid var(--border)', background: 'var(--bg-header)', position: 'sticky', top: 0 },
   tr: { borderBottom: '1px solid rgba(99,102,241,0.07)' },
   td: { padding: '16px 18px', fontSize: 17, color: 'var(--text-sub)' },
@@ -281,11 +386,17 @@ const styles = {
   demoteBtn: { background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', borderRadius: 4, padding: '6px 14px', fontSize: 14, cursor: 'pointer', fontWeight: 800 },
   deleteBtn: { background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', borderRadius: 4, padding: '6px 10px', fontSize: 14, cursor: 'pointer' },
   empty: { textAlign: 'center', color: 'var(--text-muted)', padding: '48px', fontSize: 13 },
+  pendingBox: { flexShrink: 0, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 10, padding: '14px 16px', boxShadow: '0 0 16px rgba(245,158,11,0.12)' },
+  pendingHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 },
+  pendingCountPill: { background: '#f59e0b', color: '#fff', fontSize: 12, fontWeight: 900, borderRadius: 10, padding: '1px 9px' },
+  pendingRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', flexWrap: 'wrap' },
+  approveBtn: { background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', color: '#10b981', borderRadius: 6, padding: '8px 14px', fontSize: 14, cursor: 'pointer', fontWeight: 900 },
+  rejectBtn: { background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: 6, padding: '8px 14px', fontSize: 14, cursor: 'pointer', fontWeight: 900 },
 }
 
 const mStyles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' },
-  modal: { background: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 12, width: 400, boxShadow: 'var(--shadow)' },
+  modal: { background: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 12, width: 'min(400px, 94vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow)' },
   mHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border)' },
   label: { display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--accent)', letterSpacing: '0.1em', marginBottom: 6 },
   input: { background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 16px', color: 'var(--text)', fontSize: 17, outline: 'none', width: '100%' },

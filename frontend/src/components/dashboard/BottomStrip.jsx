@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 const STATUS_COLORS = {
   ONLINE: '#10b981',
   WARNING: '#f59e0b',
-  DEGRADED: '#f97316',
   CRITICAL: '#ef4444',
   OFFLINE: '#ef4444',
   UNKNOWN: '#64748b'
@@ -82,7 +81,7 @@ const UptimeBar = ({ website, logs }) => {
             key={i}
             style={{
               ...styles.block,
-              background: (status === 'ONLINE' || status === 'WARNING' || status === 'DEGRADED') ? '#10b981'
+              background: (status === 'ONLINE' || status === 'WARNING') ? '#10b981'
                 : status === 'CRITICAL' ? '#ef4444'
                 : status === 'OFFLINE' ? '#ef4444'
                 : 'var(--border)',

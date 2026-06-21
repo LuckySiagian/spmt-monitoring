@@ -71,40 +71,46 @@ type Pool struct {
 	allocCancel          context.CancelFunc
 	browserCtx           context.Context
 	browserCancel        context.CancelFunc
+
+	// monitorInternetHealthy() cache — avoids re-probing the node's own connectivity
+	// on every status change. Guarded by netHealthMu.
+	netHealthMu        sync.Mutex
+	netHealthOK        bool
+	netHealthCheckedAt time.Time
 }
 
 type websiteState struct {
-	mu                  sync.Mutex
-	consecutiveFailures int
-	recentLatencies     []int
-	lastStatus          model.LogStatus
-	statusStartTime     time.Time
-	lastHeadlessCheck   time.Time
-	lastChromeSuccess   bool      // True if the last executed Chrome diagnostic succeeded
-	lastChromeTitle     string    // Last loaded page title from Chrome diagnostic
-	lastChromeScreenshot string    // Last captured screenshot (base64)
-	lastChromePageText   string    // Cached page text
+	mu                   sync.Mutex
+	consecutiveFailures  int
+	recentLatencies      []int
+	lastStatus           model.LogStatus
+	statusStartTime      time.Time
+	lastHeadlessCheck    time.Time
+	lastChromeSuccess    bool   // True if the last executed Chrome diagnostic succeeded
+	lastChromeTitle      string // Last loaded page title from Chrome diagnostic
+	lastChromeScreenshot string // Last captured screenshot (base64)
+	lastChromePageText   string // Cached page text
 }
 
 // probeExtras carries additional evidence that doesn't fit in MonitoringLog.
 // All fields here are collected during probing and serialized into the evidence JSON.
 type probeExtras struct {
-	AllResolvedIPs []string   // All IPs returned by DNS
-	RedirectChain  []string   // Full HTTP redirect chain
-	ContentType    string     // HTTP Content-Type header
-	ServerHeader   string     // HTTP Server header
-	CDNProvider    string     // CDN name if detected (e.g. "Cloudflare")
-	IsCDN          bool       // True if CDN signature was detected
-	TLSError       string     // TLS/SSL error code (no narrative, machine-readable)
-	TCPLatencyMs   int        // TCP connect latency in milliseconds
-	SSLIssuer      string     // SSL certificate issuer (from strict SSL check)
-	SSLExpiry      *time.Time // SSL certificate expiry date
-	WAFDetected    string     // Name of WAF if detected, or "Not Detected"
-	DynamicIsMigrated  bool
+	AllResolvedIPs       []string   // All IPs returned by DNS
+	RedirectChain        []string   // Full HTTP redirect chain
+	ContentType          string     // HTTP Content-Type header
+	ServerHeader         string     // HTTP Server header
+	CDNProvider          string     // CDN name if detected (e.g. "Cloudflare")
+	IsCDN                bool       // True if CDN signature was detected
+	TLSError             string     // TLS/SSL error code (no narrative, machine-readable)
+	TCPLatencyMs         int        // TCP connect latency in milliseconds
+	SSLIssuer            string     // SSL certificate issuer (from strict SSL check)
+	SSLExpiry            *time.Time // SSL certificate expiry date
+	WAFDetected          string     // Name of WAF if detected, or "Not Detected"
+	DynamicIsMigrated    bool
 	DynamicMigrationHint string
-	Screenshot     string     // Base64 screenshot image if taken during headless check
-	PageTitle      string     // Title of page loaded by headless browser
-	PageText       string     // Body text loaded by headless browser
+	Screenshot           string // Base64 screenshot image if taken during headless check
+	PageTitle            string // Title of page loaded by headless browser
+	PageText             string // Body text loaded by headless browser
 }
 
 func NewPool(repo *repository.Repository, hub *ws.Hub, notif *notification.Service, workerSize int) *Pool {
@@ -139,7 +145,9 @@ func (p *Pool) Start() {
 	}
 	go p.scheduler()
 	go p.healthMonitor()
-	p.startEscalationMonitor()
+	// Incident escalation auto-notifications were removed: re-alerting an unhandled
+	// incident every cycle produced Telegram spam. Telegram now pings only on the
+	// real transitions (OFFLINE / CRITICAL / recovery to ONLINE) via NotifyStatusChange.
 	p.startRetentionWorker()
 }
 
@@ -332,8 +340,12 @@ func parseTLSError(err error) (string, string) {
 	return "SSL_GENERAL_ERROR", "Terjadi gangguan pada lapisan keamanan (SSL/TLS): " + err.Error()
 }
 
-func (p *Pool) checkSSL(host string, ip string) (bool, *time.Time, string, string, string) {
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
+func (p *Pool) checkSSL(host string, ip string, manual bool) (bool, *time.Time, string, string, string) {
+	sslTimeout := 10 * time.Second
+	if manual {
+		sslTimeout = 2 * time.Second
+	}
+	dialer := &net.Dialer{Timeout: sslTimeout}
 	targetAddr := host + ":443"
 	if ip != "" {
 		targetAddr = net.JoinHostPort(ip, "443")
@@ -448,7 +460,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		IsBrowserAccessible: true, // Start as accessible, prove otherwise
 	}
 
-	if !p.isLocalNetworkOK() {
+	if !manual && !p.isLocalNetworkOK() {
 		slog.Warn("Skip checking website: local network has no internet (quorum failure)",
 			slog.String("website_name", w.Name),
 			slog.String("website_id", w.ID.String()),
@@ -482,7 +494,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	}
 
 	addrs, err := net.LookupHost(host)
-	
+
 	// Fallback to Public DNS (Google DNS 8.8.8.8) if system DNS fails, or resolves to unreachable local/intranet IP
 	if err != nil || len(addrs) == 0 {
 		slog.Warn("System DNS resolution failed, attempting public DNS fallback", "website", w.Name, "error", err)
@@ -566,7 +578,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	// 2. SSL/TLS Validation (Source of Truth — strict check, no InsecureSkipVerify)
 	isHTTPS := strings.HasPrefix(w.URL, "https://")
 	if isHTTPS {
-		sslOk, expiry, rc, _, issuer := p.checkSSL(host, l.IPAddress)
+		sslOk, expiry, rc, _, issuer := p.checkSSL(host, l.IPAddress, manual)
 		extras.SSLIssuer = issuer
 		extras.SSLExpiry = expiry
 
@@ -613,8 +625,14 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 			if l.IPAddress != "" {
 				targetAddr = net.JoinHostPort(l.IPAddress, port)
 			}
+			dialTimeout := 20 * time.Second
+			if manual {
+				dialTimeout = 2 * time.Second
+			}
 			dialer := &net.Dialer{
-				Timeout:   10 * time.Second,
+				// 20s (naik dari 10s): beri server yang lambat-tapi-hidup cukup waktu
+				// menyelesaikan handshake TCP, agar tidak dicap OFFLINE padahal hanya lambat.
+				Timeout:   dialTimeout,
 				KeepAlive: 30 * time.Second,
 			}
 			return dialer.DialContext(ctx, network, targetAddr)
@@ -622,8 +640,14 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	}
 	_ = http2.ConfigureTransport(transport)
 
+	clientTimeout := 40 * time.Second
+	if manual {
+		clientTimeout = 2 * time.Second
+	}
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		// 40s total (naik dari 30s): muat untuk dial 20s + TLS handshake + respons lambat,
+		// sehingga situs lambat jatuh ke WARNING (>3s) — bukan OFFLINE karena timeout dini.
+		Timeout: clientTimeout,
 		Jar:     jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			redirectChain = append(redirectChain, req.URL.String())
@@ -683,13 +707,22 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	httpStart := time.Now()
 	resp, httpErr := client.Do(req)
 
-	// If HTTPS request fails, try plain HTTP as fallback
+	// If HTTPS request fails, try plain HTTP as fallback — but with a SHORTER timeout.
+	// If HTTPS already timed out (~20s), re-trying HTTP for another full 20s would make
+	// an OFFLINE verdict take ~40s and report a misleading 40000ms "response time". A
+	// 10s fallback is enough to tell whether port 80 is open, capping the worst case at
+	// ~30s without losing the "HTTPS blocked but HTTP reachable" detection.
 	if httpErr != nil && isHTTPS {
 		if strings.Contains(httpErr.Error(), "refused") || strings.Contains(httpErr.Error(), "timeout") {
+			fbTimeout := 10 * time.Second
+			if manual {
+				fbTimeout = 2 * time.Second
+			}
+			fbClient := &http.Client{Timeout: fbTimeout, Jar: jar, Transport: transport, CheckRedirect: client.CheckRedirect}
 			fallbackURL := strings.Replace(w.URL, "https://", "http://", 1)
 			fallbackReq, _ := http.NewRequest("GET", fallbackURL, nil)
 			fallbackReq.Header = req.Header.Clone()
-			fallbackResp, fallbackErr := client.Do(fallbackReq)
+			fallbackResp, fallbackErr := fbClient.Do(fallbackReq)
 			if fallbackErr == nil && fallbackResp != nil {
 				resp = fallbackResp
 				httpErr = nil
@@ -745,7 +778,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		// Collect response headers into extras
 		extras.ContentType = resp.Header.Get("Content-Type")
 		extras.ServerHeader = resp.Header.Get("Server")
-		
+
 		// WAF / edge detection. Used downstream to tell a genuine application
 		// 4xx apart from our monitoring agent being fingerprinted as a bot by an
 		// edge/WAF (see the bot-block refinement in evaluateFinalStatus).
@@ -802,7 +835,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 		l.ICMPLatencyMs = nil
 	}
 
-	p.evaluateFinalStatus(l, w, body, extras)
+	p.evaluateFinalStatus(l, w, body, extras, manual)
 
 	// Final Safety: If status is still unknown, it's a logic error, default to OFFLINE
 	if l.Status == "" {
@@ -812,7 +845,7 @@ func (p *Pool) check(w model.Website, workerID int, manual bool) {
 	p.saveAndBroadcast(w, l, workerID)
 }
 
-func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body []byte, extras probeExtras) {
+func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body []byte, extras probeExtras, manual bool) {
 	state := p.getWebsiteState(w.ID)
 	state.mu.Lock()
 	defer state.mu.Unlock()
@@ -956,7 +989,7 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 		"cdn_provider":     cdnVal,
 		"http_error":       httpErrVal,
 		// ── Fingerprint ──────────────────────────
-		"waf_detected":     extras.WAFDetected,
+		"waf_detected": extras.WAFDetected,
 
 		// ── Body ─────────────────────────────
 		"response_body_preview": bodyPreview,
@@ -965,7 +998,7 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 		"chrome_success":        state.lastChromeSuccess,
 		"screenshot":            extras.Screenshot,
 		"page_title":            extras.PageTitle,
-		"page_text_preview":     func() string {
+		"page_text_preview": func() string {
 			if len(extras.PageText) > 500 {
 				return extras.PageText[:500]
 			}
@@ -1031,7 +1064,11 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 	// timeout or a one-off 5xx during a deploy — cannot raise a false incident.
 	isDown := newStatus == model.StatusOffline || newStatus == model.StatusCritical
 	if isDown {
-		state.consecutiveFailures++
+		if manual {
+			state.consecutiveFailures = failConfirmThreshold
+		} else {
+			state.consecutiveFailures++
+		}
 		if state.consecutiveFailures < failConfirmThreshold &&
 			(state.lastStatus == model.StatusOnline || state.lastStatus == model.StatusWarning) {
 			// Not yet confirmed: hold the previous healthy-ish status.
@@ -1056,8 +1093,17 @@ func (p *Pool) evaluateFinalStatus(l *model.MonitoringLog, w model.Website, body
 // ─── Deterministic status classification (DNS + HTTP only) ──────
 const (
 	// warningResponseThresholdMs: a 2xx/3xx response slower than this is reported as
-	// WARNING (slow) instead of HEALTHY.
-	warningResponseThresholdMs = 3000
+	// WARNING ("lambat") instead of ONLINE. 2000 ms follows the widely used "2-second
+	// rule" for acceptable web response time (Nielsen response-time limits; Google/Akamai
+	// page-speed research): under ~2 s a page still feels responsive, beyond it users
+	// perceive lag and abandonment rises sharply.
+	warningResponseThresholdMs = 2000
+	// severeResponseThresholdMs: above this a 2xx/3xx response is still WARNING but
+	// labelled "sangat lambat" (Apdex "frustrated" zone). Slowness by itself never
+	// escalates to CRITICAL or OFFLINE — a site that still answers is degraded, not
+	// down. Treating slowness as an outage is the single biggest source of false
+	// alarms, so a slow site stays a (silent, non-notifying) WARNING.
+	severeResponseThresholdMs = 5000
 	// failConfirmThreshold: consecutive hard-down samples required before a site is
 	// reported OFFLINE/CRITICAL (debounce against transient blips).
 	failConfirmThreshold = 3
@@ -1170,7 +1216,12 @@ func classifyStatus(l *model.MonitoringLog) (model.LogStatus, int, string, []str
 			fmt.Sprintf("WARNING: server merespons HTTP %d (client error).", code),
 			[]string{"Periksa konfigurasi rute/otorisasi halaman."}
 	case code >= 200 && code < 400:
-		if rt > warningResponseThresholdMs {
+		switch {
+		case rt > severeResponseThresholdMs:
+			return model.StatusWarning, 55,
+				fmt.Sprintf("WARNING: respons sangat lambat (%d ms, HTTP %d).", rt, code),
+				[]string{"Periksa beban server, kapasitas, dan latensi jaringan — performa jauh di bawah normal."}
+		case rt > warningResponseThresholdMs:
 			return model.StatusWarning, 70,
 				fmt.Sprintf("WARNING: respons lambat (%d ms, HTTP %d).", rt, code),
 				[]string{"Periksa beban server dan latensi jaringan."}
@@ -1241,16 +1292,28 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog, 
 		// Incident Auto-Trigger & Auto-Resolve
 		inMaintenance, _ := p.repo.GetActiveMaintenanceForWebsite(ctx, w.ID)
 
-		if logEntry.Status != model.StatusOnline && !inMaintenance {
+		// ③ False-alarm brake: an OFFLINE verdict means our node got NO response at all.
+		// If the monitoring node's OWN internet is down, that verdict can't be trusted
+		// (we can't tell "target down" from "we're offline"), so suppress the incident,
+		// push notification, and mass-failure grouping. CRITICAL/WARNING are exempt:
+		// those required an HTTP response, which already proves our connectivity was fine.
+		suppressFalseAlarm := logEntry.Status == model.StatusOffline && !p.monitorInternetHealthy()
+		if suppressFalseAlarm {
+			log.Printf("[Worker] SUPPRESS false alarm for %s: monitoring node has no internet — %s not reported (likely our connection, not the target)", w.Name, logEntry.Status)
+		}
+
+		// Only hard-down states (CRITICAL / OFFLINE) open an incident. WARNING is a
+		// degraded-but-up condition (slow response or a 4xx page) — recording it as an
+		// incident only adds noise on a flaky local network, so it is intentionally
+		// excluded. These are exactly the states that also notify on Telegram.
+		isHardDown := logEntry.Status == model.StatusOffline || logEntry.Status == model.StatusCritical
+		if isHardDown && !inMaintenance && !suppressFalseAlarm {
 			// Check if there is an active incident
 			activeInc, err := p.repo.GetActiveIncidentByWebsite(ctx, w.ID)
 			if err != nil || activeInc == nil {
 				// Create new incident
 				title := fmt.Sprintf("Website %s is %s", w.Name, logEntry.Status)
-				severity := "WARNING"
-				if logEntry.Status == model.StatusCritical || logEntry.Status == model.StatusOffline {
-					severity = "CRITICAL"
-				}
+				severity := "CRITICAL"
 				inc := &model.Incident{
 					WebsiteID: w.ID,
 					Title:     title,
@@ -1289,7 +1352,7 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog, 
 		}
 
 		// Incident Grouping: Check if many sites are failing
-		if logEntry.Status == model.StatusOffline || logEntry.Status == model.StatusCritical {
+		if (logEntry.Status == model.StatusOffline || logEntry.Status == model.StatusCritical) && !suppressFalseAlarm {
 			p.trackFailure()
 		}
 
@@ -1307,7 +1370,7 @@ func (p *Pool) saveAndBroadcast(w model.Website, logEntry *model.MonitoringLog, 
 		})
 		log.Printf("[Worker] STATUS CHANGE %s: %s → %s (%s)", w.Name, prevStatus, logEntry.Status, logEntry.RootCause)
 
-		if p.notif != nil {
+		if p.notif != nil && !suppressFalseAlarm {
 			go p.notif.NotifyStatusChange(w.ID, w.Name, w.URL, prevStatus, string(logEntry.Status), logEntry.RootCause)
 		}
 	}
@@ -1396,6 +1459,42 @@ func (p *Pool) SetNetworkReader(reader NetworkContextReader) {
 	p.netReader = reader
 }
 
+// monitorInternetHealthy reports whether the monitoring node itself currently has
+// working internet access. It dials a few highly-available anchors (DNS/HTTPS ports
+// on public resolvers); if NONE are reachable, our node is effectively offline and any
+// OFFLINE verdict it produces for a target is untrustworthy — almost certainly a false
+// alarm caused by OUR connection, not the target's. The result is cached for a short
+// window so the status-change path stays cheap.
+//
+// Assumption: the node reaches the internet directly (no mandatory outbound proxy).
+// In a proxy-only environment these direct dials may fail; tune the anchors if so.
+func (p *Pool) monitorInternetHealthy() bool {
+	p.netHealthMu.Lock()
+	if !p.netHealthCheckedAt.IsZero() && time.Since(p.netHealthCheckedAt) < 15*time.Second {
+		v := p.netHealthOK
+		p.netHealthMu.Unlock()
+		return v
+	}
+	p.netHealthMu.Unlock()
+
+	anchors := []string{"8.8.8.8:53", "1.1.1.1:53", "1.1.1.1:443"}
+	ok := false
+	for _, a := range anchors {
+		conn, err := net.DialTimeout("tcp", a, 2*time.Second)
+		if err == nil {
+			conn.Close()
+			ok = true
+			break
+		}
+	}
+
+	p.netHealthMu.Lock()
+	p.netHealthOK = ok
+	p.netHealthCheckedAt = time.Now()
+	p.netHealthMu.Unlock()
+	return ok
+}
+
 func (p *Pool) updateHealth() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -1422,6 +1521,10 @@ func (p *Pool) updateHealth() {
 		p.health.InterfaceAlias = netCtx.InterfaceAlias
 		p.health.LocalGateway = netCtx.LocalGateway
 		p.health.DNSResolver = netCtx.DNSResolver
+		// Live throughput — without these the dashboard's SystemHealth readout
+		// (topology header ↓/↑ Kbps) is stuck at 0 even though NetworkService measures it.
+		p.health.NetRxMbps = netCtx.RxMbps
+		p.health.NetTxMbps = netCtx.TxMbps
 	}
 }
 
@@ -1528,4 +1631,3 @@ func lookupPublicDNS(ctx context.Context, host string) ([]string, error) {
 	}
 	return r.LookupHost(ctx, host)
 }
-

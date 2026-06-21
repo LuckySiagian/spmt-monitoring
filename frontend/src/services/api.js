@@ -1,7 +1,12 @@
 import axios from 'axios'
 
 const getBaseURL = () => {
+  // Explicit override (production builds / custom deploys) always wins.
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  // Dev server: talk to the backend through Vite's same-origin proxy, so other
+  // devices on the LAN only need to reach port 5173 (no extra firewall hole, no CORS).
+  if (import.meta.env.DEV) return '/api'
+  // Built app served without an explicit API URL: assume backend on :8080 of the same host.
   return `http://${window.location.hostname}:8080`
 }
 const BASE_URL = getBaseURL()
@@ -33,8 +38,9 @@ export const publicAPI  = { getStatus: (c)=>api.get('/public/websites', c) }
 export const websiteAPI = { 
   getAll: (c)=>api.get('/websites', c), 
   create: (d, c)=>api.post('/websites', d, c), 
-  update: (id, d, c)=>api.put(`/websites/${id}`, d, c), 
-  delete: (id, c)=>api.delete(`/websites/${id}`, c), 
+  update: (id, d, c)=>api.put(`/websites/${id}`, d, c),
+  delete: (id, c)=>api.delete(`/websites/${id}`, c),
+  bulkDelete: (ids, c)=>api.post('/websites/bulk-delete', { ids }, c),
   getLogs: (id, l=100, c)=>api.get(`/websites/${id}/logs?limit=${l}`, c),
   getSLA: (id, c)=>api.get(`/websites/${id}/sla`, c),
   recheck: (c)=>api.post('/websites/recheck', {}, c),
@@ -42,8 +48,16 @@ export const websiteAPI = {
 }
 export const dashboardAPI = { getSummary: (c)=>api.get('/dashboard/summary', c) }
 export const systemAPI = { getHealth: (c)=>api.get('/system/health', c) }
-export const userAPI    = { getAll: (c)=>api.get('/users', c), promote: (id, c)=>api.post('/users/promote', {user_id:id}, c), demote: (id, c)=>api.post('/users/demote', {user_id:id}, c) }
-export const WS_URL     = `ws://${window.location.hostname}:8080/ws`
+export const userAPI    = { getAll: (c)=>api.get('/users', c), promote: (id, c)=>api.post('/users/promote', {user_id:id}, c), demote: (id, c)=>api.post('/users/demote', {user_id:id}, c), pendingCount: (c)=>api.get('/users/pending-count', c) }
+const getWsURL = () => {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  // Dev server: same origin (port 5173), proxied to the backend by Vite.
+  if (import.meta.env.DEV) return `${proto}//${window.location.host}/ws`
+  // Built app: backend on :8080 of the same host.
+  return `${proto}//${window.location.hostname}:8080/ws`
+}
+export const WS_URL     = getWsURL()
 export default api
 export const historyAPI = {
   getStatusHistory: (range='24h', start='', end='', c) => {
@@ -53,7 +67,7 @@ export const historyAPI = {
 }
 export const eventsAPI       = { getAll: (l=100, c)=>api.get(`/dashboard/events?limit=${l}`, c), getByWebsite: (id, l=50, c)=>api.get(`/websites/${id}/events?limit=${l}`, c) }
 export const notificationAPI = { getUnreadCount: (c)=>api.get('/notifications/unread-count', c), markAllRead: (c)=>api.post('/notifications/mark-all-read', {}, c) }
-export const userAdminAPI    = { create: (d, c)=>api.post('/users/create', d, c), delete: (id, c)=>api.delete(`/users/${id}`, c) }
+export const userAdminAPI    = { create: (d, c)=>api.post('/users/create', d, c), delete: (id, c)=>api.delete(`/users/${id}`, c), approve: (id, c)=>api.post(`/users/${id}/approve`, {}, c), reject: (id, c)=>api.post(`/users/${id}/reject`, {}, c) }
 
 export const incidentAPI = {
   getAll: (c) => api.get('/incidents', c),

@@ -71,7 +71,7 @@ export default function DashboardPage({ websites, onWebsitesUpdate, onSummaryUpd
   const handleOpenDetail = useCallback(p => onOpenDetail(websites.find(w => w.id === p.id) || p), [websites, onOpenDetail])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+    <div className="dashboard-page" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <div className="dashboard-grid">
         <div style={s.topo}>
           <NetworkTopology websites={websites} selectedId={selectedId} onSelect={setSelectedId} onOpenDetail={handleOpenDetail} wsConnected={wsConnected} />

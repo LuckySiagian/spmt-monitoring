@@ -5,8 +5,8 @@ import { useTheme } from '../../store/theme'
 import { cleanReason } from '../../utils/rootCause'
 import { getDomain, shouldSkipFavicon } from '../../utils/favicon'
 
-const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
-const SI = { ONLINE: '🟢', WARNING: '🟡', DEGRADED: '🟠', CRITICAL: '🔴', OFFLINE: '🔴', UNKNOWN: '⚪' }
+const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', CRITICAL: '#ef4444', OFFLINE: '#dc2626', UNKNOWN: '#94a3b8' }
+const SI = { ONLINE: '🟢', WARNING: '🟡', CRITICAL: '🔴', OFFLINE: '🔴', UNKNOWN: '⚪' }
 const DD_ID = 'spmt-notif-dd'
 const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 
@@ -55,7 +55,7 @@ function NotifDropdown({ notifications, unread, bellRef, onMarkAll, onItemClick,
   if (!rect) return null
   const fmt = ts => new Date(ts).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   return createPortal(
-    <div id={DD_ID} style={{ position: 'fixed', top: rect.bottom + 6, right: window.innerWidth - rect.right, width: 340, background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 99990, overflow: 'hidden', animation: 'fadeIn 0.15s ease' }}>
+    <div id={DD_ID} style={{ position: 'fixed', top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right), width: 'min(340px, 92vw)', background: 'var(--bg-card)', backdropFilter: 'blur(20px)', border: '1px solid var(--border-strong)', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 99990, overflow: 'hidden', animation: 'fadeIn 0.15s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'var(--bg-card)' }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>🔔 {t.notifTitle}</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

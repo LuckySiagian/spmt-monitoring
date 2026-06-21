@@ -57,10 +57,18 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const [showAdd, setShowAdd] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 60, save_screenshot: true })
+  const [form, setForm] = useState({ name: '', url: '', description: '', interval_seconds: 60, save_screenshot: false })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [hoveredRow, setHoveredRow] = useState(null)
+
+  // Bulk selection (admin only)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [showBulkDelete, setShowBulkDelete] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkError, setBulkError] = useState('')
+  const [confirmText, setConfirmText] = useState('')
 
   // Search & Recommendations State
   const [searchTerm, setSearchTerm] = useState('')
@@ -69,13 +77,13 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
   const [sortBy, setSortBy] = useState('a-z')
 
   const openAdd = () => {
-    setForm({ name: '', url: '', description: '', interval_seconds: 60, save_screenshot: true })
+    setForm({ name: '', url: '', description: '', interval_seconds: 60, save_screenshot: false })
     setError('')
     setShowAdd(true)
   }
 
   const openEdit = (w) => {
-    setForm({ name: w.name, url: w.url, description: w.description, interval_seconds: w.interval_seconds, save_screenshot: w.save_screenshot })
+    setForm({ name: w.name, url: w.url, description: w.description, interval_seconds: w.interval_seconds, save_screenshot: false })
     setEditTarget(w)
     setError('')
   }
@@ -104,6 +112,7 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
     if (!deleteTarget) return
     try {
       await websiteAPI.delete(deleteTarget.id)
+      setSelectedIds(prev => { const next = new Set(prev); next.delete(deleteTarget.id); return next })
       setDeleteTarget(null)
       onWebsiteUpdate?.() // Triggers global reload in App.jsx
     } catch (err) {
@@ -139,6 +148,72 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
     }
     return 0
   })
+
+  // ── Bulk selection logic ──
+  const selectedWebsites = websites.filter(w => selectedIds.has(w.id))
+  // Deleting ALL configured websites at once requires an extra typed confirmation
+  const deletingAll = websites.length > 0 && selectedWebsites.length === websites.length
+  const confirmMatches = confirmText.trim().toUpperCase() === (t.bulkDeleteAllKeyword || '').toUpperCase()
+  const visibleSelectedCount = sortedWebsites.filter(w => selectedIds.has(w.id)).length
+  const allVisibleSelected = sortedWebsites.length > 0 && visibleSelectedCount === sortedWebsites.length
+  const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        sortedWebsites.forEach(w => next.delete(w.id))
+      } else {
+        sortedWebsites.forEach(w => next.add(w.id))
+      }
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const toggleSelectMode = () => {
+    setSelectMode(prev => {
+      if (prev) setSelectedIds(new Set()) // exiting select mode clears selection
+      return !prev
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = selectedWebsites.map(w => w.id)
+    if (ids.length === 0) return
+    setBulkDeleting(true)
+    setBulkError('')
+    try {
+      // Single atomic transaction on the backend: all rows are deleted or none are
+      await websiteAPI.bulkDelete(ids)
+      setSelectedIds(new Set())
+      setShowBulkDelete(false)
+      setConfirmText('')
+      onWebsiteUpdate?.() // Triggers global reload in App.jsx (reflects DB state)
+    } catch (err) {
+      // Atomic delete failed → nothing was removed, keep the selection for retry
+      console.error(err)
+      setBulkError(err.response?.data?.error || t.bulkDeleteFailed)
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const openBulkDelete = () => {
+    setBulkError('')
+    setConfirmText('')
+    setShowBulkDelete(true)
+  }
 
   // Recommendation Logic (Unique matches from name and url)
   const recs = searchTerm.length > 0 
@@ -248,6 +323,19 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
         </div>
       </div>
 
+      {isAdmin && selectMode && selectedWebsites.length > 0 && (
+        <div style={wStyles.bulkBar}>
+          <div style={wStyles.bulkInfo}>
+            <span style={wStyles.bulkCountBadge}>{selectedWebsites.length}</span>
+            <span>{selectedWebsites.length} {t.selectedSuffix}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={wStyles.bulkClearBtn} onClick={clearSelection}>{t.clearSelectionBtn}</button>
+            <button style={wStyles.bulkDeleteBtn} onClick={openBulkDelete}>🗑️ {t.deleteSelectedBtn}</button>
+          </div>
+        </div>
+      )}
+
       <div className="website-table-container" style={wStyles.tableContainer}>
         {websites.length === 0 ? (
           <div style={wStyles.empty}>{t.noWebsitesConfigured} {isAdmin && t.clickAddWebsite}</div>
@@ -275,7 +363,28 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                 <th style={{ ...wStyles.th, width: '6%', textAlign: 'center' }}>{t.thHttp}</th>
                 <th style={{ ...wStyles.th, width: '10%', textAlign: 'center' }}>{t.thSsl}</th>
                 <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>{t.thNetLatencies}</th>
-                {isAdmin && <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>{t.thActions}</th>}
+                {isAdmin && (
+                  <th style={{ ...wStyles.th, width: '13%', textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                      {selectMode && (
+                        <input
+                          type="checkbox"
+                          style={wStyles.checkbox}
+                          checked={allVisibleSelected}
+                          ref={el => { if (el) el.indeterminate = someVisibleSelected }}
+                          onChange={toggleSelectAll}
+                          title={t.selectAllTitle}
+                        />
+                      )}
+                      <span>{t.thActions}</span>
+                      <button
+                        style={{ ...wStyles.kebabBtn, ...(selectMode ? wStyles.kebabBtnActive : {}) }}
+                        onClick={toggleSelectMode}
+                        title={t.selectMode}
+                      >⋮</button>
+                    </div>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -286,7 +395,9 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                   onMouseLeave={() => setHoveredRow(null)}
                   style={{
                     ...wStyles.tr,
-                    background: hoveredRow === w.id ? 'rgba(99,102,241,0.04)' : 'transparent'
+                    background: selectedIds.has(w.id)
+                      ? 'rgba(59,130,246,0.08)'
+                      : hoveredRow === w.id ? 'rgba(99,102,241,0.04)' : 'transparent'
                   }}
                 >
                   {/* Column 1: WEBSITE */}
@@ -424,9 +535,17 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                   {/* Column 10: ACTIONS */}
                   {isAdmin && (
                     <td style={wStyles.td}>
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
                         <button style={wStyles.editBtn} onClick={() => openEdit(w)}>✏️ {t.editBtn}</button>
                         <button style={wStyles.delBtn} onClick={() => setDeleteTarget(w)}>🗑️ {t.deleteBtn}</button>
+                        {selectMode && (
+                          <input
+                            type="checkbox"
+                            style={{ ...wStyles.checkbox, marginLeft: 2 }}
+                            checked={selectedIds.has(w.id)}
+                            onChange={() => toggleSelect(w.id)}
+                          />
+                        )}
                       </div>
                     </td>
                   )}
@@ -455,18 +574,6 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
                 { val: 120, lbl: t.interval120 },
               ]}
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, marginTop: 16 }}>
-              <input
-                type="checkbox"
-                id="save_screenshot"
-                checked={form.save_screenshot}
-                onChange={e => setForm(f => ({ ...f, save_screenshot: e.target.checked }))}
-                style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--primary)' }}
-              />
-              <label htmlFor="save_screenshot" style={{ ...mStyles.label, marginBottom: 0, cursor: 'pointer', fontSize: 12, fontWeight: 700, userSelect: 'none' }}>
-                {t.takeScreenshot}
-              </label>
-            </div>
             {error && <div style={mStyles.error}>{error}</div>}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
               <button type="button" style={mStyles.cancelBtn} onClick={() => { setShowAdd(false); setEditTarget(null) }}>{t.cancel}</button>
@@ -488,6 +595,59 @@ export default function WebsitesPage({ websites, onWebsiteUpdate }) {
           </div>
         </Modal>
       )}
+
+      {/* Bulk Delete Confirm */}
+      {showBulkDelete && selectedWebsites.length > 0 && (
+        <Modal title={t.bulkDeleteTitle} onClose={() => !bulkDeleting && setShowBulkDelete(false)}>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: 13, lineHeight: 1.5 }}>
+            {t.deleteConfirmPrefix} <strong style={{ color: 'var(--text)' }}>{selectedWebsites.length}</strong> {t.bulkDeleteUnit}{t.deleteConfirmSuffix}
+          </p>
+          <div style={mStyles.bulkList}>
+            {selectedWebsites.map(w => (
+              <div key={w.id} style={mStyles.bulkListItem}>
+                <strong style={{ color: 'var(--text)', whiteSpace: 'nowrap' }}>{w.name}</strong>
+                <span style={mStyles.bulkListUrl} title={w.url}>{w.url}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Extra verification when wiping EVERYTHING */}
+          {deletingAll && (
+            <>
+              <div style={mStyles.dangerBanner}>⚠️ {t.bulkDeleteAllWarning}</div>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--text-sub)', marginBottom: 6, lineHeight: 1.5 }}>
+                {t.bulkConfirmTypePrefix} <strong style={{ color: '#ef4444', letterSpacing: '0.04em' }}>{t.bulkDeleteAllKeyword}</strong> {t.bulkConfirmTypeSuffix}
+              </label>
+              <input
+                style={{ ...mStyles.input, marginBottom: 4, borderColor: confirmText && !confirmMatches ? 'rgba(239,68,68,0.5)' : 'var(--border)' }}
+                value={confirmText}
+                onChange={e => setConfirmText(e.target.value)}
+                placeholder={t.bulkDeleteAllKeyword}
+                disabled={bulkDeleting}
+                autoFocus
+              />
+            </>
+          )}
+
+          {bulkError && <div style={{ ...mStyles.error, marginTop: 12, marginBottom: 0 }}>{bulkError}</div>}
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+            <button style={mStyles.cancelBtn} onClick={() => setShowBulkDelete(false)} disabled={bulkDeleting}>{t.cancel}</button>
+            <button
+              style={{
+                ...mStyles.saveBtn,
+                background: 'linear-gradient(135deg, #dc2626, #ef4444)',
+                opacity: (bulkDeleting || (deletingAll && !confirmMatches)) ? 0.5 : 1,
+                cursor: (bulkDeleting || (deletingAll && !confirmMatches)) ? 'not-allowed' : 'pointer',
+              }}
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting || (deletingAll && !confirmMatches)}
+            >
+              {bulkDeleting ? t.processing : (deletingAll ? t.deleteAllBtn : t.delete)}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -503,8 +663,8 @@ const wStyles = {
     fontSize: 13, fontWeight: 700, letterSpacing: '0.01em', cursor: 'pointer',
     boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'transform 0.15s, opacity 0.15s',
   },
-  tableContainer: { flex: 1, overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
-  table: { width: '100%', borderCollapse: 'collapse' },
+  tableContainer: { flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
+  table: { width: '100%', minWidth: 820, borderCollapse: 'collapse' },
   th: { padding: '14px 16px', textAlign: 'center', fontSize: 11, fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '0.08em', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', position: 'sticky', top: 0, zIndex: 10 },
   tr: { borderBottom: '1px solid var(--border)', transition: 'background 0.2s ease' },
   td: { padding: '12px 14px', fontSize: 13, color: 'var(--text-muted)', verticalAlign: 'middle' },
@@ -519,6 +679,14 @@ const wStyles = {
     maxWidth: '180px',
     fontStyle: 'italic',
   },
+  checkbox: { width: 16, height: 16, cursor: 'pointer', accentColor: '#3b82f6', verticalAlign: 'middle' },
+  kebabBtn: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, padding: 0, lineHeight: 1, fontSize: 16, fontWeight: 900, background: 'transparent', border: '1px solid transparent', borderRadius: 6, color: 'var(--text-sub)', cursor: 'pointer', transition: 'all 0.15s' },
+  kebabBtnActive: { background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3b82f6' },
+  bulkBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 10, flexShrink: 0 },
+  bulkInfo: { display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 700, color: 'var(--text)' },
+  bulkCountBadge: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 22, height: 22, padding: '0 6px', background: 'linear-gradient(135deg,#2563eb,#3b82f6)', color: '#fff', borderRadius: 11, fontSize: 12, fontWeight: 800 },
+  bulkClearBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-sub)', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
+  bulkDeleteBtn: { background: 'linear-gradient(135deg, #dc2626, #ef4444)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239,68,68,0.25)', transition: 'all 0.15s' },
   editBtn: { background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 700, transition: 'all 0.15s' },
   delBtn: { background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 6, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 700, transition: 'all 0.15s' },
   empty: { textAlign: 'center', color: '#4a5568', padding: '64px 24px', fontSize: 13 },
@@ -526,20 +694,24 @@ const wStyles = {
 
 const mStyles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' },
-  modal: { background: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 16, width: 450, boxShadow: '0 20px 50px rgba(0,0,0,0.3)', overflow: 'hidden' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)' },
+  modal: { background: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 16, width: 'min(450px, 94vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(0,0,0,0.3)', overflow: 'hidden' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--bg-header)', flexShrink: 0 },
   title: { fontSize: 16, fontWeight: 900, color: 'var(--text)', letterSpacing: '-0.01em' },
   closeBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 20, cursor: 'pointer' },
-  body: { padding: '20px 24px 24px' },
+  body: { padding: '20px 24px 24px', overflowY: 'auto' },
   label: { fontSize: 11, fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '0.08em', marginBottom: 4 },
   input: { background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', transition: 'all 0.15s' },
   error: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: '#ef4444', fontSize: 11, marginBottom: 12 },
   cancelBtn: { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-sub)', borderRadius: 8, padding: '8px 18px', fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' },
   saveBtn: { background: 'linear-gradient(135deg,#2563eb,#3b82f6)', border: 'none', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
+  dangerBanner: { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', color: '#ef4444', fontSize: 12, fontWeight: 600, lineHeight: 1.5, marginBottom: 14 },
+  bulkList: { maxHeight: 180, overflowY: 'auto', marginBottom: 20, border: '1px solid var(--border)', borderRadius: 8 },
+  bulkListItem: { padding: '8px 12px', fontSize: 12, color: 'var(--text-sub)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' },
+  bulkListUrl: { color: 'var(--text-muted)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 }
 
 const sStyles = {
-  searchContainer: { position: 'relative', width: 300 },
+  searchContainer: { position: 'relative', width: 300, maxWidth: '100%' },
   searchIcon: { position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, opacity: 0.5 },
   searchInput: { 
     width: '100%', padding: '9px 36px 9px 32px', borderRadius: 8, 

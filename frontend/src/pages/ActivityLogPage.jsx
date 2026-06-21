@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react'
 import Badge from '../components/common/Badge'
 import { useTheme } from '../store/theme'
 
-const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', DEGRADED: '#f97316', CRITICAL: '#ef4444', OFFLINE: '#dc2626', SERVER_DOWN: '#dc2626', WEB_DOWN: '#f97316', DNS_ERROR: '#8b5cf6', SSL_INVALID: '#ec4899', SLOW: '#eab308' }
+const SC = { ONLINE: '#10b981', WARNING: '#f59e0b', CRITICAL: '#ef4444', OFFLINE: '#dc2626', SERVER_DOWN: '#dc2626', WEB_DOWN: '#f97316', DNS_ERROR: '#8b5cf6', SSL_INVALID: '#ec4899', SLOW: '#eab308' }
 const LOCALE_MAP = { id: 'id-ID', en: 'en-US', zh: 'zh-CN', ja: 'ja-JP', ru: 'ru-RU' }
 // SB removed in favor of common Badge
 const FILTERS = ['ALL', 'ONLINE', 'CRITICAL', 'OFFLINE']
@@ -39,8 +39,8 @@ export default function ActivityLogPage({ events }) {
         {/* Table */}
         {!events || events.length === 0 ? <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 13 }}>{t.noEventsFound}</div> : (
             <>
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead><tr>{[t.colService, t.colTransition, t.colNewStatus, t.colTime].map(h => <th key={h} style={{ textAlign: 'left', padding: '14px 18px', fontSize: 13, color: 'var(--text-sub)', letterSpacing: '0.1em', borderBottom: '1px solid rgba(99,102,241,0.1)', fontWeight: 800, background: 'var(--bg-card)', position: 'sticky', top: 0 }}>{h}</th>)}</tr></thead>
                   <tbody>
                     {paged.map((ev, i) => (

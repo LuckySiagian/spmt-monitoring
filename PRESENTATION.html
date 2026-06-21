@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Draf Slide Presentasi Magang - SPMT Monitoring</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+        h1 {
+            font-size: 26pt;
+            color: #1e3a8a;
+            border-bottom: 3px solid #1e3a8a;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            font-size: 14pt;
+            color: #555555;
+            text-align: center;
+            margin-top: -5px;
+            margin-bottom: 40px;
+            font-style: italic;
+        }
+        .slide {
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 35px;
+            background-color: #f8fafc;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        .slide-header {
+            font-size: 18pt;
+            color: #1e40af;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .slide-content {
+            font-size: 12pt;
+            margin-bottom: 20px;
+        }
+        .notes {
+            background-color: #fef08a;
+            border-left: 5px solid #eab308;
+            padding: 15px;
+            font-size: 11pt;
+            margin-top: 15px;
+            border-radius: 0 4px 4px 0;
+        }
+        .notes-title {
+            font-weight: bold;
+            color: #854d0e;
+            margin-bottom: 5px;
+        }
+        .visual-hint {
+            background-color: #dbeafe;
+            border-left: 5px solid #3b82f6;
+            padding: 12px;
+            font-size: 10.5pt;
+            margin-top: 10px;
+            color: #1e40af;
+        }
+        ol, ul {
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>PANDUAN & DRAF SLIDE PRESENTASI</h1>
+    <div class="subtitle">Sistem Pemantauan Jaringan NOC SPMT — Bahan Sidang Pertanggungjawaban Magang & Akademik</div>
+
+    <div style="background-color: #f3f4f6; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin-bottom: 40px;">
+        <h3>💡 Informasi File Tangkapan Layar (Screenshots)</h3>
+        <p>Saya telah men-generate 2 berkas mockup UI kualitas tinggi (tanpa frame mockup laptop) untuk mempercantik slide Anda. Silakan salin gambar tersebut dari direktori berikut di laptop Anda untuk dimasukkan ke slide presentasi:</p>
+        <ul>
+            <li><strong>Gambar 1 (Dashboard Utama & Topologi Star)</strong>:<br>
+                <code>C:\Users\asus2\.gemini\antigravity-ide\brain\f0c60992-cad1-4f89-b12b-d806bf30faa0\dashboard_mockup_1782041287101.png</code>
+            </li>
+            <li><strong>Gambar 2 (Topologi 3D Globe & Incident Feed)</strong>:<br>
+                <code>C:\Users\asus2\.gemini\antigravity-ide\brain\f0c60992-cad1-4f89-b12b-d806bf30faa0\topology_3d_mockup_1782041300472.png</code>
+            </li>
+        </ul>
+    </div>
+
+    <!-- SLIDE 1 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 1: JUDUL PRESENTASI</div>
+        <div class="slide-content">
+            <h2 style="text-align: center; margin-top: 20px; color: #1e3a8a;">Sistem Monitoring Kesehatan Web Service Real-Time Berbasis Go dan React</h2>
+            <p style="text-align: center; font-size: 13pt; font-weight: bold;">Studi Kasus: Infrastruktur Jaringan & Aplikasi PT Pelindo (Persero)</p>
+            <p style="text-align: center; font-size: 11pt; color: #666;">Diajukan oleh: [Nama Anda] - NIM: [NIM Anda]<br>Program Magang Institut Teknologi Del</p>
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Selamat pagi/siang kepada Bapak/Ibu Dosen Pembimbing, Dosen Penguji, serta Mentor Lapangan PT Pelindo. Pada kesempatan kali ini, saya akan mempresentasikan hasil proyek magang saya yang berjudul 'Sistem Monitoring Kesehatan Web Service Real-Time Berbasis Go dan React'. Sistem ini dibangun sebagai solusi untuk memantau kestabilan layanan aplikasi di PT Pelindo secara real-time."
+        </div>
+    </div>
+
+    <!-- SLIDE 2 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 2: LATAR BELAKANG MASALAH</div>
+        <div class="slide-content">
+            <ul>
+                <li><strong>Skala Infrastruktur</strong>: Pelindo mengelola puluhan aplikasi internal dan publik yang krusial bagi operasional pelabuhan.</li>
+                <li><strong>Resiko Down-time</strong>: Terganggunya satu aplikasi pelabuhan berdampak langsung pada pelayanan logistik fisik.</li>
+                <li><strong>Masalah Pemantauan Manual</strong>: Staf IT sulit memantau puluhan URL secara manual sepanjang waktu.</li>
+                <li><strong>Kebutuhan Dashboard Sentral</strong>: Perlunya dasbor terpusat di NOC (Network Operations Center) yang memberikan visualisasi status kesehatan layanan secara real-time tanpa delay.</li>
+            </ul>
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Latar belakang pembuatan sistem ini didorong oleh tantangan di PT Pelindo yang mengelola puluhan aplikasi operasional krusial. Jika salah satu layanan down, dampaknya bisa menghambat logistik pelabuhan. Saat ini, proses pemantauan website masih cenderung manual atau reaktif. Maka dari itu, kami memerlukan dasbor visual terpusat yang bisa mendeteksi kegagalan server sebelum pengguna melaporkannya."
+        </div>
+    </div>
+
+    <!-- SLIDE 3 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 3: SOLUSI YANG DITAWARKAN (SPMT MONITORING)</div>
+        <div class="slide-content">
+            <p><strong>SPMT Monitoring</strong>: Aplikasi pemantau kesehatan web service otomatis.</p>
+            <ul>
+                <li><strong>Deteksi Multi-Protokol</strong>: Mendeteksi tidak hanya HTTP, melainkan DNS resolver, status port TCP, dan ICMP Ping secara berkala.</li>
+                <li><strong>Dasbor NOC Dinamis</strong>: Menyajikan topologi jaringan real-time interaktif (Star, Tree, dan 3D Globe).</li>
+                <li><strong>Notifikasi Cepat</strong>: Mengirim alarm otomatis melalui Email dan Telegram saat terjadi kegagalan sistem.</li>
+                <li><strong>Ringan & Cepat</strong>: Menggunakan backend bahasa Go yang berukuran sangat hemat memori.</li>
+            </ul>
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Solusi yang kami rancang adalah SPMT Monitoring. Aplikasi ini bekerja secara mandiri melakukan pengecekan kesehatan server target menggunakan protokol DNS, Ping, TCP, dan HTTP secara berkala. Semua status disinkronisasikan ke dasbor NOC secara instan, lengkap dengan notifikasi cepat ke Telegram dan Email."
+        </div>
+    </div>
+
+    <!-- SLIDE 4 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 4: ARSITEKTUR TEKNOLOGI</div>
+        <div class="slide-content">
+            <ul>
+                <li><strong>Backend (Go Engine)</strong>:
+                    <ul>
+                        <li>Efisiensi konkurensi dengan Goroutine (Worker Pool Pattern).</li>
+                        <li>WebSocket server untuk broadcast data instan tanpa HTTP polling.</li>
+                    </ul>
+                </li>
+                <li><strong>Frontend (React Client)</strong>:
+                    <ul>
+                        <li>UI dinamis berbasis React 18.</li>
+                        <li>Visualisasi topologi menggunakan HTML5 Canvas performa tinggi.</li>
+                    </ul>
+                </li>
+                <li><strong>Database (PostgreSQL)</strong>:
+                    <ul>
+                        <li>Menyimpan konfigurasi situs, riwayat SLA harian, log insiden, dan audit trail operator.</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Dari segi teknologi, sistem menggunakan arsitektur 3-tier. Di bagian backend kami menggunakan Go karena sangat andal dalam menangani ratusan koneksi secara paralel lewat Goroutine dengan konsumsi memori di bawah 20MB. Frontend dibangun menggunakan React yang terhubung ke server via WebSocket agar data mengalir terus-menerus tanpa perlu memuat ulang halaman."
+        </div>
+    </div>
+
+    <!-- SLIDE 5 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 5: LOGIKA CERDAS SISTEM</div>
+        <div class="slide-content">
+            <ol>
+                <li><strong>Anti-Flapping (Brake Alarm Palsu)</strong>: Kegagalan berjadwal harus terkonfirmasi 3 kali berturut-turut sebelum dinyatakan benar-benar offline, menghindari alert palsu dari fluktuasi jaringan sesaat.</li>
+                <li><strong>Quorum Jaringan Lokal</strong>: Jika pengecekan gagal, backend melakukan validasi internet mandiri ke 3 DNS publik terpisah guna menjamin server lokal tidak sedang hilang koneksi.</li>
+                <li><strong>Refresh Manual Instan</strong>: Tombol refresh di dasbor diprogram memotong masa tunggu anti-flapping dan pengecekan lokal untuk menyajikan status aktual secara instan.</li>
+                <li><strong>Deteksi Bypass WAF/Anti-Bot</strong>: Mampu membedakan pemblokiran otomatis pada bot (HTTP 403/429/503 Cloudflare) dengan website yang memang down secara riil.</li>
+            </ol>
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Salah satu keunggulan sistem ini adalah memiliki kecerdasan dalam mendeteksi kegagalan. Sistem memiliki pelindung alarm palsu lewat anti-flapping dan cek kuorum jaringan server sendiri. Kami juga baru saja menyempurnakan fitur refresh manual. Jika operator mendeteksi isu, tombol refresh akan mengabaikan jeda flapping dan langsung memperbarui status serta last_checked saat itu juga."
+        </div>
+    </div>
+
+    <!-- SLIDE 6 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 6: DEMO DASBOR NOC & VISUALISASI STAR TOPOLOGY</div>
+        <div class="slide-content" style="text-align: center;">
+            <p style="font-weight: bold; color: #2563eb;">[ Masukkan Gambar 1 di Sini ]</p>
+            <p style="font-size: 10pt; color: #666; font-style: italic;">(Dasbor NOC Utama — Menunjukkan status server terpusat dan node website di sekelilingnya)</p>
+        </div>
+        <div class="visual-hint">
+            💡 <strong>Saran Visual:</strong> Sisipkan gambar file <code>dashboard_mockup_1782041287101.png</code> ke slide ini. Tunjukkan node berwarna hijau (online), kuning (warning), dan merah (offline/critical) yang terhubung ke server.
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Dapat dilihat pada layar presentasi, ini adalah tampilan Dasbor Utama. Kami menggunakan visualisasi topologi bertipe Star di mana server monitoring utama menjadi pusatnya. Node-node yang mengelilinginya melambangkan layanan web yang dipantau. Indikator warna memudahkan operator mengenali status layanan secara instan."
+        </div>
+    </div>
+
+    <!-- SLIDE 7 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 7: INTERAKTIF 3D GLOBE & INCIDENT FEED</div>
+        <div class="slide-content" style="text-align: center;">
+            <p style="font-weight: bold; color: #2563eb;">[ Masukkan Gambar 2 di Sini ]</p>
+            <p style="font-size: 10pt; color: #666; font-style: italic;">(Dasbor 3D Globe — Menyajikan peta status interaktif tiga dimensi untuk pusat komando NOC)</p>
+        </div>
+        <div class="visual-hint">
+            💡 <strong>Saran Visual:</strong> Sisipkan gambar file <code>topology_3d_mockup_1782041300472.png</code> ke slide ini. Tunjukkan visual globe 3D serta daftar log insiden aktif di bagian panel dasbor.
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Sistem juga mendukung mode topologi 3D Globe interaktif yang cocok ditempatkan pada layar monitor besar di ruangan NOC. Di sebelah kanan dasbor terdapat log insiden aktif, sehingga operator dapat langsung memantau durasi downtime dan menugaskan staf IT untuk menangani masalah tersebut."
+        </div>
+    </div>
+
+    <!-- SLIDE 8 -->
+    <div class="slide">
+        <div class="slide-header">SLIDE 8: KESIMPULAN & KONTRIBUSI MAGANG</div>
+        <div class="slide-content">
+            <ul>
+                <li><strong>Ketersediaan Layanan</strong>: Sistem berhasil memonitor ketersediaan aplikasi internal Pelindo secara otomatis dan real-time.</li>
+                <li><strong>Efisiensi NOC</strong>: Mengurangi waktu respon deteksi down-time dari yang sebelumnya berbasis komplain pengguna menjadi deteksi instan oleh sistem.</li>
+                <li><strong>Hemat Resource</strong>: Desain backend Go dan visualisasi Canvas meminimalkan kebutuhan server fisik berspesifikasi tinggi di kantor.</li>
+                <li><strong>Dokumentasi Siap Pakai</strong>: Kode sumber sistem telah dilengkapi dokumentasi teknis operasional lengkap untuk serah terima ke perusahaan.</li>
+            </ul>
+        </div>
+        <div class="notes">
+            <div class="notes-title">🗣️ Narasi Pembicara (Apa yang Anda ucapkan):</div>
+            "Sebagai kesimpulan, sistem monitoring ini memberikan kontribusi nyata dalam membantu tim NOC memantau web service Pelindo secara otomatis. Aplikasi ini berjalan sangat ringan, responsif, dan siap dideploy ke server produksi. Sekian presentasi dari saya, saya persilakan kepada Bapak/Ibu Dosen dan Mentor untuk memberikan tanggapan atau pertanyaan. Terima kasih."
+        </div>
+    </div>
+
+</body>
+</html>

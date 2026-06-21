@@ -35,9 +35,11 @@ export function AuthProvider({ children }) {
   const isSuperAdmin = user?.role === 'superadmin'
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
   const isViewer = user?.role === 'viewer'
+  // Superadmin and Admin Pelindo can manage users (approve/reject, promote/demote).
+  const canManageUsers = user?.role === 'superadmin' || user?.role === 'adminpelindo'
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, isSuperAdmin, isAdmin, isViewer }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isSuperAdmin, isAdmin, isViewer, canManageUsers }}>
       {children}
     </AuthContext.Provider>
   )
